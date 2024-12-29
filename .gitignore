@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+pyvenv.cfg
+
+
+temp/
+/bin
+/include
+/lib64
+/lib
+/share

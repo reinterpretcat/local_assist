@@ -1,0 +1,21 @@
+{
+    "bg": "#2b2b2b",
+    "fg": "#ffffff",
+    "input_bg": "#3e3e3e",
+    "input_fg": "#ffffff",
+    "button_bg": "#5a9f7b",
+    "button_fg": "#ffffff",
+    "list_bg": "#3e3e3e",
+    "list_fg": "#ffffff",
+    "chat_bg": "#2b2b2b",
+    "chat_fg": "#ffffff",
+    "system": {
+        "color_prefix": "red"
+    },
+    "ai": {
+        "color_prefix": "green"
+    },
+    "user": {
+        "color_prefix": "blue"
+    }
+}
