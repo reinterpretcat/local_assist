@@ -466,10 +466,12 @@ class ChatGPTUI:
             print_system_message("No audio captured. Press record to try again.")
 
 
-
     def handle_command(self, command):
         if command == "/clear":
             # Clear all messages from the chat window
-            self.chat_display.delete("1.0", tk.END)
+            self.chat_display.config(state=tk.NORMAL)
+            self.chat_display.delete(1.0, tk.END)  # Remove all text
+            self.chat_display.config(state=tk.DISABLED)
+            self.chat_history = []  # Reset the history
         else:
-            self.append_system_message(f"System: Unknown command '{command}")
+            self.append_system_message(f"Unknown command '{command}")
