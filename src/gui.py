@@ -24,7 +24,7 @@ class ChatGPTUI:
         self.tts_model = tts_model
         
         self.chat_history = []  # To store the conversation history
-        self.chats = {}  # Dictionary to store all chats
+        self.chats = {"Default Chat": []}  # Default chat with empty history
         
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  # Flag to cancel AI response
@@ -132,6 +132,9 @@ class ChatGPTUI:
         self.chat_display.tag_configure(RoleTags.SYSTEM, foreground=self.theme["system"]["color_prefix"], font=("Arial", 14, "bold"))
         self.chat_display.tag_configure("message", foreground="black")
         
+        
+        self.update_chat_list()  # Populate the chat list
+        self.load_chat("Default Chat")  # Automatically load the default chat
 
         # Input area at the bottom (outside main content frame)
         self.input_frame = tk.Frame(self.chat_display_frame, bg=self.theme["bg"], height=50)
@@ -197,6 +200,15 @@ class ChatGPTUI:
         self.user_input.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL)
+        
+    def disable_chat_list(self):
+        """Disable the chat list to prevent switching."""
+        self.chat_list.config(state=tk.DISABLED)
+
+    def enable_chat_list(self):
+        """Enable the chat list after response generation."""
+        self.chat_list.config(state=tk.NORMAL)
+
 
     def update_theme(self):
         """Update the theme for all widgets."""
@@ -214,18 +226,26 @@ class ChatGPTUI:
         if chat_name:
             self.chats[chat_name] = self.chat_history[:]
             self.update_chat_list()
+            
+    def load_chat(self, chat_name):
+        """Load a specific chat into the main chat display."""
+        # Switch to the selected chat's history
+        self.chat_history = self.chats.get(chat_name, [])
+    
+        # Update the chat display
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.delete(1.0, tk.END)  # Clear the current display
+        for message in self.chat_history:
+            self.chat_display.insert(tk.END, f"{message['sender']}: {message['message']}\n")
+        self.chat_display.config(state=tk.DISABLED)
+
 
     def load_selected_chat(self, event):
         """Load the selected chat into the chat display."""
         selection = self.chat_list.curselection()
         if selection:
             selected_chat = self.chat_list.get(selection)
-            self.chat_history = self.chats.get(selected_chat, [])
-            self.chat_display.config(state=tk.NORMAL)
-            self.chat_display.delete(1.0, tk.END)
-            for message in self.chat_history:
-                self.chat_display.insert(tk.END, f"{message['sender']}: {message['message']}\n")
-            self.chat_display.config(state=tk.DISABLED)
+            self.load_chat(selected_chat)
 
     def load_chat_from_file(self):
         """Load a chat history from a file."""
@@ -240,7 +260,7 @@ class ChatGPTUI:
     def update_chat_list(self):
         """Update the chat list display."""
         self.chat_list.delete(0, tk.END)
-        for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest
+        for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest first
             self.chat_list.insert(tk.END, chat_name)
 
     
@@ -259,8 +279,9 @@ class ChatGPTUI:
 
         self.append_to_chat("You", user_message, RoleTags.USER)
         
-        # Disable input while AI response is being generated
+         # Disable input and chat list while AI response is generating
         self.disable_input()
+        self.disable_chat_list()
         
         # Change Send button to Cancel button
         self.cancel_response = False  # Reset cancel flag
@@ -280,6 +301,7 @@ class ChatGPTUI:
             self.cancel_response = False  # Reset the flag
             self.append_to_chat_partial("AI", "(canceled)", RoleTags.AI)
             self.enable_input()  # Re-enable input
+            self.enable_chat_list()  # Re-enable chat list
             self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button text
             return
         
@@ -294,6 +316,7 @@ class ChatGPTUI:
             # self.chat_display.config(state=tk.DISABLED)
             # Re-enable input when AI response is complete
             self.enable_input()
+            self.enable_chat_list()
             self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button text
         
     def generate_ai_response(self, user_message):
@@ -398,8 +421,16 @@ class ChatGPTUI:
             self.chat_history = self.chats.get(selected_chat, [])
             self.chat_display.config(state=tk.NORMAL)
             self.chat_display.delete(1.0, tk.END)
+
+            # Reinsert messages with appropriate tags
             for message in self.chat_history:
-                self.chat_display.insert(tk.END, f"{message['sender']}: {message['message']}\n")
+                if message["sender"] == "You":
+                    self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
+                elif message["sender"] == "AI":
+                    self.chat_display.insert(tk.END, "AI: ", RoleTags.AI)
+                self.chat_display.insert(tk.END, f"{message['message']}\n", "message")   
+
+
             self.chat_display.config(state=tk.DISABLED)
 
     def load_chat_from_file(self):
@@ -417,8 +448,6 @@ class ChatGPTUI:
         self.chat_list.delete(0, tk.END)
         for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest
             self.chat_list.insert(tk.END, chat_name)
-
-
 
 
 
