@@ -31,7 +31,25 @@ class Settings(BaseSettings):
 settings = Settings()
 
 default_theme = {
-    
+    "bg": "#f7f7f8",
+    "fg": "#000000",
+    "input_bg": "#e8eaed",
+    "input_fg": "#000000",
+    "button_bg": "#10a37f",
+    "button_fg": "#ffffff",
+    "list_bg": "#ffffff",
+    "list_fg": "#000000",
+    "chat_bg": "#ffffff",
+    "chat_fg": "#000000",
+    "system": {
+        "color_prefix": "red"
+    },
+    "ai": {
+        "color_prefix": "green"
+    },
+    "user": {
+        "color_prefix": "blue"
+    }
 }
 
 default_config = {

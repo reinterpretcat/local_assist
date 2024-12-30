@@ -8,6 +8,7 @@ from typing import Optional
 from .audio import AudioIO
 from .models import STT, TTS
 from .utils import print_system_message
+from .settings import default_theme
 
 
 class RoleTags:
@@ -33,27 +34,7 @@ class ChatGPTUI:
         self.audio_io = AudioIO()
 
         # Default theme (light mode)
-        self.theme = {
-            "bg": "#f7f7f8",
-            "fg": "#000000",
-            "input_bg": "#e8eaed",
-            "input_fg": "#000000",
-            "button_bg": "#10a37f",
-            "button_fg": "#ffffff",
-            "list_bg": "#ffffff",
-            "list_fg": "#000000",
-            "chat_bg": "#ffffff",
-            "chat_fg": "#000000",
-            "system": {
-                "color_prefix": "red"
-            },
-            "ai": {
-                "color_prefix": "green"
-            },
-            "user": {
-                "color_prefix": "blue"
-            }
-        }
+        self.theme = default_theme
 
         # Configure layout
         self.root.geometry("2048x1436") 
