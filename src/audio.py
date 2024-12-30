@@ -116,6 +116,10 @@ class AudioIO:
             pygame.mixer.music.play()
         except Exception as e:
             print_system_message(f"play_wav: {e}", log_level=logging.ERROR)
+      
+    def stop_playing(self):
+        if pygame.mixer.music.get_busy():
+            pygame.mixer.music.stop()
             
     def stop_recording(self):
         self.stop_recording_flag = True

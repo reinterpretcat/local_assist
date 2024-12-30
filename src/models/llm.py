@@ -69,6 +69,8 @@ class LLM(BaseModel):
             An iterator that yields the generated text in chunks.
         """
         self.messages.append({"role": "user", "content": message})
+        
+        #print(self.messages)
 
         assistant_role = None
         generated_content = ""

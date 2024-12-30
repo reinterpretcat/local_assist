@@ -415,9 +415,9 @@ class AIChatUI:
         """Display AI response token by token."""
         if self.cancel_response:
             # Stop the AI response generation
-            self.cancel_response = False  # Reset the flag
+            self.audio_io.stop_playing()
             self.append_to_chat_partial("AI", "(canceled)", RoleTags.AI)
-            self.finish_ai_response()
+            self.check_tts_completion()
             return
         
         try:
@@ -425,10 +425,11 @@ class AIChatUI:
             self.append_to_chat_partial("AI", token, RoleTags.AI)
             self.root.after(100, self.display_ai_response, generator)  # Schedule next token
         except StopIteration:
-            if self.active_tts_threads > 0:
-                self.root.after(100, self.check_tts_completion)
-            else:
-                self.finish_ai_response()
+            self.check_tts_completion()
+            # if self.active_tts_threads > 0:
+            #     self.root.after(100, self.check_tts_completion)
+            # else:
+            #     self.finish_ai_response()
         
     def generate_ai_response(self, user_message):
         """Generate token-by-token AI response."""
@@ -437,10 +438,7 @@ class AIChatUI:
         min_chunk_size = 10
         splitters = [".", ",", "?", ":", ";"]
         
-        for token in self.llm_model.forward(user_message):
-            if self.cancel_response:
-                return
-            
+        for token in self.llm_model.forward(user_message):           
             buffer.append(token)
             if token == "\n" or (len(buffer) >= min_chunk_size and token in splitters):
                 chunk = "".join(buffer).strip()
@@ -471,34 +469,36 @@ class AIChatUI:
     def speak_text(self, text):
         """Speak the given text using TTS."""
         with self.tts_lock:  # Ensure only one thread uses the TTS engine at a time
-            if self.cancel_response:
-                return
-
             self.active_tts_threads += 1 
             try:
                 synthesis = self.tts_model.forward(text)
             except Exception as e:
                 print_system_message(f"tts_model.forward exception: {e}", color=Fore.RED, log_level=logging.ERROR)
-                self.active_tts_threads -= 1
-                return
-
 
             if synthesis:
                 while self.audio_io.is_busy():
                     time.sleep(0.25)
-                
-                if self.cancel_response:
-                    self.active_tts_threads -= 1 
-                    return
 
                 self.tts_model.model.synthesizer.save_wav(wav=synthesis, path=self.tts_model.file_path)
+                
+                if self.cancel_response:
+                    self.active_tts_threads -= 1
+                    return
+                
                 self.audio_io.play_wav(self.tts_model.file_path)
+                while self.audio_io.is_busy():
+                    if self.cancel_response:  # Stop playback if canceled
+                        print("try to break")
+                        self.audio_io.stop_playing()  # Stop the audio playback immediately
+                        break
+                    time.sleep(0.1)  # Poll for cancellation
                 
             self.active_tts_threads -= 1
     
     def check_tts_completion(self):
         """Check if all TTS threads are complete and finalize response."""
         if self.active_tts_threads == 0:
+            self.cancel_response = False  # Reset the flag
             self.finish_ai_response()
         else:
             self.root.after(100, self.check_tts_completion)
