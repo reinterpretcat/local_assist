@@ -426,10 +426,6 @@ class AIChatUI:
             self.root.after(100, self.display_ai_response, generator)  # Schedule next token
         except StopIteration:
             self.check_tts_completion()
-            # if self.active_tts_threads > 0:
-            #     self.root.after(100, self.check_tts_completion)
-            # else:
-            #     self.finish_ai_response()
         
     def generate_ai_response(self, user_message):
         """Generate token-by-token AI response."""
@@ -477,7 +473,7 @@ class AIChatUI:
 
             if synthesis:
                 while self.audio_io.is_busy():
-                    time.sleep(0.25)
+                    time.sleep(0.2)
 
                 self.tts_model.model.synthesizer.save_wav(wav=synthesis, path=self.tts_model.file_path)
                 
@@ -488,10 +484,9 @@ class AIChatUI:
                 self.audio_io.play_wav(self.tts_model.file_path)
                 while self.audio_io.is_busy():
                     if self.cancel_response:  # Stop playback if canceled
-                        print("try to break")
                         self.audio_io.stop_playing()  # Stop the audio playback immediately
                         break
-                    time.sleep(0.1)  # Poll for cancellation
+                    time.sleep(0.2)  # Poll for cancellation
                 
             self.active_tts_threads -= 1
     
@@ -545,7 +540,7 @@ class AIChatUI:
 
         # Update chat history
         if self.chat_history and self.chat_history[-1]["sender"] == sender:
-            self.chat_history[-1]["message"] += f" {token}"
+            self.chat_history[-1]["message"] += f"{token}"
     
     def append_system_message(self, message):
         before = self.chat_display.index(tk.END)
