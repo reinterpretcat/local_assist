@@ -422,13 +422,14 @@ class AIChatUI:
             self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button text
         
     def generate_ai_response(self, user_message):
-        import time
-        """Simulate token-by-token AI response generation."""
-        response = f"Simulated response to: {user_message}. Here is a detailed explanation token by token."
-        for token in response.split():
+        """Generate token-by-token AI response."""
+        for token in self.llm_model.forward(user_message):
+            if self.cancel_response:
+                return
+
             yield token
-            time.sleep(0.1)  # Simulate delay for each token
-          
+
+       
     def cancel_ai_response(self):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
@@ -464,7 +465,7 @@ class AIChatUI:
             self.chat_history.append({"sender": sender, "message": ""})  # Add new history entry
 
         # Append the token to the display
-        self.chat_display.insert(tk.END, f"{token} ")
+        self.chat_display.insert(tk.END, f"{token}")
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)  # Auto-scroll
 
