@@ -1,10 +1,7 @@
-
 from colorama import Fore
-import re
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
 import json
-from datetime import datetime
 import threading
 import logging
 from typing import Optional
@@ -21,11 +18,21 @@ class RoleTags:
     USER = "user_prefix"
     ASSISTANT = "ai_prefix"
     CONTENT = "content_prefix"
-    
+
 class RoleNames:
     TOOL = "tool"
     USER = "user"
     ASSISTANT = "assistant"
+
+    @staticmethod
+    def to_tag(role) -> RoleTags:
+        if role == RoleNames.ASSISTANT:
+            return RoleTags.ASSISTANT
+        elif role == RoleNames.USER:
+            return RoleTags.USER
+
+        return RoleTags.TOOL
+
 
 class AIChatUI:
     def __init__(self, root, llm_model: LLM, stt_model: Optional[STT], tts_model: Optional[TTS]):
@@ -136,7 +143,7 @@ class AIChatUI:
         # configure different colors for user and ai
         self.chat_display.tag_configure(RoleTags.USER, foreground=self.theme["user"]["color_prefix"], font=("Arial", 14, "bold"))
         self.chat_display.tag_configure(RoleTags.ASSISTANT, foreground=self.theme["assistant"]["color_prefix"], font=("Arial", 14, "bold"))
-        self.chat_display.tag_configure(RoleNames.TOOL, foreground=self.theme["tool"]["color_prefix"], font=("Arial", 14, "bold"))
+        self.chat_display.tag_configure(RoleTags.TOOL, foreground=self.theme["tool"]["color_prefix"], font=("Arial", 14, "bold"))
         self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
         
         
@@ -402,7 +409,7 @@ class AIChatUI:
     def handle_user_message(self, user_message):
         """Handle user message and initiate AI reply."""
     
-        self.append_to_chat(RoleNames.USER, user_message, RoleTags.USER)
+        self.append_to_chat(RoleNames.USER, user_message)
         
          # Disable input and chat list while AI response is generating
         self.disable_input()
@@ -422,13 +429,13 @@ class AIChatUI:
         if self.cancel_response:
             # Stop the AI response generation
             self.audio_io.stop_playing()
-            self.append_to_chat_partial(RoleNames.ASSISTANT, "(canceled)", RoleTags.ASSISTANT)
+            self.append_to_chat_partial(RoleNames.ASSISTANT, "(canceled)")
             self.check_tts_completion()
             return
         
         try:
             token = next(generator)
-            self.append_to_chat_partial(RoleNames.ASSISTANT, token, RoleTags.ASSISTANT)
+            self.append_to_chat_partial(RoleNames.ASSISTANT, token)
             self.root.after(100, self.display_ai_response, generator)  # Schedule next token
         except StopIteration:
             self.check_tts_completion()
@@ -471,9 +478,6 @@ class AIChatUI:
     def speak_text(self, text):
         """Speak the given text using TTS."""
 
-        # Remove star as tts tries to pronounce it
-        text = re.sub(r"[*]", "", text)
-
         with self.tts_lock:  # Ensure only one thread uses the TTS engine at a time
             self.active_tts_threads += 1 
             try:
@@ -484,7 +488,7 @@ class AIChatUI:
 
             if synthesis:
                 while self.audio_io.is_busy():
-                    time.sleep(0.2)
+                    time.sleep(0.25)
 
                 self.tts_model.model.synthesizer.save_wav(wav=synthesis, path=self.tts_model.file_path)
                 
@@ -497,7 +501,7 @@ class AIChatUI:
                     if self.cancel_response:  # Stop playback if canceled
                         self.audio_io.stop_playing()  # Stop the audio playback immediately
                         break
-                    time.sleep(0.2)  # Poll for cancellation
+                    time.sleep(0.25)  # Poll for cancellation
                 
             self.active_tts_threads -= 1
     
@@ -516,16 +520,15 @@ class AIChatUI:
         self.send_button.config(text="Send", command=self.handle_user_input)  
 
 
-    def append_to_chat(self, role, content, tag):
+    def append_to_chat(self, role, content):
         """Append a message to the chat display."""
         self.chat_display.config(state=tk.NORMAL)
         
         # Add a newline if the last character is not already a newline
         if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
             self.chat_display.insert(tk.END, "\n")
-        
-        
-        self.chat_display.insert(tk.END, f"{role}: ", tag)
+
+        self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
         self.chat_display.insert(tk.END, f"{content}\n", RoleTags.CONTENT)
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)
@@ -533,7 +536,7 @@ class AIChatUI:
         self.chat_history.append({"role": role, "content": content})
 
 
-    def append_to_chat_partial(self, role, token, tag):
+    def append_to_chat_partial(self, role, token):
         """Append a token to the chat display for partial updates."""
         self.chat_display.config(state=tk.NORMAL)
 
@@ -541,7 +544,7 @@ class AIChatUI:
         if role == RoleNames.ASSISTANT and (not self.chat_history or self.chat_history[-1]["role"] != RoleNames.ASSISTANT):
             if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
                self.chat_display.insert(tk.END, "\n")
-            self.chat_display.insert(tk.END, f"{role}: ", tag)
+            self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
             self.chat_history.append({"role": role, "content": ""})  # Add new history entry
 
         # Append the token to the display
@@ -555,7 +558,7 @@ class AIChatUI:
     
     def append_system_message(self, message):
         before = self.chat_display.index(tk.END)
-        self.append_to_chat(RoleNames.TOOL, message, RoleNames.TOOL)
+        self.append_to_chat(RoleNames.TOOL, message)
         after = self.chat_display.index(tk.END)
         self.listening_message_index = (before, after)
         
@@ -611,7 +614,7 @@ class AIChatUI:
             elif message["role"] == RoleNames.ASSISTANT:
                 self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
             elif message["role"] == RoleNames.TOOL:
-                self.chat_display.insert(tk.END, "Info: ", RoleNames.TOOL)
+                self.chat_display.insert(tk.END, "Tool: ", RoleTags.TOOL)
 
             self.chat_display.insert(tk.END, f"{message['content']}\n", RoleTags.CONTENT)   
 
