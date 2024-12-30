@@ -59,6 +59,17 @@ class LLM(BaseModel):
             # Add a new system message if none exists
             self.messages.insert(0, {"role": "system", "content": prompt})
 
+    def load_history(self, history: List[Dict[str, str]]):
+        """Load conversation history into the LLM class."""
+        # Ensure the system prompt is preserved if present
+        system_prompt = next((msg["content"] for msg in history if msg["role"] == "system"), None)
+        if system_prompt:
+            self.system_prompt = system_prompt
+        
+        print(f"set messages to {history}")
+        # Replace the current messages with the new history
+        self.messages = list(history)
+
 
     def exists(self) -> bool:
         """

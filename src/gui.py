@@ -18,7 +18,13 @@ from .settings import default_theme
 class RoleTags:
     SYSTEM = "system_prefix"
     USER = "user_prefix"
-    AI = "ai_prefix"
+    ASSISTANT = "ai_prefix"
+    CONTENT = "content_prefix"
+    
+class RoleNames:
+    SYSTEM = "system"
+    USER = "user"
+    ASSISTANT = "assistant"
 
 class AIChatUI:
     def __init__(self, root, llm_model: LLM, stt_model: Optional[STT], tts_model: Optional[TTS]):
@@ -128,9 +134,9 @@ class AIChatUI:
         
         # configure different colors for user and ai
         self.chat_display.tag_configure(RoleTags.USER, foreground=self.theme["user"]["color_prefix"], font=("Arial", 14, "bold"))
-        self.chat_display.tag_configure(RoleTags.AI, foreground=self.theme["ai"]["color_prefix"], font=("Arial", 14, "bold"))
+        self.chat_display.tag_configure(RoleTags.ASSISTANT, foreground=self.theme["assistant"]["color_prefix"], font=("Arial", 14, "bold"))
         self.chat_display.tag_configure(RoleTags.SYSTEM, foreground=self.theme["system"]["color_prefix"], font=("Arial", 14, "bold"))
-        self.chat_display.tag_configure("message", foreground="black")
+        self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
         
         
         self.update_chat_list()  # Populate the chat list
@@ -223,7 +229,7 @@ class AIChatUI:
         # Use new_chat logic to ensure consistency
         chat_name = "Default Chat"
         if chat_name not in self.chats:
-            self.chats[chat_name] = [{"sender": "System", "message": "Welcome to your default chat!"}]
+            self.chats[chat_name] = [{"role": RoleNames.SYSTEM, "content": "Welcome to your default chat!"}]
             self.chat_history = self.chats[chat_name]
             self.update_chat_list()
             self.load_chat(chat_name)
@@ -234,6 +240,7 @@ class AIChatUI:
         """Load a specific chat into the main chat display."""
         # Switch to the selected chat's history
         self.chat_history = self.chats.get(chat_name, [])
+        self.llm_model.load_history(self.chat_history)  # Sync history with LLM
     
         # Update the chat display
         self.chat_display.config(state=tk.NORMAL)
@@ -241,13 +248,6 @@ class AIChatUI:
 
         self.reinsert_messages_from_history()
 
-
-    def load_selected_chat(self, event):
-        """Load the selected chat into the chat display."""
-        selection = self.chat_list.curselection()
-        if selection:
-            selected_chat = self.chat_list.get(selection)
-            self.load_chat(selected_chat)
             
     def save_chats_to_file(self):
         """Save all chats to a file."""
@@ -396,7 +396,7 @@ class AIChatUI:
     def handle_user_message(self, user_message):
         """Handle user message and initiate AI reply."""
     
-        self.append_to_chat("You", user_message, RoleTags.USER)
+        self.append_to_chat(RoleNames.USER, user_message, RoleTags.USER)
         
          # Disable input and chat list while AI response is generating
         self.disable_input()
@@ -416,13 +416,13 @@ class AIChatUI:
         if self.cancel_response:
             # Stop the AI response generation
             self.audio_io.stop_playing()
-            self.append_to_chat_partial("AI", "(canceled)", RoleTags.AI)
+            self.append_to_chat_partial(RoleNames.ASSISTANT, "(canceled)", RoleTags.ASSISTANT)
             self.check_tts_completion()
             return
         
         try:
             token = next(generator)
-            self.append_to_chat_partial("AI", token, RoleTags.AI)
+            self.append_to_chat_partial(RoleNames.ASSISTANT, token, RoleTags.ASSISTANT)
             self.root.after(100, self.display_ai_response, generator)  # Schedule next token
         except StopIteration:
             self.check_tts_completion()
@@ -505,7 +505,7 @@ class AIChatUI:
         self.send_button.config(text="Send", command=self.handle_user_input)  
 
 
-    def append_to_chat(self, sender, message, tag):
+    def append_to_chat(self, role, content, tag):
         """Append a message to the chat display."""
         self.chat_display.config(state=tk.NORMAL)
         
@@ -514,24 +514,24 @@ class AIChatUI:
             self.chat_display.insert(tk.END, "\n")
         
         
-        self.chat_display.insert(tk.END, f"{sender}: ", tag)
-        self.chat_display.insert(tk.END, f"{message}\n", "message")
+        self.chat_display.insert(tk.END, f"{role}: ", tag)
+        self.chat_display.insert(tk.END, f"{content}\n", RoleTags.CONTENT)
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)
 
-        self.chat_history.append({"sender": sender, "message": message})
+        self.chat_history.append({"role": role, "content": content})
 
 
-    def append_to_chat_partial(self, sender, token, tag):
+    def append_to_chat_partial(self, role, token, tag):
         """Append a token to the chat display for partial updates."""
         self.chat_display.config(state=tk.NORMAL)
 
-        # If it's the first token for AI, add the sender label
-        if sender == "AI" and (not self.chat_history or self.chat_history[-1]["sender"] != "AI"):
+        # If it's the first token for assistant, add the role label
+        if role == RoleNames.ASSISTANT and (not self.chat_history or self.chat_history[-1]["role"] != RoleNames.ASSISTANT):
             if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
                self.chat_display.insert(tk.END, "\n")
-            self.chat_display.insert(tk.END, f"{sender}: ", tag)
-            self.chat_history.append({"sender": sender, "message": ""})  # Add new history entry
+            self.chat_display.insert(tk.END, f"{role}: ", tag)
+            self.chat_history.append({"role": role, "content": ""})  # Add new history entry
 
         # Append the token to the display
         self.chat_display.insert(tk.END, f"{token}")
@@ -539,12 +539,12 @@ class AIChatUI:
         self.chat_display.see(tk.END)  # Auto-scroll
 
         # Update chat history
-        if self.chat_history and self.chat_history[-1]["sender"] == sender:
-            self.chat_history[-1]["message"] += f"{token}"
+        if self.chat_history and self.chat_history[-1]["role"] == role:
+            self.chat_history[-1]["content"] += f"{token}"
     
     def append_system_message(self, message):
         before = self.chat_display.index(tk.END)
-        self.append_to_chat("System", message, RoleTags.SYSTEM)
+        self.append_to_chat(RoleNames.SYSTEM, message, RoleTags.SYSTEM)
         after = self.chat_display.index(tk.END)
         self.listening_message_index = (before, after)
         
@@ -563,7 +563,7 @@ class AIChatUI:
         """Start a new chat."""
         chat_name = simpledialog.askstring("New Chat", "Enter a name for this chat:")
         if chat_name and chat_name not in self.chats:
-            self.chats[chat_name] = [{"sender": "System", "message": "Welcome to your new chat!"}]
+            self.chats[chat_name] = [{"role": RoleNames.SYSTEM, "content": "Welcome to your new chat!"}]
             self.chat_history = self.chats[chat_name]
              
             # Update chat list and focus on the new chat
@@ -574,19 +574,6 @@ class AIChatUI:
             self.user_input.focus_set()
         elif chat_name in self.chats:
             messagebox.showerror("New Chat", "A chat with this name already exists.")
-
-
-    def save_chat(self):
-        """Save the current chat history."""
-        chat_name = simpledialog.askstring("Save Chat", "Enter a name to save this chat:", initialvalue="Chat " + datetime.now().strftime("%Y-%m-%d %H:%M"))
-        
-        self.chat_history = [
-           message for message in self.chat_history if message["message"] != "Listening for your voice..."
-        ]
-        
-        if chat_name:
-            self.chats[chat_name] = self.chat_history[:]
-            self.update_chat_list()
 
     def load_selected_chat(self, event):
         """Load the selected chat into the chat display."""
@@ -599,16 +586,6 @@ class AIChatUI:
 
             self.reinsert_messages_from_history()
 
-    def load_chat_from_file(self):
-        """Load a chat history from a file."""
-        file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
-        if file_path:
-            with open(file_path, "r", encoding="utf-8") as file:
-                loaded_chat = json.load(file)
-            chat_name = f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            self.chats[chat_name] = loaded_chat
-            self.update_chat_list()
-
     def update_chat_list(self):
         """Update the chat list display."""
         self.chat_list.delete(0, tk.END)
@@ -618,14 +595,14 @@ class AIChatUI:
     def reinsert_messages_from_history(self):
         """Reinsert messages with appropriate tags."""
         for message in self.chat_history:
-            if message["sender"] == "You":
+            if message["role"] == RoleNames.USER:
                 self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
-            elif message["sender"] == "AI":
-                self.chat_display.insert(tk.END, "AI: ", RoleTags.AI)
-            elif message["sender"] == "System":
+            elif message["role"] == RoleNames.ASSISTANT:
+                self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
+            elif message["role"] == RoleNames.SYSTEM:
                 self.chat_display.insert(tk.END, "System: ", RoleTags.SYSTEM)
 
-            self.chat_display.insert(tk.END, f"{message['message']}\n", "message")   
+            self.chat_display.insert(tk.END, f"{message['content']}\n", RoleTags.CONTENT)   
 
 
         self.chat_display.config(state=tk.DISABLED)

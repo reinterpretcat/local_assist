@@ -44,7 +44,7 @@ default_theme = {
     "system": {
         "color_prefix": "red"
     },
-    "ai": {
+    "assistant": {
         "color_prefix": "green"
     },
     "user": {
