@@ -1,9 +1,13 @@
+
+from colorama import Fore
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
 import json
 from datetime import datetime
 import threading
+import logging
 from typing import Optional
+import time
 
 from .audio import AudioIO
 from .models import LLM, STT, TTS
@@ -24,6 +28,8 @@ class AIChatUI:
         self.llm_model = llm_model
         self.stt_model = stt_model
         self.tts_model = tts_model
+        self.tts_lock = threading.Lock()
+        self.active_tts_threads = 0 # # Counter for active TTS chunks
         
         self.chats = {}
         self.chat_history = []  # To store the conversation history
@@ -403,9 +409,7 @@ class AIChatUI:
             # Stop the AI response generation
             self.cancel_response = False  # Reset the flag
             self.append_to_chat_partial("AI", "(canceled)", RoleTags.AI)
-            self.enable_input()  # Re-enable input
-            self.enable_chat_list()  # Re-enable chat list
-            self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button text
+            self.finish_ai_response()
             return
         
         try:
@@ -413,25 +417,91 @@ class AIChatUI:
             self.append_to_chat_partial("AI", token, RoleTags.AI)
             self.root.after(100, self.display_ai_response, generator)  # Schedule next token
         except StopIteration:
-            self.enable_input()
-            self.enable_chat_list()
-            self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button text
+            if self.active_tts_threads > 0:
+                self.root.after(100, self.check_tts_completion)
+            else:
+                self.finish_ai_response()
         
     def generate_ai_response(self, user_message):
         """Generate token-by-token AI response."""
+        
+        buffer = []
+        min_chunk_size = 10
+        splitters = [".", ",", "?", ":", ";"]
+        
         for token in self.llm_model.forward(user_message):
             if self.cancel_response:
                 return
+            
+            buffer.append(token)
+            if token == "\n" or (len(buffer) >= min_chunk_size and token in splitters):
+                chunk = "".join(buffer).strip()
+                buffer.clear()
+                
+                if chunk:
+                    # Queue this chunk for TTS processing
+                    threading.Thread(target=self.speak_text, args=(chunk,), daemon=True).start()
 
             yield token
+        
+        # Process any remaining text in buffer    
+        if buffer:
+            chunk = "".join(buffer).strip()
+
+            if chunk:
+                threading.Thread(target=self.speak_text, args=(chunk,), daemon=True).start()
+         
+        self.check_tts_completion()
 
        
     def cancel_ai_response(self):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
         self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button to Send
-        self.enable_input()  # Re-enable inputs  
+        self.enable_input()  # Re-enable inputs
+        
+    def speak_text(self, text):
+        """Speak the given text using TTS."""
+        with self.tts_lock:  # Ensure only one thread uses the TTS engine at a time
+            if self.cancel_response:
+                return
+
+            self.active_tts_threads += 1 
+            try:
+                synthesis = self.tts_model.forward(text)
+            except Exception as e:
+                print_system_message(f"tts_model.forward exception: {e}", color=Fore.RED, log_level=logging.ERROR)
+                self.active_tts_threads -= 1
+                return
+
+
+            if synthesis:
+                while self.audio_io.is_busy():
+                    time.sleep(0.25)
+                
+                if self.cancel_response:
+                    self.active_tts_threads -= 1 
+                    return
+
+                self.tts_model.model.synthesizer.save_wav(wav=synthesis, path=self.tts_model.file_path)
+                self.audio_io.play_wav(self.tts_model.file_path)
+                
+            self.active_tts_threads -= 1
     
+    def check_tts_completion(self):
+        """Check if all TTS threads are complete and finalize response."""
+        if self.active_tts_threads == 0:
+            self.finish_ai_response()
+        else:
+            self.root.after(100, self.check_tts_completion)
+
+    def finish_ai_response(self):
+        """Finalize the AI response display after generation and TTS complete."""
+        self.enable_input()
+        self.enable_chat_list()
+        self.send_button.config(text="Send", command=self.handle_user_input)  
+
+
     def append_to_chat(self, sender, message, tag):
         """Append a message to the chat display."""
         self.chat_display.config(state=tk.NORMAL)

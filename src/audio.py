@@ -84,6 +84,12 @@ class AudioIO:
         if self.pa:
             self.pa.terminate()
 
+
+    @staticmethod
+    def is_busy() -> bool:
+        """Returns true if music mixer is busy"""
+        return pygame.mixer.music.get_busy()
+
     @staticmethod
     def is_silent(data: np.ndarray) -> bool:
         """
