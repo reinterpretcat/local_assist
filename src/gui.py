@@ -6,7 +6,7 @@ import threading
 from typing import Optional
 
 from .audio import AudioIO
-from .models import STT, TTS
+from .models import LLM, STT, TTS
 from .utils import print_system_message
 from .settings import default_theme
 
@@ -17,10 +17,11 @@ class RoleTags:
     AI = "ai_prefix"
 
 class AIChatUI:
-    def __init__(self, root, stt_model: Optional[STT], tts_model: Optional[TTS]):
+    def __init__(self, root, llm_model: LLM, stt_model: Optional[STT], tts_model: Optional[TTS]):
         self.root = root
         self.root.title("AI Assistance Chat")
         
+        self.llm_model = llm_model
         self.stt_model = stt_model
         self.tts_model = tts_model
         
