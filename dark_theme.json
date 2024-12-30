@@ -9,7 +9,7 @@
     "list_fg": "#ffffff",
     "chat_bg": "#2b2b2b",
     "chat_fg": "#ffffff",
-    "system": {
+    "tool": {
         "color_prefix": "red"
     },
     "assistant": {

@@ -41,7 +41,7 @@ default_theme = {
     "list_fg": "#000000",
     "chat_bg": "#ffffff",
     "chat_fg": "#000000",
-    "system": {
+    "tool": {
         "color_prefix": "red"
     },
     "assistant": {

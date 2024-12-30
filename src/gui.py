@@ -16,13 +16,13 @@ from .settings import default_theme
 
 
 class RoleTags:
-    SYSTEM = "system_prefix"
+    TOOL = "tool_prefix"
     USER = "user_prefix"
     ASSISTANT = "ai_prefix"
     CONTENT = "content_prefix"
     
 class RoleNames:
-    SYSTEM = "system"
+    TOOL = "tool"
     USER = "user"
     ASSISTANT = "assistant"
 
@@ -135,7 +135,7 @@ class AIChatUI:
         # configure different colors for user and ai
         self.chat_display.tag_configure(RoleTags.USER, foreground=self.theme["user"]["color_prefix"], font=("Arial", 14, "bold"))
         self.chat_display.tag_configure(RoleTags.ASSISTANT, foreground=self.theme["assistant"]["color_prefix"], font=("Arial", 14, "bold"))
-        self.chat_display.tag_configure(RoleTags.SYSTEM, foreground=self.theme["system"]["color_prefix"], font=("Arial", 14, "bold"))
+        self.chat_display.tag_configure(RoleNames.TOOL, foreground=self.theme["tool"]["color_prefix"], font=("Arial", 14, "bold"))
         self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
         
         
@@ -229,7 +229,7 @@ class AIChatUI:
         # Use new_chat logic to ensure consistency
         chat_name = "Default Chat"
         if chat_name not in self.chats:
-            self.chats[chat_name] = [{"role": RoleNames.SYSTEM, "content": "Welcome to your default chat!"}]
+            self.chats[chat_name] = [{"role": RoleNames.TOOL, "content": "Welcome to your default chat!"}]
             self.chat_history = self.chats[chat_name]
             self.update_chat_list()
             self.load_chat(chat_name)
@@ -240,7 +240,6 @@ class AIChatUI:
         """Load a specific chat into the main chat display."""
         # Switch to the selected chat's history
         self.chat_history = self.chats.get(chat_name, [])
-        self.llm_model.load_history(self.chat_history)  # Sync history with LLM
     
         # Update the chat display
         self.chat_display.config(state=tk.NORMAL)
@@ -544,7 +543,7 @@ class AIChatUI:
     
     def append_system_message(self, message):
         before = self.chat_display.index(tk.END)
-        self.append_to_chat(RoleNames.SYSTEM, message, RoleTags.SYSTEM)
+        self.append_to_chat(RoleNames.TOOL, message, RoleNames.TOOL)
         after = self.chat_display.index(tk.END)
         self.listening_message_index = (before, after)
         
@@ -563,7 +562,7 @@ class AIChatUI:
         """Start a new chat."""
         chat_name = simpledialog.askstring("New Chat", "Enter a name for this chat:")
         if chat_name and chat_name not in self.chats:
-            self.chats[chat_name] = [{"role": RoleNames.SYSTEM, "content": "Welcome to your new chat!"}]
+            self.chats[chat_name] = [{"role": RoleNames.TOOL, "content": "Welcome to your new chat!"}]
             self.chat_history = self.chats[chat_name]
              
             # Update chat list and focus on the new chat
@@ -599,13 +598,14 @@ class AIChatUI:
                 self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
             elif message["role"] == RoleNames.ASSISTANT:
                 self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
-            elif message["role"] == RoleNames.SYSTEM:
-                self.chat_display.insert(tk.END, "System: ", RoleTags.SYSTEM)
+            elif message["role"] == RoleNames.TOOL:
+                self.chat_display.insert(tk.END, "Info: ", RoleNames.TOOL)
 
             self.chat_display.insert(tk.END, f"{message['content']}\n", RoleTags.CONTENT)   
 
 
         self.chat_display.config(state=tk.DISABLED)
+        self.llm_model.load_history(self.chat_history)
 
 
     def record_voice(self):

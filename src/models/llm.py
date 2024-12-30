@@ -2,11 +2,12 @@
 This module provides a class for interacting with a Language Model (LLM) using the ollama library.
 """
 
+import logging
 from typing import Dict, Iterator, List, Optional
-
 from ollama import Client, ResponseError
 
 from .common import BaseModel
+from ..utils import print_system_message
 
 
 class LLM(BaseModel):
@@ -65,10 +66,14 @@ class LLM(BaseModel):
         system_prompt = next((msg["content"] for msg in history if msg["role"] == "system"), None)
         if system_prompt:
             self.system_prompt = system_prompt
+            
+        print(f"PROMT: {self.system_prompt=}")
         
-        print(f"set messages to {history}")
-        # Replace the current messages with the new history
-        self.messages = list(history)
+        self.messages = [msg for msg in history if msg.get("role") != "tool"]
+
+        self.set_system_prompt(self.system_prompt)
+        
+        print_system_message(f"Set LLM messages to {self.messages}", log_level=logging.INFO)
 
 
     def exists(self) -> bool:
