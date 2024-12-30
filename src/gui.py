@@ -81,22 +81,26 @@ class AIChatUI:
         self.chat_list.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         self.chat_list.bind("<<ListboxSelect>>", self.load_selected_chat)
 
-        tk.Button(
+        self.new_chat_button = tk.Button(
             self.left_panel,
             text="New Chat",
             command=self.new_chat,
             bg=self.theme["button_bg"],
             fg=self.theme["button_fg"],
             font=("Arial", 12),
-        ).pack(padx=10, pady=5, fill=tk.X)
-        tk.Button(
+        )
+        self.new_chat_button.pack(padx=10, pady=5, fill=tk.X)
+
+        self.rename_button = tk.Button(
             self.left_panel,
             text="Rename",
             command=self.edit_chat_name,
             bg=self.theme["button_bg"],
             fg=self.theme["button_fg"],
             font=("Arial", 12),
-        ).pack(padx=10, pady=5, fill=tk.X)
+        )
+        self.rename_button.pack(padx=10, pady=5, fill=tk.X)
+
         self.delete_button = tk.Button(
             self.left_panel,
             text="Delete Chat",
@@ -104,8 +108,9 @@ class AIChatUI:
             bg="red",
             fg=self.theme["button_fg"],
             font=("Arial", 12),
-        ).pack(padx=10, pady=5, fill=tk.X)
-        
+        )
+        self.delete_button.pack(padx=10, pady=5, fill=tk.X)
+
 
         # Right panel for chat display
         self.chat_display_frame = tk.Frame(self.main_frame, bg=self.theme["chat_bg"])
@@ -208,6 +213,9 @@ class AIChatUI:
         self.input_frame.configure(bg=self.theme["bg"])
         self.user_input.configure(bg=self.theme["input_bg"], fg=self.theme["input_fg"])
         self.send_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
+        self.delete_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
+        self.rename_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
+        self.new_chat_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
 
 
     def create_default_chat(self):
