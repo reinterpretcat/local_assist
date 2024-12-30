@@ -63,11 +63,15 @@ class ChatGPTUI:
         # Top menu for options
         self.menu_bar = tk.Menu(root)
         root.config(menu=self.menu_bar)
+        
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        file_menu.add_command(label="Save Chat", command=self.save_chat)
-        file_menu.add_command(label="Load Chat", command=self.load_chat_from_file)
-        file_menu.add_command(label="Change Theme", command=self.load_theme)
-        self.menu_bar.add_cascade(label="Options", menu=file_menu)
+        file_menu.add_command(label="Save Chats", command=self.save_chats_to_file)
+        file_menu.add_command(label="Load Chats", command=self.load_chats_from_file)
+        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        
+        settings_menu = tk.Menu(self.menu_bar, tearoff=0)
+        settings_menu.add_command(label="Change Theme", command=self.load_theme)
+        self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
         # Main layout with two frames (main content + input frame)
         self.main_frame = tk.Frame(root, bg=self.theme["bg"])
@@ -97,20 +101,28 @@ class ChatGPTUI:
         ).pack(padx=10, pady=5, fill=tk.X)
         tk.Button(
             self.left_panel,
-            text="Save Chat",
-            command=self.save_chat,
+            text="Rename",
+            command=self.edit_chat_name,
             bg=self.theme["button_bg"],
             fg=self.theme["button_fg"],
             font=("Arial", 12),
         ).pack(padx=10, pady=5, fill=tk.X)
-        tk.Button(
-            self.left_panel,
-            text="Load Chat",
-            command=self.load_chat_from_file,
-            bg=self.theme["button_bg"],
-            fg=self.theme["button_fg"],
-            font=("Arial", 12),
-        ).pack(padx=10, pady=5, fill=tk.X)
+        # tk.Button(
+        #     self.left_panel,
+        #     text="Save Chat",
+        #     command=self.save_chat,
+        #     bg=self.theme["button_bg"],
+        #     fg=self.theme["button_fg"],
+        #     font=("Arial", 12),
+        # ).pack(padx=10, pady=5, fill=tk.X)
+        # tk.Button(
+        #     self.left_panel,
+        #     text="Load Chat",
+        #     command=self.load_chat_from_file,
+        #     bg=self.theme["button_bg"],
+        #     fg=self.theme["button_fg"],
+        #     font=("Arial", 12),
+        # ).pack(padx=10, pady=5, fill=tk.X)
 
         # Right panel for chat display
         self.chat_display_frame = tk.Frame(self.main_frame, bg=self.theme["chat_bg"])
@@ -201,14 +213,6 @@ class ChatGPTUI:
         self.send_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL)
         
-    def disable_chat_list(self):
-        """Disable the chat list to prevent switching."""
-        self.chat_list.config(state=tk.DISABLED)
-
-    def enable_chat_list(self):
-        """Enable the chat list after response generation."""
-        self.chat_list.config(state=tk.NORMAL)
-
 
     def update_theme(self):
         """Update the theme for all widgets."""
@@ -220,12 +224,39 @@ class ChatGPTUI:
         self.user_input.configure(bg=self.theme["input_bg"], fg=self.theme["input_fg"])
         self.send_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
 
-    def save_chat(self):
-        """Save the current chat history."""
-        chat_name = simpledialog.askstring("Save Chat", "Enter a name to save this chat:", initialvalue="Chat " + datetime.now().strftime("%Y-%m-%d %H:%M"))
-        if chat_name:
-            self.chats[chat_name] = self.chat_history[:]
-            self.update_chat_list()
+    # def save_chat(self):
+    #     """Save the current chat history."""
+    #     chat_name = simpledialog.askstring("Save Chat", "Enter a name to save this chat:", initialvalue="Chat " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+    #     if chat_name:
+    #         self.chats[chat_name] = self.chat_history[:]
+    #         self.update_chat_list()
+            
+    # def save_chat(self):
+    #     """Save the current chat history to the selected chat."""
+    #     # Ensure a chat is selected
+    #     selection = self.chat_list.curselection()
+    #     if not selection:
+    #         messagebox.showwarning("Save Chat", "Please select a chat to save.")
+    #         return
+
+    #     # Get the selected chat name
+    #     selected_index = selection[0]
+    #     chat_name = self.chat_list.get(selected_index)
+
+    #     # Save the current chat history to the selected chat
+    #     self.chats[chat_name] = self.chat_history[:]
+
+    #     # Update the chat list to reflect any changes (e.g., sorting)
+    #     self.update_chat_list()
+
+    #     # Restore selection after updating the list
+    #     new_index = list(self.chats.keys()).index(chat_name)
+    #     self.chat_list.selection_set(new_index)
+
+    #     messagebox.showinfo("Save Chat", f"Chat '{chat_name}' has been saved.")
+
+            
+            
             
     def load_chat(self, chat_name):
         """Load a specific chat into the main chat display."""
@@ -246,16 +277,56 @@ class ChatGPTUI:
         if selection:
             selected_chat = self.chat_list.get(selection)
             self.load_chat(selected_chat)
-
-    def load_chat_from_file(self):
-        """Load a chat history from a file."""
-        file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
+            
+    def save_chats_to_file(self):
+        """Save all chats to a file."""
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("JSON Files", "*.json")]
+        )
         if file_path:
-            with open(file_path, "r", encoding="utf-8") as file:
-                loaded_chat = json.load(file)
-            chat_name = f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            self.chats[chat_name] = loaded_chat
-            self.update_chat_list()
+            try:
+                with open(file_path, "w", encoding="utf-8") as file:
+                    json.dump(self.chats, file, ensure_ascii=False, indent=4)
+                messagebox.showinfo("Save Chats", "All chats have been saved successfully.")
+            except Exception as e:
+                messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
+
+    def load_chats_from_file(self):
+        """Load chats from a file."""
+        file_path = filedialog.askopenfilename(
+            filetypes=[("JSON Files", "*.json")]
+        )
+        if file_path:
+            try:
+                with open(file_path, "r", encoding="utf-8") as file:
+                    loaded_chats = json.load(file)
+
+                # Replace existing chats with the loaded ones
+                self.chats = loaded_chats
+
+                # Refresh chat list
+                self.update_chat_list()
+
+                # Load the first chat automatically
+                if self.chats:
+                    first_chat = next(iter(self.chats))
+                    self.load_chat(first_chat)
+
+                messagebox.showinfo("Load Chats", "Chats have been loaded successfully.")
+            except Exception as e:
+                messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
+
+
+    # def load_chat_from_file(self):
+    #     """Load a chat history from a file."""
+    #     file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
+    #     if file_path:
+    #         with open(file_path, "r", encoding="utf-8") as file:
+    #             loaded_chat = json.load(file)
+    #         chat_name = f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    #         self.chats[chat_name] = loaded_chat
+    #         self.update_chat_list()
 
     def update_chat_list(self):
         """Update the chat list display."""
@@ -263,7 +334,46 @@ class ChatGPTUI:
         for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest first
             self.chat_list.insert(tk.END, chat_name)
 
-    
+    def edit_chat_name(self):
+        """Edit the selected chat's name."""
+        selection = self.chat_list.curselection()
+        if not selection:
+            messagebox.showwarning("Edit Name", "Please select a chat to rename.")
+            return
+
+        # Get the currently selected chat name
+        selected_index = selection[0]
+        old_name = self.chat_list.get(selected_index)
+
+        # Prompt for a new name
+        new_name = simpledialog.askstring("Edit Chat Name", f"Rename '{old_name}' to:", initialvalue=old_name)
+        if not new_name:
+            return  # User canceled or entered nothing
+
+        # Validate new name
+        if new_name in self.chat_list.get(0, tk.END):
+            messagebox.showerror("Edit Name", "A chat with this name already exists.")
+            return
+
+        # Update the chat name in the list
+        self.chat_list.delete(selected_index)
+        self.chat_list.insert(selected_index, new_name)
+        self.chat_list.selection_set(selected_index)  # Keep the selection on the renamed chat
+
+        # Update the underlying chat data
+        self.chats[new_name] = self.chats.pop(old_name)
+
+    def disable_chat_list(self):
+        """Disable the chat list to prevent switching."""
+        self.chat_list.config(state=tk.DISABLED)
+
+    def enable_chat_list(self):
+        """Enable the chat list after response generation."""
+        self.chat_list.config(state=tk.NORMAL)
+
+
+
+
     def handle_user_input(self, event=None):
         """Handle user input and simulate AI reply."""
         user_message = self.user_input.get().strip()
