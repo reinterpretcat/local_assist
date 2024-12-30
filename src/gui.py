@@ -364,21 +364,24 @@ class AIChatUI:
         self.chat_list.config(state=tk.NORMAL)
 
 
-
-
-    def handle_user_input(self, event=None):
-        """Handle user input and simulate AI reply."""
+    def handle_user_input(self, event = None):
+        """Handle user input from input."""
         user_message = self.user_input.get().strip()
         if not user_message:
             return
-        
         self.user_input.delete(0, tk.END)
-        
+
         # Handle special commands
         if user_message.startswith("/"):
             self.handle_command(user_message)
             return
 
+        self.handle_user_message(user_message)
+
+
+    def handle_user_message(self, user_message):
+        """Handle user message and initiate AI reply."""
+    
         self.append_to_chat("You", user_message, RoleTags.USER)
         
          # Disable input and chat list while AI response is generating
@@ -396,8 +399,6 @@ class AIChatUI:
 
     def display_ai_response(self, generator):
         """Display AI response token by token."""
-        
-        
         if self.cancel_response:
             # Stop the AI response generation
             self.cancel_response = False  # Reset the flag
@@ -412,11 +413,6 @@ class AIChatUI:
             self.append_to_chat_partial("AI", token, RoleTags.AI)
             self.root.after(100, self.display_ai_response, generator)  # Schedule next token
         except StopIteration:
-            # Add a newline when the response is complete
-            # self.chat_display.config(state=tk.NORMAL)
-            # self.chat_display.insert(tk.END, "\n")
-            # self.chat_display.config(state=tk.DISABLED)
-            # Re-enable input when AI response is complete
             self.enable_input()
             self.enable_chat_list()
             self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button text
@@ -591,7 +587,7 @@ class AIChatUI:
 
                 transcription = self.stt_model.forward(audio_data)
 
-                self.append_to_chat("You", transcription, RoleTags.USER)
+                self.handle_user_message(transcription)
 
         except Exception as e:
             print_system_message(f"Recording error: {e}")
