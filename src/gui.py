@@ -70,8 +70,10 @@ class ChatGPTUI:
         self.menu_bar.add_cascade(label="File", menu=file_menu)
         
         settings_menu = tk.Menu(self.menu_bar, tearoff=0)
+        settings_menu.add_command(label="LLM Settings", command=self.open_llm_settings_dialog)
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
+
 
         # Main layout with two frames (main content + input frame)
         self.main_frame = tk.Frame(root, bg=self.theme["bg"])
@@ -116,23 +118,6 @@ class ChatGPTUI:
             font=("Arial", 12),
         ).pack(padx=10, pady=5, fill=tk.X)
         
-        
-        # tk.Button(
-        #     self.left_panel,
-        #     text="Save Chat",
-        #     command=self.save_chat,
-        #     bg=self.theme["button_bg"],
-        #     fg=self.theme["button_fg"],
-        #     font=("Arial", 12),
-        # ).pack(padx=10, pady=5, fill=tk.X)
-        # tk.Button(
-        #     self.left_panel,
-        #     text="Load Chat",
-        #     command=self.load_chat_from_file,
-        #     bg=self.theme["button_bg"],
-        #     fg=self.theme["button_fg"],
-        #     font=("Arial", 12),
-        # ).pack(padx=10, pady=5, fill=tk.X)
 
         # Right panel for chat display
         self.chat_display_frame = tk.Frame(self.main_frame, bg=self.theme["chat_bg"])
@@ -236,39 +221,7 @@ class ChatGPTUI:
         self.user_input.configure(bg=self.theme["input_bg"], fg=self.theme["input_fg"])
         self.send_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
 
-    # def save_chat(self):
-    #     """Save the current chat history."""
-    #     chat_name = simpledialog.askstring("Save Chat", "Enter a name to save this chat:", initialvalue="Chat " + datetime.now().strftime("%Y-%m-%d %H:%M"))
-    #     if chat_name:
-    #         self.chats[chat_name] = self.chat_history[:]
-    #         self.update_chat_list()
-            
-    # def save_chat(self):
-    #     """Save the current chat history to the selected chat."""
-    #     # Ensure a chat is selected
-    #     selection = self.chat_list.curselection()
-    #     if not selection:
-    #         messagebox.showwarning("Save Chat", "Please select a chat to save.")
-    #         return
 
-    #     # Get the selected chat name
-    #     selected_index = selection[0]
-    #     chat_name = self.chat_list.get(selected_index)
-
-    #     # Save the current chat history to the selected chat
-    #     self.chats[chat_name] = self.chat_history[:]
-
-    #     # Update the chat list to reflect any changes (e.g., sorting)
-    #     self.update_chat_list()
-
-    #     # Restore selection after updating the list
-    #     new_index = list(self.chats.keys()).index(chat_name)
-    #     self.chat_list.selection_set(new_index)
-
-    #     messagebox.showinfo("Save Chat", f"Chat '{chat_name}' has been saved.")
-
-            
-    
     def create_default_chat(self):
         """Create the default chat on app startup."""
         # Use new_chat logic to ensure consistency
@@ -340,15 +293,6 @@ class ChatGPTUI:
                 messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
 
 
-    # def load_chat_from_file(self):
-    #     """Load a chat history from a file."""
-    #     file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
-    #     if file_path:
-    #         with open(file_path, "r", encoding="utf-8") as file:
-    #             loaded_chat = json.load(file)
-    #         chat_name = f"Chat {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    #         self.chats[chat_name] = loaded_chat
-    #         self.update_chat_list()
 
     def update_chat_list(self):
         """Update the chat list display."""
@@ -562,9 +506,6 @@ class ChatGPTUI:
             self.listening_message_index = None
 
 
-    # def get_ai_response(self, user_message):
-    #     """Simulate an AI response (placeholder for real integration)."""
-    #     return f"Simulated response to: {user_message}"
 
     def new_chat(self):
         """Start a new chat."""
@@ -691,3 +632,38 @@ class ChatGPTUI:
             self.chat_history = []  # Reset the history
         else:
             self.append_system_message(f"Unknown command '{command}")
+
+ 
+    def open_llm_settings_dialog(self):
+        """Open a dialog to set LLM settings."""
+        settings_window = tk.Toplevel(self.root)
+        settings_window.title("LLM Settings")
+        
+        current_prompt = "TODO: current prompt"
+        current_temperature = 0.7
+
+        # System Prompt
+        tk.Label(settings_window, text="System Prompt:", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
+        prompt_text = tk.Text(settings_window, wrap=tk.WORD, height=8, width=50)
+        prompt_text.insert(tk.END, current_prompt)
+        prompt_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
+
+        # Temperature
+        tk.Label(settings_window, text="Temperature (0.0 - 1.0):", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
+        temperature_var = tk.DoubleVar(value=current_temperature)
+        temperature_entry = tk.Entry(settings_window, textvariable=temperature_var)
+        temperature_entry.pack(padx=10, pady=5, anchor="w")
+        
+        # Save Button
+        def save_settings():
+            self.system_prompt = prompt_text.get(1.0, tk.END).strip()  # Save system prompt
+            self.temperature = temperature_var.get()  # Save temperature
+            messagebox.showinfo("LLM Settings", "Settings updated successfully!")
+            settings_window.destroy()
+
+        tk.Button(settings_window, text="Save", command=save_settings, bg="green", fg="white").pack(pady=10)
+
+        # Center the settings window
+        settings_window.transient(self.root)
+        settings_window.grab_set()
+        settings_window.wait_window(settings_window)

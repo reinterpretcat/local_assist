@@ -30,6 +30,9 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+default_theme = {
+    
+}
 
 default_config = {
     "llm": {"disable_chat_history": False, "model": "llama3.1:8b-instruct-q4_0"},
