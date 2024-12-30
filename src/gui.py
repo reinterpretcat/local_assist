@@ -107,6 +107,16 @@ class ChatGPTUI:
             fg=self.theme["button_fg"],
             font=("Arial", 12),
         ).pack(padx=10, pady=5, fill=tk.X)
+        self.delete_button = tk.Button(
+            self.left_panel,
+            text="Delete Chat",
+            command=self.delete_active_chat,
+            bg="red",
+            fg=self.theme["button_fg"],
+            font=("Arial", 12),
+        ).pack(padx=10, pady=5, fill=tk.X)
+        
+        
         # tk.Button(
         #     self.left_panel,
         #     text="Save Chat",
@@ -362,6 +372,38 @@ class ChatGPTUI:
 
         # Update the underlying chat data
         self.chats[new_name] = self.chats.pop(old_name)
+        
+    def delete_active_chat(self):
+        """Delete the currently selected chat after confirmation."""
+        selection = self.chat_list.curselection()
+        if not selection:
+            messagebox.showwarning("Delete Chat", "Please select a chat to delete.")
+            return
+
+        # Get the selected chat name
+        selected_index = selection[0]
+        chat_name = self.chat_list.get(selected_index)
+
+        # Confirmation dialog
+        confirm = messagebox.askyesno("Delete Chat", f"Are you sure you want to delete '{chat_name}'?")
+        if confirm:
+            # Delete the chat from the dictionary
+            del self.chats[chat_name]
+
+            # Refresh chat list
+            self.update_chat_list()
+
+            # Automatically select and load the first available chat
+            if self.chats:
+                first_chat = next(iter(self.chats))
+                self.load_chat(first_chat)
+            else:
+                # Clear the display if no chats are left
+                self.chat_display.config(state=tk.NORMAL)
+                self.chat_display.delete(1.0, tk.END)
+                self.chat_display.config(state=tk.DISABLED)
+                self.chat_history = []
+
 
     def disable_chat_list(self):
         """Disable the chat list to prevent switching."""
