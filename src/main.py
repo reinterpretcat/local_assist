@@ -14,7 +14,7 @@ from json import loads
 
 from . import __version__
 #from .audio import AudioIO
-from .gui import ChatGPTUI
+from .gui import AIChatUI
 from .models import STT, TTS
 from .settings import default_config
 from .utils import ThreadSafeState, deep_merge_dicts, logger, print_system_message
@@ -38,7 +38,7 @@ async def _real_main(**kwargs):
     
     
     root = tk.Tk()    
-    app = ChatGPTUI(root, stt_model, tts_model)
+    app = AIChatUI(root, stt_model, tts_model)
     
     root.mainloop()
     

@@ -16,7 +16,7 @@ class RoleTags:
     USER = "user_prefix"
     AI = "ai_prefix"
 
-class ChatGPTUI:
+class AIChatUI:
     def __init__(self, root, stt_model: Optional[STT], tts_model: Optional[TTS]):
         self.root = root
         self.root.title("AI Assistance Chat")
