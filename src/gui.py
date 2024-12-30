@@ -23,8 +23,8 @@ class ChatGPTUI:
         self.stt_model = stt_model
         self.tts_model = tts_model
         
+        self.chats = {}
         self.chat_history = []  # To store the conversation history
-        self.chats = {"Default Chat": []}  # Default chat with empty history
         
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  # Flag to cancel AI response
@@ -194,6 +194,8 @@ class ChatGPTUI:
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
         
+        self.create_default_chat()
+        
 
     def apply_theme(self):
         """Apply the current theme to the root window."""
@@ -266,7 +268,18 @@ class ChatGPTUI:
     #     messagebox.showinfo("Save Chat", f"Chat '{chat_name}' has been saved.")
 
             
-            
+    
+    def create_default_chat(self):
+        """Create the default chat on app startup."""
+        # Use new_chat logic to ensure consistency
+        chat_name = "Default Chat"
+        if chat_name not in self.chats:
+            self.chats[chat_name] = [{"sender": "System", "message": "Welcome to your default chat!"}]
+            self.chat_history = self.chats[chat_name]
+            self.update_chat_list()
+            self.load_chat(chat_name)
+            self.focus_on_chat(chat_name)
+            self.user_input.focus_set()        
             
     def load_chat(self, chat_name):
         """Load a specific chat into the main chat display."""
@@ -276,9 +289,8 @@ class ChatGPTUI:
         # Update the chat display
         self.chat_display.config(state=tk.NORMAL)
         self.chat_display.delete(1.0, tk.END)  # Clear the current display
-        for message in self.chat_history:
-            self.chat_display.insert(tk.END, f"{message['sender']}: {message['message']}\n")
-        self.chat_display.config(state=tk.DISABLED)
+
+        self.reinsert_messages_from_history()
 
 
     def load_selected_chat(self, event):
@@ -390,20 +402,32 @@ class ChatGPTUI:
             # Delete the chat from the dictionary
             del self.chats[chat_name]
 
-            # Refresh chat list
-            self.update_chat_list()
-
-            # Automatically select and load the first available chat
-            if self.chats:
+            # Check if any chats remain
+            if not self.chats:
+                # Automatically create a new default chat
+                default_chat_name = "Default Chat"
+                self.chats[default_chat_name] = []
+                self.chat_history = []
+                self.update_chat_list()
+                self.load_chat(default_chat_name)
+                self.focus_on_chat(default_chat_name)
+                #messagebox.showinfo("Delete Chat", "The last chat was deleted. A new 'Default Chat' has been created.")
+            else:
+                # Refresh chat list and load the first available chat
+                self.update_chat_list()
                 first_chat = next(iter(self.chats))
                 self.load_chat(first_chat)
-            else:
-                # Clear the display if no chats are left
-                self.chat_display.config(state=tk.NORMAL)
-                self.chat_display.delete(1.0, tk.END)
-                self.chat_display.config(state=tk.DISABLED)
-                self.chat_history = []
+                self.focus_on_chat(first_chat)
 
+    def focus_on_chat(self, chat_name):
+        """Set focus on the given chat in the chat list."""
+        try:
+            chat_index = list(self.chats.keys()).index(chat_name)
+            self.chat_list.selection_clear(0, tk.END)  # Clear any existing selection
+            self.chat_list.selection_set(chat_index)  # Select the desired chat
+            self.chat_list.see(chat_index)  # Ensure the chat is visible
+        except ValueError:
+            pass  # Chat name not found (unlikely case)
 
     def disable_chat_list(self):
         """Disable the chat list to prevent switching."""
@@ -545,13 +569,19 @@ class ChatGPTUI:
     def new_chat(self):
         """Start a new chat."""
         chat_name = simpledialog.askstring("New Chat", "Enter a name for this chat:")
-        if chat_name:
-            self.chat_history = []
-            self.chat_display.config(state=tk.NORMAL)
-            self.chat_display.delete(1.0, tk.END)
-            self.chat_display.config(state=tk.DISABLED)
-            self.chats[chat_name] = []
+        if chat_name and chat_name not in self.chats:
+            self.chats[chat_name] = [{"sender": "System", "message": "Welcome to your new chat!"}]
+            self.chat_history = self.chats[chat_name]
+             
+            # Update chat list and focus on the new chat
             self.update_chat_list()
+            self.load_chat(chat_name)
+            self.focus_on_chat(chat_name)
+            # Focus on the input field
+            self.user_input.focus_set()
+        elif chat_name in self.chats:
+            messagebox.showerror("New Chat", "A chat with this name already exists.")
+
 
     def save_chat(self):
         """Save the current chat history."""
@@ -574,16 +604,7 @@ class ChatGPTUI:
             self.chat_display.config(state=tk.NORMAL)
             self.chat_display.delete(1.0, tk.END)
 
-            # Reinsert messages with appropriate tags
-            for message in self.chat_history:
-                if message["sender"] == "You":
-                    self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
-                elif message["sender"] == "AI":
-                    self.chat_display.insert(tk.END, "AI: ", RoleTags.AI)
-                self.chat_display.insert(tk.END, f"{message['message']}\n", "message")   
-
-
-            self.chat_display.config(state=tk.DISABLED)
+            self.reinsert_messages_from_history()
 
     def load_chat_from_file(self):
         """Load a chat history from a file."""
@@ -601,6 +622,20 @@ class ChatGPTUI:
         for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest
             self.chat_list.insert(tk.END, chat_name)
 
+    def reinsert_messages_from_history(self):
+        """Reinsert messages with appropriate tags."""
+        for message in self.chat_history:
+            if message["sender"] == "You":
+                self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
+            elif message["sender"] == "AI":
+                self.chat_display.insert(tk.END, "AI: ", RoleTags.AI)
+            elif message["sender"] == "System":
+                self.chat_display.insert(tk.END, "System: ", RoleTags.SYSTEM)
+
+            self.chat_display.insert(tk.END, f"{message['message']}\n", "message")   
+
+
+        self.chat_display.config(state=tk.DISABLED)
 
 
     def record_voice(self):
