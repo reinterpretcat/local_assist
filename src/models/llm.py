@@ -35,13 +35,30 @@ class LLM(BaseModel):
 
         self.system_prompt: Optional[str] = kwargs.get("system_prompt")
 
-        print(f"Used system prompt: '{self.system_prompt}'")
         if self.system_prompt:
             self.messages.append({"role": "system", "content": self.system_prompt})
 
         self.is_chat_history_disabled: Optional[bool] = kwargs.get("disable_chat_history")
 
         self.model = Client()
+
+    def set_system_prompt(self, prompt: str):
+        """Update the system prompt and ensure it is reflected in messages."""
+        self.system_prompt = prompt
+
+        # Check if a system message already exists in the messages list
+        system_message_index = next(
+            (index for index, msg in enumerate(self.messages) if msg["role"] == "system"),
+            None
+        )
+
+        if system_message_index is not None:
+            # Update the existing system message
+            self.messages[system_message_index]["content"] = prompt
+        else:
+            # Add a new system message if none exists
+            self.messages.insert(0, {"role": "system", "content": prompt})
+
 
     def exists(self) -> bool:
         """
@@ -70,8 +87,6 @@ class LLM(BaseModel):
         """
         self.messages.append({"role": "user", "content": message})
         
-        #print(self.messages)
-
         assistant_role = None
         generated_content = ""
 

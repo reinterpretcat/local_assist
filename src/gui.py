@@ -696,7 +696,7 @@ class AIChatUI:
         settings_window = tk.Toplevel(self.root)
         settings_window.title("LLM Settings")
         
-        current_prompt = "TODO: current prompt"
+        current_prompt = self.llm_model.system_prompt
         current_temperature = 0.7
 
         # System Prompt
@@ -713,9 +713,8 @@ class AIChatUI:
         
         # Save Button
         def save_settings():
-            self.system_prompt = prompt_text.get(1.0, tk.END).strip()  # Save system prompt
-            self.temperature = temperature_var.get()  # Save temperature
-            messagebox.showinfo("LLM Settings", "Settings updated successfully!")
+            self.llm_model.set_system_prompt(prompt_text.get(1.0, tk.END).strip())  # Save system prompt
+            _temperature = temperature_var.get()  # Save temperature
             settings_window.destroy()
 
         tk.Button(settings_window, text="Save", command=save_settings, bg="green", fg="white").pack(pady=10)
