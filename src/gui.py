@@ -1,5 +1,6 @@
 
 from colorama import Fore
+import re
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
 import json
@@ -371,10 +372,16 @@ class AIChatUI:
     def disable_chat_list(self):
         """Disable the chat list to prevent switching."""
         self.chat_list.config(state=tk.DISABLED)
+        self.new_chat_button.config(state=tk.DISABLED)
+        self.rename_button.config(state=tk.DISABLED)
+        self.delete_button.config(state=tk.DISABLED)
 
     def enable_chat_list(self):
         """Enable the chat list after response generation."""
         self.chat_list.config(state=tk.NORMAL)
+        self.new_chat_button.config(state=tk.NORMAL)
+        self.rename_button.config(state=tk.NORMAL)
+        self.delete_button.config(state=tk.NORMAL)
 
 
     def handle_user_input(self, event = None):
@@ -463,10 +470,15 @@ class AIChatUI:
         
     def speak_text(self, text):
         """Speak the given text using TTS."""
+
+        # Remove star as tts tries to pronounce it
+        text = re.sub(r"[*]", "", text)
+
         with self.tts_lock:  # Ensure only one thread uses the TTS engine at a time
             self.active_tts_threads += 1 
             try:
                 synthesis = self.tts_model.forward(text)
+
             except Exception as e:
                 print_system_message(f"tts_model.forward exception: {e}", color=Fore.RED, log_level=logging.ERROR)
 
