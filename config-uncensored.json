@@ -1,0 +1,18 @@
+{
+    "llm": {
+        "disable_chat_history": false,
+        "model": "dorian2b/vera",
+        "system_prompt": "Du bist meine Assistentin."
+    },
+    "stt": {
+        "device": "cuda",
+        "model": "primeline/distil-whisper-large-v3-german"
+    },
+    "tts": {
+        "device": "cuda",
+        "model": "tts_models/de/thorsten/tacotron2-DDC",
+        "generation_args": {
+            "file_path": "ggg.wav"
+        }
+    }
+}

@@ -403,6 +403,8 @@ class AIChatUI:
             self.handle_command(user_message)
             return
 
+        self.user_input.focus_set()
+
         self.handle_user_message(user_message)
 
 
@@ -625,6 +627,9 @@ class AIChatUI:
 
     def record_voice(self):
         """Toggle recording state and handle recording."""
+
+        self.record_button.focus_set()
+
         if not self.is_recording:
             # Start recording
             self.is_recording = True
@@ -673,7 +678,16 @@ class AIChatUI:
             self.chat_display.config(state=tk.NORMAL)
             self.chat_display.delete(1.0, tk.END)  # Remove all text
             self.chat_display.config(state=tk.DISABLED)
-            self.chat_history = []  # Reset the history
+
+            # Reset the history
+            self.chat_history = []
+            self.llm_model.load_history(self.chat_history)
+            selection = self.chat_list.curselection()
+            if selection:
+                selected_index = selection[0]
+                chat_name = self.chat_list.get(selected_index)
+                self.chats[chat_name] = []
+
         else:
             self.append_system_message(f"Unknown command '{command}")
 

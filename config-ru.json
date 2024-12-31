@@ -1,0 +1,18 @@
+{
+    "llm": {
+        "disable_chat_history": false,
+        "model": "owl/t-lite",
+        "system_prompt": "Ты ассистент."
+    },
+    "stt": {
+        "device": "cuda",
+        "model": "antony66/whisper-large-v3-russian"
+    },
+    "tts": {
+        "device": "cuda",
+        "model": "tts_models/rus/fairseq/vits",
+        "generation_args": {
+            "file_path": "ggg.wav"
+        }
+    }
+}
