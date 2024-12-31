@@ -4,7 +4,7 @@ This module provides a class for interacting with a Language Model (LLM) using t
 
 import logging
 from typing import Dict, Iterator, List, Optional
-from ollama import Client, ResponseError
+from ollama import Client, ResponseError, Options
 
 from .common import BaseModel
 from ..utils import print_system_message
@@ -36,6 +36,9 @@ class LLM(BaseModel):
 
         self.system_prompt: Optional[str] = kwargs.get("system_prompt")
 
+        self.options: Optional[Options] = kwargs.get("options")
+        print(f"{self.options=}")
+
         if self.system_prompt:
             self.messages.append({"role": "system", "content": self.system_prompt})
 
@@ -66,13 +69,11 @@ class LLM(BaseModel):
         system_prompt = next((msg["content"] for msg in history if msg["role"] == "system"), None)
         if system_prompt:
             self.system_prompt = system_prompt
-            
-        print(f"PROMT: {self.system_prompt=}")
-        
+
         self.messages = [msg for msg in history if msg.get("role") != "tool"]
 
         self.set_system_prompt(self.system_prompt)
-        
+
         print_system_message(f"Set LLM messages to {self.messages}", log_level=logging.INFO)
 
 
@@ -110,6 +111,7 @@ class LLM(BaseModel):
             model=self.model_id,
             messages=self.messages,
             stream=True,
+            options=self.options
         )
 
         for chunk in stream:

@@ -53,11 +53,22 @@ default_theme = {
 }
 
 default_config = {
-    "llm": {"disable_chat_history": False, "model": "llama3.1:8b-instruct-q4_0"},
+    "llm": {
+        "disable_chat_history": False,
+        "model": "llama3.1:8b-instruct-q4_0",
+        # NOTE OLLama options are supported
+        # "options": {
+        #     "temperature": 0.7,
+        #     "seed": 123
+        # }
+    },
     "stt": {
         "device": settings.TORCH_DEVICE,
         "generation_args": {"batch_size": 8},
         "model": "openai/whisper-small.en",
     },
-    "tts": {"device": settings.TORCH_DEVICE, "model": "tts_models/en/ljspeech/glow-tts"},
+    "tts": {
+        "device": settings.TORCH_DEVICE,
+        "model": "tts_models/en/ljspeech/glow-tts"
+    },
 }

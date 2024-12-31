@@ -185,6 +185,7 @@ class AIChatUI:
             font=("Arial", 12),
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
+        self.root.bind("<Escape>", self.cancel_ai_response)
         
         self.create_default_chat()
         
@@ -402,8 +403,6 @@ class AIChatUI:
             self.handle_command(user_message)
             return
 
-        self.user_input.focus_set()
-
         self.handle_user_message(user_message)
 
 
@@ -470,7 +469,7 @@ class AIChatUI:
         self.check_tts_completion()
 
        
-    def cancel_ai_response(self):
+    def cancel_ai_response(self, event=None):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
         self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button to Send
@@ -694,27 +693,19 @@ class AIChatUI:
     def open_llm_settings_dialog(self):
         """Open a dialog to set LLM settings."""
         settings_window = tk.Toplevel(self.root)
-        settings_window.title("LLM Settings")
+        settings_window.title("LLM System Prompt")
         
         current_prompt = self.llm_model.system_prompt
-        current_temperature = 0.7
 
         # System Prompt
         tk.Label(settings_window, text="System Prompt:", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
         prompt_text = tk.Text(settings_window, wrap=tk.WORD, height=8, width=50)
         prompt_text.insert(tk.END, current_prompt)
         prompt_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
-
-        # Temperature
-        tk.Label(settings_window, text="Temperature (0.0 - 1.0):", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
-        temperature_var = tk.DoubleVar(value=current_temperature)
-        temperature_entry = tk.Entry(settings_window, textvariable=temperature_var)
-        temperature_entry.pack(padx=10, pady=5, anchor="w")
         
         # Save Button
         def save_settings():
-            self.llm_model.set_system_prompt(prompt_text.get(1.0, tk.END).strip())  # Save system prompt
-            _temperature = temperature_var.get()  # Save temperature
+            self.llm_model.set_system_prompt(prompt_text.get(1.0, tk.END).strip())
             settings_window.destroy()
 
         tk.Button(settings_window, text="Save", command=save_settings, bg="green", fg="white").pack(pady=10)
