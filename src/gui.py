@@ -9,7 +9,7 @@ import time
 
 from .audio import AudioIO
 from .models import LLM, STT, TTS
-from .utils import print_system_message
+from .utils import compress_messages, print_system_message
 from .settings import default_theme
 
 
@@ -120,6 +120,16 @@ class AIChatUI:
         )
         self.rename_button.pack(padx=10, pady=5, fill=tk.X)
 
+        self.compress_button = tk.Button(
+            self.left_panel,
+            text="Compress Chat",
+            command=self.compress_active_chat,
+            bg=self.theme["button_bg"],
+            fg=self.theme["button_fg"],
+            font=("Arial", 12),
+        )
+        self.compress_button.pack(padx=10, pady=5, fill=tk.X)
+
         self.delete_button = tk.Button(
             self.left_panel,
             text="Delete Chat",
@@ -162,9 +172,6 @@ class AIChatUI:
         )
         self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
 
-        self.update_chat_list()  # Populate the chat list
-        self.load_chat("Default Chat")  # Automatically load the default chat
-
         # Input area at the bottom (outside main content frame)
         self.input_frame = tk.Frame(
             self.chat_display_frame, bg=self.theme["bg"], height=50
@@ -203,6 +210,7 @@ class AIChatUI:
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
         self.root.bind("<Escape>", self.cancel_ai_response)
 
+        self.update_chat_list()
         self.create_default_chat()
 
     def apply_theme(self):
@@ -228,12 +236,14 @@ class AIChatUI:
         self.user_input.config(state=tk.DISABLED)
         self.send_button.config(state=tk.DISABLED)
         self.record_button.config(state=tk.DISABLED)
+        self.compress_button.config(state=tk.DISABLED)
 
     def enable_input(self):
         """Enable user input and send button."""
         self.user_input.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL)
+        self.compress_button.config(state=tk.NORMAL)
 
     def update_theme(self):
         """Update the theme for all widgets."""
@@ -267,8 +277,6 @@ class AIChatUI:
             self.chat_history = self.chats[chat_name]
             self.update_chat_list()
             self.load_chat(chat_name)
-            self.focus_on_chat(chat_name)
-            self.user_input.focus_set()
 
     def load_chat(self, chat_name):
         """Load a specific chat into the main chat display."""
@@ -278,6 +286,9 @@ class AIChatUI:
         # Update the chat display
         self.chat_display.config(state=tk.NORMAL)
         self.chat_display.delete(1.0, tk.END)  # Clear the current display
+
+        self.focus_on_chat(chat_name)
+        self.user_input.focus_set()
 
         self.reinsert_messages_from_history()
 
@@ -389,13 +400,11 @@ class AIChatUI:
                 self.chat_history = []
                 self.update_chat_list()
                 self.load_chat(default_chat_name)
-                self.focus_on_chat(default_chat_name)
             else:
                 # Refresh chat list and load the first available chat
                 self.update_chat_list()
                 first_chat = next(iter(self.chats))
                 self.load_chat(first_chat)
-                self.focus_on_chat(first_chat)
 
     def focus_on_chat(self, chat_name):
         """Set focus on the given chat in the chat list."""
@@ -405,7 +414,11 @@ class AIChatUI:
             self.chat_list.selection_set(chat_index)  # Select the desired chat
             self.chat_list.see(chat_index)  # Ensure the chat is visible
         except ValueError:
-            pass  # Chat name not found (unlikely case)
+            print_system_message(
+                "cannot find chat: {chat_name}",
+                log_level=logging.WARN,
+                color=Fore.YELLOW,
+            )
 
     def disable_chat_list(self):
         """Disable the chat list to prevent switching."""
@@ -629,9 +642,6 @@ class AIChatUI:
             # Update chat list and focus on the new chat
             self.update_chat_list()
             self.load_chat(chat_name)
-            self.focus_on_chat(chat_name)
-            # Focus on the input field
-            self.user_input.focus_set()
         elif chat_name in self.chats:
             messagebox.showerror("New Chat", "A chat with this name already exists.")
 
@@ -668,6 +678,23 @@ class AIChatUI:
 
         self.chat_display.config(state=tk.DISABLED)
         self.llm_model.load_history(self.chat_history)
+
+    def compress_active_chat(self):
+        """Compress chat history for the selected chat or all chats."""
+        selection = self.chat_list.curselection()
+        if selection:
+            # Compress the selected chat's history
+            selected_chat = self.chat_list.get(selection)
+            if selected_chat in self.chats:
+                self.chats[selected_chat] = compress_messages(self.chats[selected_chat])
+                self.llm_model.load_history(self.chats[selected_chat])  # Sync with LLM
+                self.load_chat(selected_chat)  # Refresh the chat display
+                messagebox.showinfo(
+                    "Compress Chat",
+                    f"Chat history for '{selected_chat}' compressed successfully!",
+                )
+            else:
+                messagebox.showerror("Compress Chat", "Selected chat not found.")
 
     def record_voice(self):
         """Toggle recording state and handle recording."""

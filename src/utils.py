@@ -118,3 +118,48 @@ def print_system_message(
         log_level,
         f"{Style.BRIGHT}{Fore.YELLOW}[system]> {Style.NORMAL}{color}{message}{Style.RESET_ALL}",
     )
+
+
+def compress_messages(messages):
+    def summarize_message(message: str, max_split=50) -> str:
+        """Simple heuristic or an external summarization model."""
+        if len(message.split()) > max_split:  # Arbitrary threshold for long messages
+            return " ".join(message.split()[:max_split]) + "..."
+        return message
+
+    def compress_old_messages(messages, keep_last=15):
+        """Compress all but the last `keep_last` messages."""
+        if len(messages) > keep_last:
+            for i in range(len(messages) - keep_last):
+                messages[i]["content"] = summarize_message(messages[i]["content"])
+        return messages
+
+    def filter_non_critical_messages(messages):
+        """Remove redundant messages from the history."""
+        return [msg for msg in messages if not (msg["role"] == "tool")]
+
+    def merge_consecutive_messages(messages):
+        """Merge consecutive messages from the same role."""
+        merged_messages = []
+        for msg in messages:
+            if merged_messages and merged_messages[-1]["role"] == msg["role"]:
+                merged_messages[-1]["content"] += " " + msg["content"]
+            else:
+                merged_messages.append(msg)
+        return merged_messages
+
+    def truncate_message(message: str, max_length: int = 100) -> str:
+        """Truncate a message to a maximum number of tokens."""
+        if len(message.split()) > max_length:
+            return " ".join(message.split()[:max_length]) + "..."
+        return message
+
+    messages = compress_old_messages(messages, keep_last=5)
+    messages = filter_non_critical_messages(messages)
+    messages = merge_consecutive_messages(messages)
+    for msg in messages:
+        msg["content"] = truncate_message(msg["content"], max_length=100)
+
+    print(messages)
+
+    return messages
