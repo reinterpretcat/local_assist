@@ -52,8 +52,19 @@ default_config = {
         "model": "llama3.1:8b-instruct-q4_0",
         # NOTE OLLama options are supported
         # "options": {
+        #     # adjusts creativity. Lower values for precise responses, higher values for creative answers.
         #     "temperature": 0.7,
-        #     "seed": 123
+        #
+        #     # seed for determenistic responses
+        #     "seed": 123,
+        #
+        #     # controls how much of the previous conversation or text the model
+        #     # should remember. This is especially important in longer conversations or when you want the model to keep
+        #     # track of a lot of information.
+        #     "num_ctx": 1024
+        #
+        #     # determines how much text the model generates. Use higher values for longer responses, and lower values for short ones.
+        #     "num_predict": 20
         # }
     },
     "stt": {
