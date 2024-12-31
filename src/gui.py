@@ -358,7 +358,6 @@ class AIChatUI:
                 self.update_chat_list()
                 self.load_chat(default_chat_name)
                 self.focus_on_chat(default_chat_name)
-                #messagebox.showinfo("Delete Chat", "The last chat was deleted. A new 'Default Chat' has been created.")
             else:
                 # Refresh chat list and load the first available chat
                 self.update_chat_list()

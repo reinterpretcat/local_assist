@@ -5,8 +5,6 @@ This module provides utility classes and functions.
 import logging
 import os
 import sys
-import threading
-from typing import Any
 
 from colorama import Fore, Style
 
@@ -16,46 +14,6 @@ _formatter = logging.Formatter("%(message)s")
 _handler.setFormatter(_formatter)
 logger.addHandler(_handler)
 logger.setLevel(logging.INFO)
-
-
-class ThreadSafeState:
-    """
-    A thread-safe class for managing a shared state value.
-
-    This class provides methods for setting and getting the value in a thread-safe manner
-    using a lock.
-
-    Args:
-        value: The initial value of the shared state.
-
-    Attributes:
-        _value: The shared state value.
-        _lock: A lock object used for thread-safe access to the shared state.
-    """
-
-    def __init__(self, value: Any) -> None:
-        self._value = value
-        self._lock = threading.Lock()
-
-    def set_value(self, value: Any) -> None:
-        """
-        Set the shared state value in a thread-safe manner.
-
-        Args:
-            value: The new value to set for the shared state.
-        """
-        with self._lock:
-            self._value = value
-
-    def get_value(self) -> Any:
-        """
-        Get the shared state value in a thread-safe manner.
-
-        Returns:
-            The current value of the shared state.
-        """
-        with self._lock:
-            return self._value
 
 
 class suppress_stdout_stderr:

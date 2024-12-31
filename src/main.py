@@ -7,19 +7,13 @@ import click
 from colorama import Fore
 import tkinter as tk
 import logging
-# import os
-# import time
-# import re
-# from threading import Thread
-# from typing import Optional
 from json import loads
 
 from . import __version__
-#from .audio import AudioIO
 from .gui import AIChatUI
 from .models import LLM, STT, TTS
 from .settings import default_config
-from .utils import ThreadSafeState, deep_merge_dicts, logger, print_system_message
+from .utils import deep_merge_dicts, print_system_message
 
 
 async def _real_main(**kwargs):
