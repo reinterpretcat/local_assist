@@ -5,7 +5,7 @@ This module provides utility classes and functions.
 import logging
 import os
 import sys
-
+from typing import Optional
 from colorama import Fore, Style
 
 logger = logging.getLogger(__name__)
@@ -121,45 +121,45 @@ def print_system_message(
 
 
 def compress_messages(messages):
-    def summarize_message(message: str, max_split=50) -> str:
-        """Simple heuristic or an external summarization model."""
-        if len(message.split()) > max_split:  # Arbitrary threshold for long messages
-            return " ".join(message.split()[:max_split]) + "..."
-        return message
+    import re
 
-    def compress_old_messages(messages, keep_last=15):
+    def summarize_message(role: Optional[str], message: str, max_words) -> str:
+        """Summarize a message by truncating it heuristically, keeping as much context as possible."""
+
+        # Skip summarization for system messages
+        if role == "system":
+            return message
+
+        words = message.split()
+        if len(words) <= max_words:
+            return message  # No summarization needed
+
+        # Heuristic: Look for punctuation to avoid cutting mid-sentence
+        truncated = " ".join(words[:max_words])
+        if not truncated.endswith((".", "!", "?")):
+            # Attempt to find a natural endpoint within the truncated segment
+            match = re.search(r"(.*?[.!?])\s", truncated)
+            if match:
+                return match.group(1) + "..."  # Use the matched sentence
+            else:
+                # Default fallback: Add ellipsis if no natural endpoint found
+                return truncated + "..."
+        return truncated
+
+    def compress_old_messages(messages, keep_last, max_words):
         """Compress all but the last `keep_last` messages."""
         if len(messages) > keep_last:
             for i in range(len(messages) - keep_last):
-                messages[i]["content"] = summarize_message(messages[i]["content"])
+                messages[i]["content"] = summarize_message(
+                    messages[i]["role"], messages[i]["content"], max_words
+                )
         return messages
 
     def filter_non_critical_messages(messages):
         """Remove redundant messages from the history."""
         return [msg for msg in messages if not (msg["role"] == "tool")]
 
-    def merge_consecutive_messages(messages):
-        """Merge consecutive messages from the same role."""
-        merged_messages = []
-        for msg in messages:
-            if merged_messages and merged_messages[-1]["role"] == msg["role"]:
-                merged_messages[-1]["content"] += " " + msg["content"]
-            else:
-                merged_messages.append(msg)
-        return merged_messages
-
-    def truncate_message(message: str, max_length: int = 100) -> str:
-        """Truncate a message to a maximum number of tokens."""
-        if len(message.split()) > max_length:
-            return " ".join(message.split()[:max_length]) + "..."
-        return message
-
-    messages = compress_old_messages(messages, keep_last=5)
+    messages = compress_old_messages(messages, keep_last=1, max_words=10)
     messages = filter_non_critical_messages(messages)
-    messages = merge_consecutive_messages(messages)
-    for msg in messages:
-        msg["content"] = truncate_message(msg["content"], max_length=100)
-
-    print(messages)
 
     return messages
