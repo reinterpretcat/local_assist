@@ -19,6 +19,7 @@ class RoleTags:
     ASSISTANT = "ai_prefix"
     CONTENT = "content_prefix"
 
+
 class RoleNames:
     TOOL = "tool"
     USER = "user"
@@ -35,47 +36,51 @@ class RoleNames:
 
 
 class AIChatUI:
-    def __init__(self, root, llm_model: LLM, stt_model: Optional[STT], tts_model: Optional[TTS]):
+    def __init__(
+        self, root, llm_model: LLM, stt_model: Optional[STT], tts_model: Optional[TTS]
+    ):
         self.root = root
         self.root.title("AI Assistance Chat")
-        
+
         self.llm_model = llm_model
         self.stt_model = stt_model
         self.tts_model = tts_model
         self.tts_lock = threading.Lock()
-        self.active_tts_threads = 0 # # Counter for active TTS chunks
-        
+        self.active_tts_threads = 0  # # Counter for active TTS chunks
+
         self.chats = {}
         self.chat_history = []  # To store the conversation history
-        
+
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  # Flag to cancel AI response
-        
-        self.listening_message_index = None # Tracks the position of the listening message
+
+        self.listening_message_index = (
+            None  # Tracks the position of the listening message
+        )
         self.audio_io = AudioIO()
 
         # Default theme (light mode)
         self.theme = default_theme
 
         # Configure layout
-        self.root.geometry("2048x1436") 
+        self.root.geometry("2048x1436")
         self.apply_theme()
-        
 
         # Top menu for options
         self.menu_bar = tk.Menu(root)
         root.config(menu=self.menu_bar)
-        
+
         file_menu = tk.Menu(self.menu_bar, tearoff=0)
         file_menu.add_command(label="Save Chats", command=self.save_chats_to_file)
         file_menu.add_command(label="Load Chats", command=self.load_chats_from_file)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
-        
+
         settings_menu = tk.Menu(self.menu_bar, tearoff=0)
-        settings_menu.add_command(label="LLM Settings", command=self.open_llm_settings_dialog)
+        settings_menu.add_command(
+            label="LLM Settings", command=self.open_llm_settings_dialog
+        )
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
-
 
         # Main layout with two frames (main content + input frame)
         self.main_frame = tk.Frame(root, bg=self.theme["bg"])
@@ -125,7 +130,6 @@ class AIChatUI:
         )
         self.delete_button.pack(padx=10, pady=5, fill=tk.X)
 
-
         # Right panel for chat display
         self.chat_display_frame = tk.Frame(self.main_frame, bg=self.theme["chat_bg"])
         self.chat_display_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -139,19 +143,32 @@ class AIChatUI:
             font=("Arial", 12),
         )
         self.chat_display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        
+
         # configure different colors for user and ai
-        self.chat_display.tag_configure(RoleTags.USER, foreground=self.theme["user"]["color_prefix"], font=("Arial", 14, "bold"))
-        self.chat_display.tag_configure(RoleTags.ASSISTANT, foreground=self.theme["assistant"]["color_prefix"], font=("Arial", 14, "bold"))
-        self.chat_display.tag_configure(RoleTags.TOOL, foreground=self.theme["tool"]["color_prefix"], font=("Arial", 14, "bold"))
+        self.chat_display.tag_configure(
+            RoleTags.USER,
+            foreground=self.theme["user"]["color_prefix"],
+            font=("Arial", 14, "bold"),
+        )
+        self.chat_display.tag_configure(
+            RoleTags.ASSISTANT,
+            foreground=self.theme["assistant"]["color_prefix"],
+            font=("Arial", 14, "bold"),
+        )
+        self.chat_display.tag_configure(
+            RoleTags.TOOL,
+            foreground=self.theme["tool"]["color_prefix"],
+            font=("Arial", 14, "bold"),
+        )
         self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
-        
-        
+
         self.update_chat_list()  # Populate the chat list
         self.load_chat("Default Chat")  # Automatically load the default chat
 
         # Input area at the bottom (outside main content frame)
-        self.input_frame = tk.Frame(self.chat_display_frame, bg=self.theme["bg"], height=50)
+        self.input_frame = tk.Frame(
+            self.chat_display_frame, bg=self.theme["bg"], height=50
+        )
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.user_input = tk.Entry(
@@ -164,8 +181,7 @@ class AIChatUI:
         )
         self.user_input.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill=tk.X, expand=True)
         self.user_input.bind("<Return>", self.handle_user_input)
-        
-        
+
         self.record_button = tk.Button(
             self.input_frame,
             text="🎙️ Record",
@@ -186,9 +202,8 @@ class AIChatUI:
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
         self.root.bind("<Escape>", self.cancel_ai_response)
-        
+
         self.create_default_chat()
-        
 
     def apply_theme(self):
         """Apply the current theme to the root window."""
@@ -202,10 +217,12 @@ class AIChatUI:
                 with open(file_path, "r", encoding="utf-8") as file:
                     self.theme = json.load(file)
                 self.update_theme()
-                messagebox.showinfo("Theme Loaded", "Custom theme applied successfully!")
+                messagebox.showinfo(
+                    "Theme Loaded", "Custom theme applied successfully!"
+                )
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
-                
+
     def disable_input(self):
         """Disable user input and send button."""
         self.user_input.config(state=tk.DISABLED)
@@ -217,7 +234,6 @@ class AIChatUI:
         self.user_input.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL)
-        
 
     def update_theme(self):
         """Update the theme for all widgets."""
@@ -227,55 +243,62 @@ class AIChatUI:
         self.chat_display.configure(bg=self.theme["chat_bg"], fg=self.theme["chat_fg"])
         self.input_frame.configure(bg=self.theme["bg"])
         self.user_input.configure(bg=self.theme["input_bg"], fg=self.theme["input_fg"])
-        self.send_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
-        self.delete_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
-        self.rename_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
-        self.new_chat_button.configure(bg=self.theme["button_bg"], fg=self.theme["button_fg"])
-
+        self.send_button.configure(
+            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
+        )
+        self.delete_button.configure(
+            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
+        )
+        self.rename_button.configure(
+            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
+        )
+        self.new_chat_button.configure(
+            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
+        )
 
     def create_default_chat(self):
         """Create the default chat on app startup."""
         # Use new_chat logic to ensure consistency
         chat_name = "Default Chat"
         if chat_name not in self.chats:
-            self.chats[chat_name] = [{"role": RoleNames.TOOL, "content": "Welcome to your default chat!"}]
+            self.chats[chat_name] = [
+                {"role": RoleNames.TOOL, "content": "Welcome to your default chat!"}
+            ]
             self.chat_history = self.chats[chat_name]
             self.update_chat_list()
             self.load_chat(chat_name)
             self.focus_on_chat(chat_name)
-            self.user_input.focus_set()        
-            
+            self.user_input.focus_set()
+
     def load_chat(self, chat_name):
         """Load a specific chat into the main chat display."""
         # Switch to the selected chat's history
         self.chat_history = self.chats.get(chat_name, [])
-    
+
         # Update the chat display
         self.chat_display.config(state=tk.NORMAL)
         self.chat_display.delete(1.0, tk.END)  # Clear the current display
 
         self.reinsert_messages_from_history()
 
-            
     def save_chats_to_file(self):
         """Save all chats to a file."""
         file_path = filedialog.asksaveasfilename(
-            defaultextension=".json",
-            filetypes=[("JSON Files", "*.json")]
+            defaultextension=".json", filetypes=[("JSON Files", "*.json")]
         )
         if file_path:
             try:
                 with open(file_path, "w", encoding="utf-8") as file:
                     json.dump(self.chats, file, ensure_ascii=False, indent=4)
-                messagebox.showinfo("Save Chats", "All chats have been saved successfully.")
+                messagebox.showinfo(
+                    "Save Chats", "All chats have been saved successfully."
+                )
             except Exception as e:
                 messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
 
     def load_chats_from_file(self):
         """Load chats from a file."""
-        file_path = filedialog.askopenfilename(
-            filetypes=[("JSON Files", "*.json")]
-        )
+        file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
         if file_path:
             try:
                 with open(file_path, "r", encoding="utf-8") as file:
@@ -292,16 +315,18 @@ class AIChatUI:
                     first_chat = next(iter(self.chats))
                     self.load_chat(first_chat)
 
-                messagebox.showinfo("Load Chats", "Chats have been loaded successfully.")
+                messagebox.showinfo(
+                    "Load Chats", "Chats have been loaded successfully."
+                )
             except Exception as e:
                 messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
-
-
 
     def update_chat_list(self):
         """Update the chat list display."""
         self.chat_list.delete(0, tk.END)
-        for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest first
+        for chat_name in sorted(
+            self.chats.keys(), reverse=True
+        ):  # Sort by latest first
             self.chat_list.insert(tk.END, chat_name)
 
     def edit_chat_name(self):
@@ -316,7 +341,9 @@ class AIChatUI:
         old_name = self.chat_list.get(selected_index)
 
         # Prompt for a new name
-        new_name = simpledialog.askstring("Edit Chat Name", f"Rename '{old_name}' to:", initialvalue=old_name)
+        new_name = simpledialog.askstring(
+            "Edit Chat Name", f"Rename '{old_name}' to:", initialvalue=old_name
+        )
         if not new_name:
             return  # User canceled or entered nothing
 
@@ -328,11 +355,13 @@ class AIChatUI:
         # Update the chat name in the list
         self.chat_list.delete(selected_index)
         self.chat_list.insert(selected_index, new_name)
-        self.chat_list.selection_set(selected_index)  # Keep the selection on the renamed chat
+        self.chat_list.selection_set(
+            selected_index
+        )  # Keep the selection on the renamed chat
 
         # Update the underlying chat data
         self.chats[new_name] = self.chats.pop(old_name)
-        
+
     def delete_active_chat(self):
         """Delete the currently selected chat after confirmation."""
         selection = self.chat_list.curselection()
@@ -345,7 +374,9 @@ class AIChatUI:
         chat_name = self.chat_list.get(selected_index)
 
         # Confirmation dialog
-        confirm = messagebox.askyesno("Delete Chat", f"Are you sure you want to delete '{chat_name}'?")
+        confirm = messagebox.askyesno(
+            "Delete Chat", f"Are you sure you want to delete '{chat_name}'?"
+        )
         if confirm:
             # Delete the chat from the dictionary
             del self.chats[chat_name]
@@ -390,8 +421,7 @@ class AIChatUI:
         self.rename_button.config(state=tk.NORMAL)
         self.delete_button.config(state=tk.NORMAL)
 
-
-    def handle_user_input(self, event = None):
+    def handle_user_input(self, event=None):
         """Handle user input from input."""
         user_message = self.user_input.get().strip()
         if not user_message:
@@ -405,24 +435,24 @@ class AIChatUI:
 
         self.handle_user_message(user_message)
 
-
     def handle_user_message(self, user_message):
         """Handle user message and initiate AI reply."""
-    
+
         self.append_to_chat(RoleNames.USER, user_message)
-        
-         # Disable input and chat list while AI response is generating
+
+        # Disable input and chat list while AI response is generating
         self.disable_input()
         self.disable_chat_list()
-        
+
         # Change Send button to Cancel button
         self.cancel_response = False  # Reset cancel flag
-        self.send_button.config(text="Cancel", command=self.cancel_ai_response, state=tk.NORMAL)
+        self.send_button.config(
+            text="Cancel", command=self.cancel_ai_response, state=tk.NORMAL
+        )
 
         # Start token-by-token AI response
         response_generator = self.generate_ai_response(user_message)
         self.root.after(100, self.display_ai_response, response_generator)
-        
 
     def display_ai_response(self, generator):
         """Display AI response token by token."""
@@ -432,79 +462,92 @@ class AIChatUI:
             self.append_to_chat_partial(RoleNames.ASSISTANT, "(canceled)")
             self.check_tts_completion()
             return
-        
+
         try:
             token = next(generator)
             self.append_to_chat_partial(RoleNames.ASSISTANT, token)
-            self.root.after(100, self.display_ai_response, generator)  # Schedule next token
+            self.root.after(
+                100, self.display_ai_response, generator
+            )  # Schedule next token
         except StopIteration:
             self.check_tts_completion()
-        
+
     def generate_ai_response(self, user_message):
         """Generate token-by-token AI response."""
-        
+
         buffer = []
         min_chunk_size = 10
         splitters = [".", ",", "?", ":", ";"]
-        
-        for token in self.llm_model.forward(user_message):           
+
+        for token in self.llm_model.forward(user_message):
             buffer.append(token)
             if token == "\n" or (len(buffer) >= min_chunk_size and token in splitters):
                 chunk = "".join(buffer).strip()
                 buffer.clear()
-                
+
                 if chunk:
                     # Queue this chunk for TTS processing
-                    threading.Thread(target=self.speak_text, args=(chunk,), daemon=True).start()
+                    threading.Thread(
+                        target=self.speak_text, args=(chunk,), daemon=True
+                    ).start()
 
             yield token
-        
-        # Process any remaining text in buffer    
+
+        # Process any remaining text in buffer
         if buffer:
             chunk = "".join(buffer).strip()
 
             if chunk:
-                threading.Thread(target=self.speak_text, args=(chunk,), daemon=True).start()
-         
+                threading.Thread(
+                    target=self.speak_text, args=(chunk,), daemon=True
+                ).start()
+
         self.check_tts_completion()
 
-       
     def cancel_ai_response(self, event=None):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
-        self.send_button.config(text="Send", command=self.handle_user_input)  # Revert button to Send
+        self.send_button.config(
+            text="Send", command=self.handle_user_input
+        )  # Revert button to Send
         self.enable_input()  # Re-enable inputs
-        
+
     def speak_text(self, text):
         """Speak the given text using TTS."""
 
         with self.tts_lock:  # Ensure only one thread uses the TTS engine at a time
-            self.active_tts_threads += 1 
+            self.active_tts_threads += 1
             try:
                 synthesis = self.tts_model.forward(text)
 
             except Exception as e:
-                print_system_message(f"tts_model.forward exception: {e}", color=Fore.RED, log_level=logging.ERROR)
+                print_system_message(
+                    f"tts_model.forward exception: {e}",
+                    color=Fore.RED,
+                    log_level=logging.ERROR,
+                )
 
             if synthesis:
                 while self.audio_io.is_busy():
                     time.sleep(0.25)
 
-                self.tts_model.model.synthesizer.save_wav(wav=synthesis, path=self.tts_model.file_path)
-                
+                self.tts_model.model.synthesizer.save_wav(
+                    wav=synthesis, path=self.tts_model.file_path
+                )
+
                 if self.cancel_response:
                     self.active_tts_threads -= 1
                     return
-                
+
                 self.audio_io.play_wav(self.tts_model.file_path)
                 while self.audio_io.is_busy():
                     if self.cancel_response:  # Stop playback if canceled
                         self.audio_io.stop_playing()  # Stop the audio playback immediately
                         break
                     time.sleep(0.25)  # Poll for cancellation
-                
+
             self.active_tts_threads -= 1
-    
+
     def check_tts_completion(self):
         """Check if all TTS threads are complete and finalize response."""
         if self.active_tts_threads == 0:
@@ -517,13 +560,12 @@ class AIChatUI:
         """Finalize the AI response display after generation and TTS complete."""
         self.enable_input()
         self.enable_chat_list()
-        self.send_button.config(text="Send", command=self.handle_user_input)  
-
+        self.send_button.config(text="Send", command=self.handle_user_input)
 
     def append_to_chat(self, role, content):
         """Append a message to the chat display."""
         self.chat_display.config(state=tk.NORMAL)
-        
+
         # Add a newline if the last character is not already a newline
         if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
             self.chat_display.insert(tk.END, "\n")
@@ -535,17 +577,21 @@ class AIChatUI:
 
         self.chat_history.append({"role": role, "content": content})
 
-
     def append_to_chat_partial(self, role, token):
         """Append a token to the chat display for partial updates."""
         self.chat_display.config(state=tk.NORMAL)
 
         # If it's the first token for assistant, add the role label
-        if role == RoleNames.ASSISTANT and (not self.chat_history or self.chat_history[-1]["role"] != RoleNames.ASSISTANT):
+        if role == RoleNames.ASSISTANT and (
+            not self.chat_history
+            or self.chat_history[-1]["role"] != RoleNames.ASSISTANT
+        ):
             if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
-               self.chat_display.insert(tk.END, "\n")
+                self.chat_display.insert(tk.END, "\n")
             self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-            self.chat_history.append({"role": role, "content": ""})  # Add new history entry
+            self.chat_history.append(
+                {"role": role, "content": ""}
+            )  # Add new history entry
 
         # Append the token to the display
         self.chat_display.insert(tk.END, f"{token}")
@@ -555,31 +601,31 @@ class AIChatUI:
         # Update chat history
         if self.chat_history and self.chat_history[-1]["role"] == role:
             self.chat_history[-1]["content"] += f"{token}"
-    
+
     def append_system_message(self, message):
         before = self.chat_display.index(tk.END)
         self.append_to_chat(RoleNames.TOOL, message)
         after = self.chat_display.index(tk.END)
         self.listening_message_index = (before, after)
-        
+
     def remove_last_system_message(self):
         if self.listening_message_index:
             before, after = self.listening_message_index
             self.chat_display.config(state=tk.NORMAL)
             self.chat_display.delete(before, after)
-            
+
             self.chat_display.config(state=tk.DISABLED)
             self.listening_message_index = None
-
-
 
     def new_chat(self):
         """Start a new chat."""
         chat_name = simpledialog.askstring("New Chat", "Enter a name for this chat:")
         if chat_name and chat_name not in self.chats:
-            self.chats[chat_name] = [{"role": RoleNames.TOOL, "content": "Welcome to your new chat!"}]
+            self.chats[chat_name] = [
+                {"role": RoleNames.TOOL, "content": "Welcome to your new chat!"}
+            ]
             self.chat_history = self.chats[chat_name]
-             
+
             # Update chat list and focus on the new chat
             self.update_chat_list()
             self.load_chat(chat_name)
@@ -616,12 +662,12 @@ class AIChatUI:
             elif message["role"] == RoleNames.TOOL:
                 self.chat_display.insert(tk.END, "Tool: ", RoleTags.TOOL)
 
-            self.chat_display.insert(tk.END, f"{message['content']}\n", RoleTags.CONTENT)   
-
+            self.chat_display.insert(
+                tk.END, f"{message['content']}\n", RoleTags.CONTENT
+            )
 
         self.chat_display.config(state=tk.DISABLED)
         self.llm_model.load_history(self.chat_history)
-
 
     def record_voice(self):
         """Toggle recording state and handle recording."""
@@ -636,18 +682,20 @@ class AIChatUI:
         else:
             # Stop recording
             self.is_recording = False
-            self.record_button.config(text="🎙️ Record", bg=self.theme["button_bg"])  # Revert to default
+            self.record_button.config(
+                text="🎙️ Record", bg=self.theme["button_bg"]
+            )  # Revert to default
             self.stop_recording()
-            
+
     def start_recording(self):
         """Start recording in a separate thread."""
         self.recording_thread = threading.Thread(target=self.record_audio)
         self.recording_thread.start()
-        
+
     def record_audio(self):
-        """Capture audio using the microphone."""       
+        """Capture audio using the microphone."""
         self.append_system_message("Listening for your voice...")
-        
+
         try:
             audio_data = self.audio_io.record_audio()
             if audio_data is not None:
@@ -659,16 +707,15 @@ class AIChatUI:
 
         except Exception as e:
             print_system_message(f"Recording error: {e}")
-            
+
     def stop_recording(self):
         """Stop recording and process the audio."""
         try:
             self.audio_io.stop_recording()
             self.remove_last_system_message()
-        
+
         except AttributeError:
             print_system_message("No audio captured. Press record to try again.")
-
 
     def handle_command(self, command):
         if command == "/clear":
@@ -689,26 +736,29 @@ class AIChatUI:
         else:
             self.append_system_message(f"Unknown command '{command}")
 
- 
     def open_llm_settings_dialog(self):
         """Open a dialog to set LLM settings."""
         settings_window = tk.Toplevel(self.root)
         settings_window.title("LLM System Prompt")
-        
+
         current_prompt = self.llm_model.system_prompt
 
         # System Prompt
-        tk.Label(settings_window, text="System Prompt:", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=5)
+        tk.Label(
+            settings_window, text="System Prompt:", font=("Arial", 12, "bold")
+        ).pack(anchor="w", padx=10, pady=5)
         prompt_text = tk.Text(settings_window, wrap=tk.WORD, height=8, width=50)
         prompt_text.insert(tk.END, current_prompt)
         prompt_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
-        
+
         # Save Button
         def save_settings():
             self.llm_model.set_system_prompt(prompt_text.get(1.0, tk.END).strip())
             settings_window.destroy()
 
-        tk.Button(settings_window, text="Save", command=save_settings, bg="green", fg="white").pack(pady=10)
+        tk.Button(
+            settings_window, text="Save", command=save_settings, bg="green", fg="white"
+        ).pack(pady=10)
 
         # Center the settings window
         settings_window.transient(self.root)

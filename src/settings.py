@@ -41,15 +41,9 @@ default_theme = {
     "list_fg": "#000000",
     "chat_bg": "#ffffff",
     "chat_fg": "#000000",
-    "tool": {
-        "color_prefix": "red"
-    },
-    "assistant": {
-        "color_prefix": "green"
-    },
-    "user": {
-        "color_prefix": "blue"
-    }
+    "tool": {"color_prefix": "red"},
+    "assistant": {"color_prefix": "green"},
+    "user": {"color_prefix": "blue"},
 }
 
 default_config = {
@@ -69,6 +63,6 @@ default_config = {
     },
     "tts": {
         "device": settings.TORCH_DEVICE,
-        "model": "tts_models/en/ljspeech/glow-tts"
+        "model": "tts_models/en/ljspeech/glow-tts",
     },
 }

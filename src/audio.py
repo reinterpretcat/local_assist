@@ -72,7 +72,9 @@ class AudioIO:
                 rate=self.RATE,
             )
         except Exception as e:
-            print_system_message(f"_initialize_input_stream: {e}", log_level=logging.ERROR)
+            print_system_message(
+                f"_initialize_input_stream: {e}", log_level=logging.ERROR
+            )
 
     def close(self) -> None:
         """
@@ -83,7 +85,6 @@ class AudioIO:
 
         if self.pa:
             self.pa.terminate()
-
 
     @staticmethod
     def is_busy() -> bool:
@@ -116,16 +117,15 @@ class AudioIO:
             pygame.mixer.music.play()
         except Exception as e:
             print_system_message(f"play_wav: {e}", log_level=logging.ERROR)
-      
+
     def stop_playing(self):
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.stop()
-            
+
     def stop_recording(self):
         self.stop_recording_flag = True
         if pygame.mixer.music.get_busy():
             pygame.mixer.music.stop()
-
 
     def record_audio(self) -> Optional[Dict[str, Union[int, np.ndarray]]]:
         """
@@ -146,10 +146,14 @@ class AudioIO:
         print_system_message("Listening for sound...", log_level=logging.INFO)
 
         while True:
-            data: np.ndarray = np.frombuffer(self.input_stream.read(self.CHUNK), dtype=np.int16)
+            data: np.ndarray = np.frombuffer(
+                self.input_stream.read(self.CHUNK), dtype=np.int16
+            )
 
             if not recording and not self.is_silent(data):
-                print_system_message("Sound detected, starting recording...", log_level=logging.INFO)
+                print_system_message(
+                    "Sound detected, starting recording...", log_level=logging.INFO
+                )
                 recording = True
 
             if recording:
@@ -159,8 +163,14 @@ class AudioIO:
                 else:
                     current_silence = 0
 
-                if current_silence > (self.SILENCE_LIMIT * self.RATE / self.CHUNK) or self.stop_recording_flag:
-                    print_system_message(f"Silence/Interruption detected ({self.stop_recording_flag=}), stopping recording...", log_level=logging.INFO)
+                if (
+                    current_silence > (self.SILENCE_LIMIT * self.RATE / self.CHUNK)
+                    or self.stop_recording_flag
+                ):
+                    print_system_message(
+                        f"Silence/Interruption detected ({self.stop_recording_flag=}), stopping recording...",
+                        log_level=logging.INFO,
+                    )
                     break
 
         self.input_stream.stop_stream()

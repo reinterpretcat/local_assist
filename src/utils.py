@@ -101,7 +101,9 @@ def deep_merge_dicts(old: dict, new: dict) -> dict:
     return merged
 
 
-def print_system_message(message: str, color: str = Fore.LIGHTBLUE_EX, log_level: int = logging.DEBUG) -> None:
+def print_system_message(
+    message: str, color: str = Fore.LIGHTBLUE_EX, log_level: int = logging.DEBUG
+) -> None:
     """
     Print a message with a colored system prompt.
 
@@ -112,4 +114,7 @@ def print_system_message(message: str, color: str = Fore.LIGHTBLUE_EX, log_level
         log_level: The logging level for the message (e.g., logging.DEBUG).
             Defaults to logging.DEBUG.
     """
-    logger.log(log_level, f"{Style.BRIGHT}{Fore.YELLOW}[system]> {Style.NORMAL}{color}{message}{Style.RESET_ALL}")
+    logger.log(
+        log_level,
+        f"{Style.BRIGHT}{Fore.YELLOW}[system]> {Style.NORMAL}{color}{message}{Style.RESET_ALL}",
+    )

@@ -42,7 +42,9 @@ class LLM(BaseModel):
         if self.system_prompt:
             self.messages.append({"role": "system", "content": self.system_prompt})
 
-        self.is_chat_history_disabled: Optional[bool] = kwargs.get("disable_chat_history")
+        self.is_chat_history_disabled: Optional[bool] = kwargs.get(
+            "disable_chat_history"
+        )
 
         self.model = Client()
 
@@ -52,8 +54,12 @@ class LLM(BaseModel):
 
         # Check if a system message already exists in the messages list
         system_message_index = next(
-            (index for index, msg in enumerate(self.messages) if msg["role"] == "system"),
-            None
+            (
+                index
+                for index, msg in enumerate(self.messages)
+                if msg["role"] == "system"
+            ),
+            None,
         )
 
         if system_message_index is not None:
@@ -66,7 +72,9 @@ class LLM(BaseModel):
     def load_history(self, history: List[Dict[str, str]]):
         """Load conversation history into the LLM class."""
         # Ensure the system prompt is preserved if present
-        system_prompt = next((msg["content"] for msg in history if msg["role"] == "system"), None)
+        system_prompt = next(
+            (msg["content"] for msg in history if msg["role"] == "system"), None
+        )
         if system_prompt:
             self.system_prompt = system_prompt
 
@@ -74,8 +82,9 @@ class LLM(BaseModel):
 
         self.set_system_prompt(self.system_prompt)
 
-        print_system_message(f"Set LLM messages to {self.messages}", log_level=logging.INFO)
-
+        print_system_message(
+            f"Set LLM messages to {self.messages}", log_level=logging.INFO
+        )
 
     def exists(self) -> bool:
         """
@@ -103,7 +112,7 @@ class LLM(BaseModel):
             An iterator that yields the generated text in chunks.
         """
         self.messages.append({"role": "user", "content": message})
-        
+
         assistant_role = None
         generated_content = ""
 
@@ -111,7 +120,7 @@ class LLM(BaseModel):
             model=self.model_id,
             messages=self.messages,
             stream=True,
-            options=self.options
+            options=self.options,
         )
 
         for chunk in stream:
