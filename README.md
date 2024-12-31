@@ -4,6 +4,8 @@ A  GUI chat client for ollama with TTS/STT integration. The main goal is to buil
 
 The GUI itself built using LLM in a few days (I'm not expert in Python), so the quality is not the main strength. As start, I used some scripts from [june](https://github.com/mezbaul-h/june) project.
 
+![image](https://github.com/user-attachments/assets/f9fb5092-406c-4c38-ab1e-3b35d6363624)
+
 
 ## Installation
 
