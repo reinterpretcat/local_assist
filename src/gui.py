@@ -51,6 +51,7 @@ class AIChatUI:
         self.chats = {}
         self.chat_history = []  # To store the conversation history
 
+        self.tts_enabled = True  # A flag to track whether tts is enabled or not
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  # Flag to cancel AI response
 
@@ -272,7 +273,10 @@ class AIChatUI:
         chat_name = "Default Chat"
         if chat_name not in self.chats:
             self.chats[chat_name] = [
-                {"role": RoleNames.TOOL, "content": "Welcome to your default chat!"}
+                {
+                    "role": RoleNames.TOOL,
+                    "content": "Welcome to the chat with AI assistant! Use /help to list available meta commands.",
+                }
             ]
             self.chat_history = self.chats[chat_name]
             self.update_chat_list()
@@ -528,6 +532,9 @@ class AIChatUI:
     def speak_text(self, text):
         """Speak the given text using TTS."""
 
+        if not self.tts_enabled:
+            return
+
         with self.tts_lock:  # Ensure only one thread uses the TTS engine at a time
             self.active_tts_threads += 1
             try:
@@ -760,6 +767,40 @@ class AIChatUI:
                 chat_name = self.chat_list.get(selected_index)
                 self.chats[chat_name] = []
 
+        elif command.startswith("/tts"):
+            args = command.split()
+            if len(args) == 1:
+                # No argument provided, show help
+                self.append_system_message(
+                    "Syntax for TTS commands:\n"
+                    "/tts on  - Enable text-to-speech\n"
+                    "/tts off - Disable text-to-speech\n"
+                    "/tts      - Show this help message",
+                )
+            elif len(args) == 2:
+                if args[1] == "on":
+                    self.tts_enabled = True
+                    self.append_system_message("Text-to-speech enabled.")
+                elif args[1] == "off":
+                    self.tts_enabled = False
+                    self.append_system_message("Text-to-speech disabled.")
+                else:
+                    # Invalid argument, show help
+                    self.append_system_message(
+                        f"Invalid argument '{args[1]}'. Use /tts on, /tts off",
+                    )
+            else:
+                # Too many arguments, show help
+                self.append_system_message(
+                    "Too many arguments. Use /tts on, /tts off",
+                )
+        elif command == "/help":
+            self.append_system_message(
+                "Available commands:\n"
+                "/clear - Clear the chat history\n"
+                "/tts   - Manage text-to-speech (use '/tts' for detailed options)\n"
+                "/help  - Display this help message",
+            )
         else:
             self.append_system_message(f"Unknown command '{command}")
 
