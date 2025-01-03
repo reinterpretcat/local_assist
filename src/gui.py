@@ -37,7 +37,8 @@ class RoleNames:
 
 class AIChatUI:
     def __init__(
-        self, root, llm_model: LLM, stt_model: STT, tts_model: TTS, rag_model: RAG):
+        self, root, llm_model: LLM, stt_model: STT, tts_model: TTS, rag_model: RAG
+    ):
         self.root = root
         self.root.title("AI Assistance Chat")
 
@@ -45,7 +46,7 @@ class AIChatUI:
         self.stt_model = stt_model
         self.tts_model = tts_model
         self.rag_model = rag_model
-        
+
         self.tts_lock = threading.Lock()
         self.active_tts_threads = 0  # # Counter for active TTS chunks
 
@@ -77,17 +78,18 @@ class AIChatUI:
         file_menu.add_command(label="Load Chats", command=self.load_chats_from_file)
         self.menu_bar.add_cascade(label="File", menu=file_menu)
 
+        rag_menu = tk.Menu(self.menu_bar, tearoff=0)
+        rag_menu.add_command(
+            label="Manage RAG Data", command=self.open_rag_management_ui
+        )
+        self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
+
         settings_menu = tk.Menu(self.menu_bar, tearoff=0)
         settings_menu.add_command(
             label="LLM Settings", command=self.open_llm_settings_dialog
         )
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
-        
-        rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-        rag_menu.add_command(label="Manage RAG Data", command=self.open_rag_management_ui)
-        self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
-
 
         # Main layout with two frames (main content + input frame)
         self.main_frame = tk.Frame(root, bg=self.theme["bg"])
