@@ -1,110 +1,184 @@
-import chromadb
-from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-
+from dataclasses import dataclass
+from typing import List, Iterator, Optional, Dict
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
+import chromadb
+from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
+from ollama import Client
 import os
-from typing import Iterator, Optional
-
+from pathlib import Path
 from .common import BaseModel
-from ollama import Client, ResponseError, Options
+
+
+@dataclass
+class DocumentReference:
+    """Reference information for a document in a collection."""
+
+    collection_name: str
+    document_id: str
+    source: str
+
+
+class RAGCollection:
+    def __init__(self, collection_name: str, chroma_client):
+        self.name = collection_name
+        self.collection = chroma_client.get_or_create_collection(name=collection_name)
+        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+
+    def add_document(self, file_path: str, chunks: List[str]) -> List[str]:
+        """Add document chunks to collection and return their IDs."""
+        if not chunks:
+            return []
+
+        embeddings = self.model.encode(chunks, convert_to_numpy=True)
+        base_id = os.path.basename(file_path).replace(" ", "_")
+
+        chunk_ids = [f"{base_id}_{idx}" for idx in range(len(chunks))]
+
+        # Check for duplicates
+        existing_docs = self.collection.get(ids=chunk_ids, include=["metadatas"])
+        existing_ids = set(existing_docs["ids"])
+
+        # Prepare new documents
+        new_ids = []
+        new_chunks = []
+        new_embeddings = []
+        new_metadatas = []
+
+        for idx, (chunk_id, chunk, embedding) in enumerate(
+            zip(chunk_ids, chunks, embeddings)
+        ):
+            if chunk_id not in existing_ids:
+                new_ids.append(chunk_id)
+                new_chunks.append(chunk)
+                new_embeddings.append(embedding.tolist())
+                new_metadatas.append(
+                    {"source": file_path, "id": chunk_id, "chunk_index": idx}
+                )
+
+        if new_ids:
+            self.collection.add(
+                ids=new_ids,
+                documents=new_chunks,
+                embeddings=new_embeddings,
+                metadatas=new_metadatas,
+            )
+
+        return chunk_ids
+
+    def query(
+        self, query: str, top_k: int, selected_ids: Optional[List[str]] = None
+    ) -> Dict:
+        """Query the collection with optional document filtering."""
+        query_embedding = self.model.encode([query])[0]
+
+        # If specific documents are selected, use where filter
+        where = {"id": {"$in": selected_ids}} if selected_ids else None
+
+        return self.collection.query(
+            query_embeddings=[query_embedding.tolist()], n_results=top_k, where=where
+        )
 
 
 class RAG(BaseModel):
-    """
-    A class for Retrival Augument Generation using the ollama library.
-
-    This class inherits from the BaseModel class and provides methods for checking if a model exists,
-    and generating text from user input using the specified LLM.
-
-    Args:
-        **kwargs: Keyword arguments for initializing the LLM/RAG
-
-    """
-
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
+        """
+        A class for Retrival Augument Generation using the ollama library.
 
-        persist_directory = kwargs.get("persist_directory")
+        This class inherits from the BaseModel class and provides methods for checking if a model exists,
+        and generating text from user input using the specified LLM.
+
+        Args:
+            **kwargs: Keyword arguments for initializing the LLM/RAG
+
+        """
+        super().__init__(**kwargs)
 
         self.ollama_client = Client()
         self.chroma_client = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=Settings(),
+            path=kwargs.get("persist_directory"),
+            settings=Settings(allow_reset=True, is_persistent=True),
             tenant=DEFAULT_TENANT,
             database=DEFAULT_DATABASE,
         )
-        self.collection = self.chroma_client.get_or_create_collection(name="documents")
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")  # Embedding model
 
-    def add_pdf(self, file_path):
-        """Parse and add content from a PDF file."""
-        reader = PdfReader(file_path)
-        chunks = [page.extract_text() for page in reader.pages if page.extract_text()]
-        self._add_to_collection(file_path, chunks)
+        # Dictionary to store all collections
+        self.collections: Dict[str, RAGCollection] = {}
 
-    def add_text(self, file_path):
-        """Parse and add content from a plain text file."""
-        with open(file_path, "r", encoding="utf-8") as f:
-            chunks = f.read().split("\n\n")  # Split into paragraphs
-        self._add_to_collection(file_path, chunks)
+        # Dictionary to store document references
+        self.document_refs: Dict[str, DocumentReference] = {}
 
-    def add_markdown(self, file_path):
-        """Parse and add content from a Markdown file."""
-        with open(file_path, "r", encoding="utf-8") as f:
-            content = f.read()
-        chunks = content.split("\n\n")  # Split into paragraphs or sections
-        self._add_to_collection(file_path, chunks)
+        # Initialize default collection
+        self.get_or_create_collection("default")
 
-    def _add_to_collection(self, file_path, chunks):
-        """Add chunks to the ChromaDB collection with unique IDs, avoiding duplicates."""
-        embeddings = self.model.encode(chunks, convert_to_numpy=True)
-        base_id = os.path.basename(file_path).replace(
-            " ", "_"
-        )  # Clean file name for ID base
+    def get_or_create_collection(self, collection_name: str) -> RAGCollection:
+        """Get or create a RAG collection."""
+        if collection_name not in self.collections:
+            self.collections[collection_name] = RAGCollection(
+                collection_name, self.chroma_client
+            )
+        return self.collections[collection_name]
 
-        # Fetch existing metadata to check for duplicates
-        existing_metadatas = self.collection.get(include=["metadatas"])["metadatas"]
-        existing_ids = {meta.get("id") for meta in existing_metadatas}
+    def add_document(
+        self, collection_name: str, file_path: str, document_type: str = None
+    ):
+        """Add a document to a specific collection."""
+        if document_type is None:
+            document_type = Path(file_path).suffix.lower()
 
-        for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-            unique_id = f"{base_id}_{idx}"
+        # Get document chunks based on type
+        chunks = self._get_document_chunks(file_path, document_type)
 
-            # Add only if the ID is not already in the collection
-            if unique_id not in existing_ids:
-                self.collection.add(
-                    ids=[unique_id],
-                    documents=[chunk],
-                    embeddings=[embedding.tolist()],
-                    metadatas=[{"source": file_path, "id": unique_id}],
-                )
+        # Get or create collection and add document
+        collection = self.get_or_create_collection(collection_name)
+        chunk_ids = collection.add_document(file_path, chunks)
 
-    def retrieve_and_limit_context(self, query, top_k=5, token_limit=1500):
-        """
-        Retrieve relevant document chunks and ensure the combined token count
-        fits within the limit for the context window.
+        # Store document references
+        for chunk_id in chunk_ids:
+            self.document_refs[chunk_id] = DocumentReference(
+                collection_name=collection_name, document_id=chunk_id, source=file_path
+            )
 
-        Args:
-            query (str): The user's query.
-            top_k (int): Number of top chunks to retrieve.
-            token_limit (int): Maximum tokens to allow for the context.
+    def _get_document_chunks(self, file_path: str, document_type: str) -> List[str]:
+        """Get chunks from document based on its type."""
+        if document_type in [".pdf", "pdf"]:
+            reader = PdfReader(file_path)
+            return [page.extract_text() for page in reader.pages if page.extract_text()]
 
-        Returns:
-            list[str]: List of selected chunks fitting within the token limit.
-        """
-        # Step 1: Retrieve relevant chunks
-        query_embedding = self.model.encode([query])[0]
-        results = self.collection.query(
-            query_embeddings=[query_embedding.tolist()], n_results=top_k
-        )
-        chunks = results["documents"][0]
+        elif document_type in [".md", "md", "markdown"]:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            return content.split("\n\n")
 
-        # Step 2: Fit chunks within the token limit
+        else:  # Default to text processing
+            with open(file_path, "r", encoding="utf-8") as f:
+                return f.read().split("\n\n")
+
+    def retrieve_and_limit_context(
+        self,
+        query: str,
+        collection_name: str = None,
+        selected_ids: List[str] = None,
+        top_k: int = 5,
+        token_limit: int = 1500,
+    ) -> List[str]:
+        """Retrieve relevant chunks with filtering options."""
+        if collection_name and collection_name in self.collections:
+            collections_to_query = [self.collections[collection_name]]
+        else:
+            collections_to_query = list(self.collections.values())
+
+        all_chunks = []
+        for collection in collections_to_query:
+            results = collection.query(query, top_k, selected_ids)
+            all_chunks.extend(results["documents"][0])
+
+        # Limit tokens
         selected_chunks = []
         total_tokens = 0
 
-        for chunk in chunks:
-            chunk_tokens = len(chunk.split())  # Approximation: 1 word ≈ 1 token
+        for chunk in all_chunks:
+            chunk_tokens = len(chunk.split())
             if total_tokens + chunk_tokens <= token_limit:
                 selected_chunks.append(chunk)
                 total_tokens += chunk_tokens
@@ -113,58 +187,38 @@ class RAG(BaseModel):
 
         return selected_chunks
 
-    def summarize_chunks(self, chunks, token_limit=1500):
-        """
-        Summarize the retrieved chunks to reduce their token count.
-
-        Args:
-            chunks (list[str]): List of retrieved document chunks.
-            token_limit (int): Target token limit for the summarized content.
-
-        Returns:
-            str: Summarized text fitting within the token limit.
-        """
+    def summarize_chunks(self, chunks: List[str]) -> str:
+        """Summarize the retrieved chunks."""
         prompt = "Summarize the following information concisely:\n\n" + "\n\n".join(
             chunks
         )
-
-        # Use Ollama to summarize the chunks
         response = self.ollama_client.chat([{"role": "user", "content": prompt}])
-        summary = response["content"]
+        return response["content"]
 
-        # Ensure the summary fits within the token limit
-        if len(summary.split()) > token_limit:
-            summary = " ".join(summary.split()[:token_limit]) + "..."
-
-        return summary
-
-    def forward(self, user_query) -> Iterator[str]:
-        """
-        Generate a response using RAG with context window management.
-
-        Args:
-            user_query (str): The user's query.
-
-        Returns:
-            str: Generated response from Ollama.
-        """
-        # Step 1: Retrieve relevant chunks
+    def forward(
+        self,
+        user_query: str,
+        collection_name: str = None,
+        selected_ids: List[str] = None,
+    ) -> Iterator[str]:
+        """Generate a response using RAG with filtered context."""
         context_chunks = self.retrieve_and_limit_context(
-            user_query, top_k=5, token_limit=1500
+            user_query,
+            collection_name=collection_name,
+            selected_ids=selected_ids,
+            top_k=5,
+            token_limit=1500,
         )
 
-        # Step 2: Summarize chunks if necessary
         if sum(len(chunk.split()) for chunk in context_chunks) > 1500:
             context_chunks = [self.summarize_chunks(context_chunks)]
 
-        # Step 3: Construct the prompt
         prompt = (
             f"[CONTEXT]\n{'\n'.join(context_chunks)}\n\n"
             f"[QUERY]\n{user_query}\n\n"
             f"[INSTRUCTION]\nAnswer based on the provided context."
         )
 
-        # Step 4: Generate response
         stream = self.ollama_client.chat(
             model=self.model_id,
             messages=[{"role": "user", "content": prompt}],
@@ -173,3 +227,19 @@ class RAG(BaseModel):
 
         for chunk in stream:
             yield chunk["message"]["content"]
+
+    def get_collections(self) -> List[str]:
+        """Get list of available collections."""
+        return list(self.collections.keys())
+
+    def get_document_refs(self) -> Dict[str, DocumentReference]:
+        """Get all document references."""
+        return self.document_refs
+
+    def get_collection_documents(self, collection_name: str) -> List[Dict]:
+        """Get all documents in a collection."""
+        if collection_name not in self.collections:
+            return []
+
+        collection = self.collections[collection_name]
+        return collection.collection.get(include=["metadatas"])["metadatas"]
