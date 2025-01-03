@@ -11,7 +11,7 @@ from json import loads
 
 from . import __version__
 from .gui import AIChatUI
-from .models import LLM, STT, TTS
+from .models import LLM, RAG, STT, TTS
 from .settings import default_config
 from .utils import deep_merge_dicts, print_system_message
 
@@ -24,10 +24,12 @@ async def _real_main(**kwargs):
     llm_config = config.get("llm") or {}
     stt_config = config.get("stt") or {}
     tts_config = config.get("tts") or {}
+    rag_config = config.get("rag") or {}
 
     llm_model = LLM(**llm_config) if llm_config else None
     stt_model = STT(**stt_config) if stt_config else None
     tts_model = TTS(**tts_config) if tts_config else None
+    rag_model = RAG(**rag_config) if rag_config else None
 
     if not llm_model.exists():
         print_system_message(
@@ -38,7 +40,7 @@ async def _real_main(**kwargs):
         return 2
 
     root = tk.Tk()
-    app = AIChatUI(root, llm_model, stt_model, tts_model)
+    app = AIChatUI(root, llm_model, stt_model, tts_model, rag_model)
 
     root.mainloop()
 

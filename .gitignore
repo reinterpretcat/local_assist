@@ -5,6 +5,7 @@ __pycache__/
 pyvenv.cfg
 
 history*.json
+example*.txt
 
 *.wav
 
@@ -14,3 +15,5 @@ temp/
 /lib64
 /lib
 /share
+
+/.chromadb

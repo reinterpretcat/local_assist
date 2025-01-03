@@ -7,6 +7,9 @@
             "num_ctx": 4096
         }
     },
+    "rag": {
+        "model": "cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0"
+    },
     "stt": {
         "device": "cuda",
         "model": "primeline/distil-whisper-large-v3-german"

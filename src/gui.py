@@ -4,11 +4,11 @@ from tkinter import filedialog, simpledialog, messagebox
 import json
 import threading
 import logging
-from typing import Optional
 import time
 
 from .audio import AudioIO
-from .models import LLM, STT, TTS
+from .gui_rag import RAGManagementUI
+from .models import LLM, STT, TTS, RAG
 from .utils import compress_messages, print_system_message
 from .settings import default_theme
 
@@ -37,14 +37,15 @@ class RoleNames:
 
 class AIChatUI:
     def __init__(
-        self, root, llm_model: LLM, stt_model: Optional[STT], tts_model: Optional[TTS]
-    ):
+        self, root, llm_model: LLM, stt_model: STT, tts_model: TTS, rag_model: RAG):
         self.root = root
         self.root.title("AI Assistance Chat")
 
         self.llm_model = llm_model
         self.stt_model = stt_model
         self.tts_model = tts_model
+        self.rag_model = rag_model
+        
         self.tts_lock = threading.Lock()
         self.active_tts_threads = 0  # # Counter for active TTS chunks
 
@@ -82,6 +83,11 @@ class AIChatUI:
         )
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
+        
+        rag_menu = tk.Menu(self.menu_bar, tearoff=0)
+        rag_menu.add_command(label="Manage RAG Data", command=self.open_rag_management_ui)
+        self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
+
 
         # Main layout with two frames (main content + input frame)
         self.main_frame = tk.Frame(root, bg=self.theme["bg"])
@@ -803,6 +809,10 @@ class AIChatUI:
             )
         else:
             self.append_system_message(f"Unknown command '{command}")
+
+    def open_rag_management_ui(self):
+        """Open the RAG Management window."""
+        RAGManagementUI(self.root, self.rag_model)
 
     def open_llm_settings_dialog(self):
         """Open a dialog to set LLM settings."""

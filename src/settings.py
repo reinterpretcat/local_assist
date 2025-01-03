@@ -67,6 +67,10 @@ default_config = {
         #     "num_predict": 20
         # }
     },
+    "rag": {
+        "model": "llama3.1:8b-instruct-q4_0",
+        "persist_directory": ".chromadb"  
+    },
     "stt": {
         "device": settings.TORCH_DEVICE,
         "generation_args": {"batch_size": 8},

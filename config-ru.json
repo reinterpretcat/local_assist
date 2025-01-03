@@ -4,6 +4,9 @@
         "model": "owl/t-lite",
         "system_prompt": "Ты ассистент."
     },
+    "rag": {
+        "model": "owl/t-lite"
+    },
     "stt": {
         "device": "cuda",
         "model": "antony66/whisper-large-v3-russian"

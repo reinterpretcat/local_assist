@@ -4,6 +4,9 @@
         "model": "dorian2b/vera",
         "system_prompt": "Du bist meine Assistentin."
     },
+    "rag": {
+        "model": "dorian2b/vera"
+    },
     "stt": {
         "device": "cuda",
         "model": "primeline/distil-whisper-large-v3-german"
