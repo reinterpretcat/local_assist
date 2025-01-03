@@ -251,7 +251,7 @@ class RAGManagementUI:
                         "Confirm Delete",
                         f"Are you sure you want to delete the entire collection '{collection_name}'?",
                     ):
-                        self.rag_model.client.delete_collection(collection_name)
+                        self.rag_model.chroma_client.delete_collection(collection_name)
                 else:
                     # Delete single document
                     source_path = self.data_store_tree.item(item)["tags"][0]
@@ -298,7 +298,7 @@ class RAGManagementUI:
                     )
 
                 # Delete old collection
-                self.rag_model.client.delete_collection(self.current_collection)
+                self.rag_model.chroma_client.delete_collection(self.current_collection)
 
                 # Update UI
                 self.current_collection = new_name
