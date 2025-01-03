@@ -4,7 +4,6 @@ from tkinter import ttk, filedialog, messagebox
 from typing import Optional, Dict
 from .models import RAG, DocumentReference
 
-
 import tkinter as tk
 import os
 from tkinter import ttk, filedialog, messagebox
@@ -42,22 +41,25 @@ class RAGManagementUI:
             "<<ComboboxSelected>>", self.on_collection_changed
         )
 
-        # New collection button
+        # Collection management buttons
         self.new_collection_button = ttk.Button(
             self.collection_frame,
-            text="New Collection",
+            text="New",
             command=self.create_new_collection,
         )
         self.new_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        # File Upload Section
-        self.upload_frame = ttk.LabelFrame(self.window, text="Upload Documents")
-        self.upload_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        self.upload_button = ttk.Button(
-            self.upload_frame, text="Upload File", command=self.upload_file
+        self.rename_collection_button = ttk.Button(
+            self.collection_frame,
+            text="Rename",
+            command=self.rename_collection,
         )
-        self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
+        self.rename_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
+
+        self.delete_button = ttk.Button(
+            self.collection_frame, text="Delete Selected", command=self.delete_selected
+        )
+        self.delete_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
         # Data Store Section
         self.data_store_frame = ttk.LabelFrame(self.window, text="Data Store")
@@ -104,15 +106,15 @@ class RAGManagementUI:
         self.tree_frame.grid_rowconfigure(0, weight=1)
         self.tree_frame.grid_columnconfigure(0, weight=1)
 
+        self.upload_button = ttk.Button(
+            self.data_store_frame, text="Upload File", command=self.upload_file
+        )
+        self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
+
         self.refresh_button = ttk.Button(
             self.data_store_frame, text="Refresh", command=self.refresh_data_store
         )
         self.refresh_button.pack(side=tk.RIGHT, padx=5, pady=5)
-
-        self.delete_button = ttk.Button(
-            self.data_store_frame, text="Delete Selected", command=self.delete_selected
-        )
-        self.delete_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         # Query Testing Section
         self.query_frame = ttk.LabelFrame(self.window, text="Test RAG Query")
@@ -234,27 +236,78 @@ class RAGManagementUI:
             messagebox.showerror("Error", f"Failed to refresh data store: {e}")
 
     def delete_selected(self):
-        """Delete selected documents."""
+        """Delete selected items (files or collections)."""
         selected_items = self.data_store_tree.selection()
         if not selected_items:
-            messagebox.showwarning("Warning", "No document selected.")
+            messagebox.showwarning("Warning", "No items selected.")
             return
 
         try:
             for item in selected_items:
                 if item.startswith("collection_"):
-                    continue
+                    # Delete entire collection
+                    collection_name = item.replace("collection_", "")
+                    if messagebox.askyesno(
+                        "Confirm Delete",
+                        f"Are you sure you want to delete the entire collection '{collection_name}'?",
+                    ):
+                        self.rag_model.client.delete_collection(collection_name)
+                else:
+                    # Delete single document
+                    source_path = self.data_store_tree.item(item)["tags"][0]
+                    parent_id = self.data_store_tree.parent(item)
+                    collection_name = parent_id.replace("collection_", "")
+                    collection = self.rag_model.get_or_create_collection(
+                        collection_name
+                    )
+                    collection.collection.delete(where={"source": source_path})
 
-                # Get source path from tags
-                source_path = self.data_store_tree.item(item)["tags"][0]
-                parent_id = self.data_store_tree.parent(item)
-                collection_name = parent_id.replace("collection_", "")
-
-                collection = self.rag_model.get_or_create_collection(collection_name)
-                collection.collection.delete(where={"source": source_path})
+            self.refresh_collections()
             self.refresh_data_store()
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to delete documents: {e}")
+            messagebox.showerror("Error", f"Failed to delete items: {e}")
+
+    def rename_collection(self):
+        """Rename the selected collection."""
+        if not self.current_collection:
+            messagebox.showwarning("Warning", "Please select a collection first.")
+            return
+
+        new_name = tk.simpledialog.askstring(
+            "Rename Collection",
+            "Enter new collection name:",
+            initialvalue=self.current_collection,
+        )
+
+        if new_name and new_name != self.current_collection:
+            try:
+                # Get the old collection
+                old_collection = self.rag_model.get_or_create_collection(
+                    self.current_collection
+                )
+                # Create new collection
+                new_collection = self.rag_model.get_or_create_collection(new_name)
+
+                # Move all documents to new collection
+                docs = old_collection.collection.get()
+                if docs["ids"]:
+                    new_collection.collection.add(
+                        documents=docs["documents"],
+                        metadatas=docs["metadatas"],
+                        ids=docs["ids"],
+                    )
+
+                # Delete old collection
+                self.rag_model.client.delete_collection(self.current_collection)
+
+                # Update UI
+                self.current_collection = new_name
+                self.refresh_collections()
+                self.collection_var.set(new_name)
+                self.refresh_data_store()
+
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
     def test_query(self):
         """Test a RAG query."""
@@ -270,14 +323,14 @@ class RAGManagementUI:
                 if selected_items:
                     selected_ids = []
                     document_refs = self.rag_model.get_document_refs()
-                    
+
                     for item in selected_items:
                         if item.startswith("doc_"):
-                            source_path = self.data_store_tree.item(item)['tags'][0]
+                            source_path = self.data_store_tree.item(item)["tags"][0]
                             # Get all document IDs associated with this source file
                             doc_ids = [
-                                ref.document_id 
-                                for ref in document_refs.values() 
+                                ref.document_id
+                                for ref in document_refs.values()
                                 if ref.source == source_path
                             ]
                             selected_ids.extend(doc_ids)
