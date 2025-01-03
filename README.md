@@ -43,3 +43,8 @@ python3 -m src.main --config config-ru.json
 
 ## UI
 - add scrollbar to chat area
+
+## RAG
+
+- merge rag chat to the main one
+- allow to specify documents to chat with

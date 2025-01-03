@@ -29,12 +29,41 @@ class RAGManagementUI:
         self.data_store_frame = ttk.LabelFrame(self.window, text="Data Store")
         self.data_store_frame.pack(fill=tk.BOTH, padx=10, pady=10, expand=True)
 
+        # Create a frame to hold the Treeview and scrollbars
+        self.tree_frame = ttk.Frame(self.data_store_frame)
+        self.tree_frame.pack(fill=tk.BOTH, padx=5, pady=5, expand=True)
+
+        # Configure style for proper row height
+        style = ttk.Style()
+        style.configure(
+            "Treeview",
+            rowheight=36,  # Increased row height
+            font=("TkDefaultFont", 10),  # Explicit font size
+        )
+
         self.data_store_tree = ttk.Treeview(
-            self.data_store_frame, columns=("Name", "Type"), show="headings"
+            self.tree_frame,
+            columns=("Name", "Type"),
+            show="headings",
+            style="Treeview",  # Apply the style
         )
         self.data_store_tree.heading("Name", text="File Name")
         self.data_store_tree.heading("Type", text="File Type")
         self.data_store_tree.pack(fill=tk.BOTH, padx=5, pady=5, expand=True)
+
+        # Create vertical scrollbar
+        self.vsb = ttk.Scrollbar(
+            self.tree_frame, orient="vertical", command=self.data_store_tree.yview
+        )
+        self.data_store_tree.configure(yscrollcommand=self.vsb.set)
+
+        # Grid layout for Treeview and scrollbars
+        self.data_store_tree.grid(row=0, column=0, sticky="nsew")
+        self.vsb.grid(row=0, column=1, sticky="ns")
+
+        # Configure grid weights
+        self.tree_frame.grid_rowconfigure(0, weight=1)
+        self.tree_frame.grid_columnconfigure(0, weight=1)
 
         self.refresh_button = ttk.Button(
             self.data_store_frame, text="Refresh", command=self.refresh_data_store
