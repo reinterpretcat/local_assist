@@ -49,7 +49,10 @@ class RAGManagementUI:
         )
         self.data_store_tree.heading("Name", text="File Name")
         self.data_store_tree.heading("Type", text="File Type")
-        self.data_store_tree.pack(fill=tk.BOTH, padx=5, pady=5, expand=True)
+
+        # Set column widths
+        self.data_store_tree.column("Name", width=640, minwidth=320)
+        self.data_store_tree.column("Type", width=48, minwidth=24)
 
         # Create vertical scrollbar
         self.vsb = ttk.Scrollbar(
