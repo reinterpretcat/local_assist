@@ -82,16 +82,7 @@ class RAGCollection:
 
 class RAG(BaseModel):
     def __init__(self, **kwargs) -> None:
-        """
-        A class for Retrival Augument Generation using the ollama library.
-
-        This class inherits from the BaseModel class and provides methods for checking if a model exists,
-        and generating text from user input using the specified LLM.
-
-        Args:
-            **kwargs: Keyword arguments for initializing the LLM/RAG
-
-        """
+        """ A class for Retrival Augument Generation using the ollama library. """
         super().__init__(**kwargs)
 
         self.ollama_client = Client()
@@ -108,6 +99,9 @@ class RAG(BaseModel):
         # Dictionary to store document references
         self.document_refs: Dict[str, DocumentReference] = {}
 
+        # Load existing collections and document refs
+        self._load_existing_collections_and_refs()
+
         # Initialize default collection
         self.get_or_create_collection("default")
 
@@ -118,6 +112,33 @@ class RAG(BaseModel):
                 collection_name, self.chroma_client
             )
         return self.collections[collection_name]
+
+
+    def _load_existing_collections_and_refs(self):
+        """Load existing collections and document references from the ChromaDB client."""
+        try:
+            existing_collections = self.chroma_client.list_collections()
+
+            for collection_name in existing_collections:
+                # Initialize the collection
+                collection = RAGCollection(collection_name, self.chroma_client)
+                self.collections[collection_name] = collection
+
+                # Load document references from the metadata
+                metadatas = collection.collection.get(include=["metadatas"])["metadatas"]
+                for metadata in metadatas:
+                    document_id = metadata.get("id")
+                    source = metadata.get("source")
+                    if document_id and source:
+                        self.document_refs[document_id] = DocumentReference(
+                            collection_name=collection_name,
+                            document_id=document_id,
+                            source=source
+                        )
+        except Exception as e:
+            print(f"Error loading existing collections or document references: {e}")
+
+
 
     def add_document(
         self, collection_name: str, file_path: str, document_type: str = None
