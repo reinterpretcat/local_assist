@@ -25,8 +25,20 @@ class DocumentReference:
 class RAGCollection:
     def __init__(self, collection_name: str, chroma_client):
         self.name = collection_name
-        self.collection = chroma_client.get_or_create_collection(name=collection_name)
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
+        self.collection = chroma_client.get_or_create_collection(
+            name=collection_name,
+            # https://docs.trychroma.com/docs/collections/configure
+            metadata={
+                # use cosine similarity metric while default is Squared L2
+                "hnsw:space": "cosine",
+                # determines the size of the dynamic candidate list used while searching for the nearest neighbors.
+                # A higher value improves recall and accuracy by exploring more potential neighbors but increases
+                # query time and computational cost, while a lower value results in faster but less accurate searches.
+                # The default value is 10.
+                "hnsw:search_ef": 30,
+            },
+        )
 
     def add_document(self, file_path: str, chunks: List[str]) -> List[str]:
         """Add document chunks to collection and return their IDs."""
@@ -236,7 +248,8 @@ class RAG(BaseModel):
                     results["distances"][0],
                 )
             ):
-                # Convert cosine distance to similarity
+
+                # Convert (1 - cosine distance) to similarity
                 relevance_score = 1 - (distance / 2)
                 if relevance_score >= self.min_relevance:
                     all_chunks.append(
@@ -284,7 +297,7 @@ class RAG(BaseModel):
                     break
 
         print_system_message(
-            f"all_chunks={[c["metadata"]["id"] for c in all_chunks]}, {selected_chunk_ids=} {selected_total_tokens=}",
+            f"all_chunks={[(c["metadata"]["id"], c["relevance"]) for c in all_chunks]}, {selected_chunk_ids=} {selected_total_tokens=}",
             color=Fore.LIGHTWHITE_EX,
             log_level=logging.DEBUG,
         )
