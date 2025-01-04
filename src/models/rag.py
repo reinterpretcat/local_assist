@@ -212,6 +212,12 @@ class RAG(BaseModel):
         else:
             collections_to_query = list(self.collections.values())
 
+        print_system_message(
+            f"{collections_to_query=}",
+            color=Fore.LIGHTWHITE_EX,
+            log_level=logging.DEBUG,
+        )
+
         all_chunks = []
         for collection in collections_to_query:
             results = collection.query(query, top_k, selected_ids)
