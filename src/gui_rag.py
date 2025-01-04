@@ -237,6 +237,8 @@ class RAGManagementUI:
         self.data_store_tree.delete(*self.data_store_tree.get_children())
 
         try:
+            # Get all collections and document references
+            all_collections = self.rag_model.collections.keys()
             document_refs = self.rag_model.get_document_refs()
             collections_dict = {}
 
@@ -246,14 +248,15 @@ class RAGManagementUI:
                     collections_dict[doc_ref.collection_name] = set()
                 collections_dict[doc_ref.collection_name].add(doc_ref.source)
 
-            # Add collections and their documents
-            for collection_name, sources in collections_dict.items():
+            # Add all collections, even if empty
+            for collection_name in all_collections:
                 collection_id = f"collection_{collection_name}"
                 self.data_store_tree.insert(
                     "", tk.END, iid=collection_id, text=collection_name, values=("", "")
                 )
 
-                # Add documents under collection
+                # Add documents under collection if they exist
+                sources = collections_dict.get(collection_name, set())
                 for source_path in sources:
                     file_name = os.path.basename(source_path)
                     file_type = os.path.splitext(source_path)[1][1:].upper()
@@ -277,6 +280,7 @@ class RAGManagementUI:
 
         self.update_collection_label()
         self.update_button_states()
+
 
     def delete_selected(self):
         """Delete selected items (files or collections)."""
