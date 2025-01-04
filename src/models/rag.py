@@ -136,6 +136,23 @@ class RAG(BaseModel):
             )
         return self.collections[collection_name]
 
+    def get_collections(self) -> List[str]:
+        """Get list of available collections."""
+        return list(self.collections.keys())
+
+    def get_document_refs(self) -> Dict[str, DocumentReference]:
+        """Get all document references."""
+        return self.document_refs
+
+    def get_collection_documents(self, collection_name: str) -> List[Dict]:
+        """Get all documents in a collection."""
+        if collection_name not in self.collections:
+            return []
+
+        collection = self.collections[collection_name]
+        results = collection.collection.get(include=["metadatas"])
+        return results["metadatas"]
+
     def add_document(
         self, collection_name: str, file_path: str, document_type: str = None
     ):
@@ -176,10 +193,11 @@ class RAG(BaseModel):
         query: str,
         collection_name: str = None,
         selected_ids: List[str] = None,
-        top_k: int = 5,
+        top_k: int = 10,
         token_limit: int = 1500,
+        min_relevance: float = 0.3,
     ) -> List[str]:
-        """Retrieve relevant chunks with filtering options."""
+        """Retrieve and filter relevant chunks based on token limits."""
         if collection_name and collection_name in self.collections:
             collections_to_query = [self.collections[collection_name]]
         else:
@@ -188,56 +206,92 @@ class RAG(BaseModel):
         all_chunks = []
         for collection in collections_to_query:
             results = collection.query(query, top_k, selected_ids)
-            all_chunks.extend(results["documents"][0])
 
-        # Limit tokens
+            # Combine results with metadata and scores
+            for idx, (chunk, metadata, distance) in enumerate(
+                zip(
+                    results["documents"][0],
+                    results["metadatas"][0],
+                    results["distances"][0],
+                )
+            ):
+                relevance_score = 1 - (
+                    distance / 2
+                )  # Convert cosine distance to similarity
+                if relevance_score >= min_relevance:
+                    all_chunks.append(
+                        {
+                            "text": chunk,
+                            "tokens": len(chunk.split()),
+                            "relevance": relevance_score,
+                            "metadata": metadata,
+                            "index": idx,
+                        }
+                    )
+
+        # Sort chunks by relevance
+        all_chunks = sorted(all_chunks, key=lambda x: x["relevance"], reverse=True)
+
+        # Select chunks while respecting token limits
         selected_chunks = []
         total_tokens = 0
 
         for chunk in all_chunks:
-            chunk_tokens = len(chunk.split())
-            if total_tokens + chunk_tokens <= token_limit:
-                selected_chunks.append(chunk)
-                total_tokens += chunk_tokens
+            if total_tokens + chunk["tokens"] <= token_limit:
+                selected_chunks.append(chunk["text"])
+                total_tokens += chunk["tokens"]
             else:
                 break
 
         return selected_chunks
 
-    def summarize_chunks(self, chunks: List[str]) -> str:
-        """Summarize the retrieved chunks."""
+    def summarize_chunks(self, chunks: List[str], token_limit: int = 1500) -> str:
+        """Summarize the retrieved chunks if their combined length exceeds the token limit."""
         prompt = "Summarize the following information concisely:\n\n" + "\n\n".join(
             chunks
         )
         response = self.ollama_client.chat([{"role": "user", "content": prompt}])
-        return response["content"]
+
+        # Ensure the summary fits within the token limit
+        summary = response["content"]
+        if len(summary.split()) > token_limit:
+            summary = " ".join(summary.split()[:token_limit]) + "..."
+        return summary
 
     def forward(
         self,
         user_query: str,
         collection_name: str = None,
         selected_ids: List[str] = None,
+        token_limit: int = 1500,
     ) -> Iterator[str]:
-        """Generate a response using RAG with filtered context."""
+        """Generate a response using RAG with filtered and optimized context."""
         context_chunks = self.retrieve_and_limit_context(
-            user_query,
+            query=user_query,
             collection_name=collection_name,
             selected_ids=selected_ids,
-            top_k=5,
-            token_limit=1500,
+            top_k=10,
+            token_limit=token_limit,
+            min_relevance=0.1,
         )
 
-        if sum(len(chunk.split()) for chunk in context_chunks) > 1500:
-            context_chunks = [self.summarize_chunks(context_chunks)]
-            
+        # Summarize chunks if the combined length exceeds token_limit
+        total_tokens = sum(len(chunk.split()) for chunk in context_chunks)
+        if total_tokens > token_limit:
+            context_chunks = [
+                self.summarize_chunks(context_chunks, token_limit=token_limit)
+            ]
+
         print(f"{context_chunks=}")
 
+        # Construct the prompt
         prompt = (
             f"[CONTEXT]\n{'\n'.join(context_chunks)}\n\n"
             f"[QUERY]\n{user_query}\n\n"
             f"[INSTRUCTION]\nAnswer based on the provided context."
         )
 
+        # Generate response token by token
         stream = self.ollama_client.chat(
             model=self.model_id,
             messages=[{"role": "user", "content": prompt}],
@@ -246,20 +300,3 @@ class RAG(BaseModel):
 
         for chunk in stream:
             yield chunk["message"]["content"]
-
-    def get_collections(self) -> List[str]:
-        """Get list of available collections."""
-        return list(self.collections.keys())
-
-    def get_document_refs(self) -> Dict[str, DocumentReference]:
-        """Get all document references."""
-        return self.document_refs
-
-    def get_collection_documents(self, collection_name: str) -> List[Dict]:
-        """Get all documents in a collection."""
-        if collection_name not in self.collections:
-            return []
-
-        collection = self.collections[collection_name]
-        results = collection.collection.get(include=["metadatas"])
-        return results["metadatas"]
