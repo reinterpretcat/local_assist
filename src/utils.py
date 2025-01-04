@@ -13,7 +13,7 @@ _handler = logging.StreamHandler()
 _formatter = logging.Formatter("%(message)s")
 _handler.setFormatter(_formatter)
 logger.addHandler(_handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 
 class suppress_stdout_stderr:

@@ -8,6 +8,9 @@ from ollama import Client
 import os
 from pathlib import Path
 from .common import BaseModel
+import logging
+from colorama import Fore
+from ..utils import print_system_message
 
 
 @dataclass
@@ -56,6 +59,9 @@ class RAGCollection:
         )
 
         return chunk_ids
+
+    def __repr__(self):
+        return self.name
 
     def query(
         self, query: str, top_k: int, selected_ids: Optional[List[str]] = None
@@ -203,6 +209,12 @@ class RAG(BaseModel):
         else:
             collections_to_query = list(self.collections.values())
 
+        print_system_message(
+            f"{collections_to_query=}",
+            color=Fore.LIGHTWHITE_EX,
+            log_level=logging.DEBUG,
+        )
+
         all_chunks = []
         for collection in collections_to_query:
             results = collection.query(query, top_k, selected_ids)
@@ -215,9 +227,8 @@ class RAG(BaseModel):
                     results["distances"][0],
                 )
             ):
-                relevance_score = 1 - (
-                    distance / 2
-                )  # Convert cosine distance to similarity
+                # Convert cosine distance to similarity
+                relevance_score = 1 - (distance / 2)
                 if relevance_score >= min_relevance:
                     all_chunks.append(
                         {
@@ -232,18 +243,24 @@ class RAG(BaseModel):
         # Sort chunks by relevance
         all_chunks = sorted(all_chunks, key=lambda x: x["relevance"], reverse=True)
 
-        # Select chunks while respecting token limits
-        selected_chunks = []
-        total_tokens = 0
+        # Select text chunks while respecting token limits
+        selected_text = []
+        selected_total_tokens = 0
 
         for chunk in all_chunks:
-            if total_tokens + chunk["tokens"] <= token_limit:
-                selected_chunks.append(chunk["text"])
-                total_tokens += chunk["tokens"]
+            if selected_total_tokens + chunk["tokens"] <= token_limit:
+                selected_text.append(chunk["text"])
+                selected_total_tokens += chunk["tokens"]
             else:
                 break
 
-        return selected_chunks
+        print_system_message(
+            f"all_chunks={[c["metadata"]["id"] for c in all_chunks]}, {selected_total_tokens=}, selected text chunks={len(selected_text)}",
+            color=Fore.LIGHTWHITE_EX,
+            log_level=logging.DEBUG,
+        )
+
+        return selected_text
 
     def summarize_chunks(self, chunks: List[str], token_limit: int = 1500) -> str:
         """Summarize the retrieved chunks if their combined length exceeds the token limit."""
@@ -282,13 +299,17 @@ class RAG(BaseModel):
                 self.summarize_chunks(context_chunks, token_limit=token_limit)
             ]
 
-        print(f"{context_chunks=}")
-
         # Construct the prompt
         prompt = (
             f"[CONTEXT]\n{'\n'.join(context_chunks)}\n\n"
             f"[QUERY]\n{user_query}\n\n"
             f"[INSTRUCTION]\nAnswer based on the provided context."
+        )
+
+        print_system_message(
+            f"{prompt=}",
+            color=Fore.LIGHTWHITE_EX,
+            log_level=logging.DEBUG,
         )
 
         # Generate response token by token
