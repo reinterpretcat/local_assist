@@ -48,3 +48,4 @@ python3 -m src.main --config config-ru.json
 
 - merge rag chat to the main one
 - allow to specify documents to chat with (e.g. select documents from the list)
+

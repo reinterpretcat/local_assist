@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List, Iterator, Optional, Dict
+from typing import List, Iterator, Optional, Dict, Set
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 import chromadb
@@ -31,38 +31,29 @@ class RAGCollection:
             return []
 
         embeddings = self.model.encode(chunks, convert_to_numpy=True)
-        base_id = os.path.basename(file_path).replace(" ", "_")
 
+        # Generate unique IDs for this collection
+        base_id = f"{self.name}_{os.path.basename(file_path)}".replace(" ", "_")
         chunk_ids = [f"{base_id}_{idx}" for idx in range(len(chunks))]
 
-        # Check for duplicates
-        existing_docs = self.collection.get(ids=chunk_ids, include=["metadatas"])
-        existing_ids = set(existing_docs["ids"])
+        # Always add as new documents since we want independent copies in each collection
+        new_embeddings = [embedding.tolist() for embedding in embeddings]
+        new_metadatas = [
+            {
+                "source": file_path,
+                "id": chunk_id,
+                "chunk_index": idx,
+                "collection": self.name,
+            }
+            for idx, chunk_id in enumerate(chunk_ids)
+        ]
 
-        # Prepare new documents
-        new_ids = []
-        new_chunks = []
-        new_embeddings = []
-        new_metadatas = []
-
-        for idx, (chunk_id, chunk, embedding) in enumerate(
-            zip(chunk_ids, chunks, embeddings)
-        ):
-            if chunk_id not in existing_ids:
-                new_ids.append(chunk_id)
-                new_chunks.append(chunk)
-                new_embeddings.append(embedding.tolist())
-                new_metadatas.append(
-                    {"source": file_path, "id": chunk_id, "chunk_index": idx}
-                )
-
-        if new_ids:
-            self.collection.add(
-                ids=new_ids,
-                documents=new_chunks,
-                embeddings=new_embeddings,
-                metadatas=new_metadatas,
-            )
+        self.collection.add(
+            ids=chunk_ids,
+            documents=chunks,
+            embeddings=new_embeddings,
+            metadatas=new_metadatas,
+        )
 
         return chunk_ids
 
@@ -79,10 +70,15 @@ class RAGCollection:
             query_embeddings=[query_embedding.tolist()], n_results=top_k, where=where
         )
 
+    def get_documents(self) -> Set[str]:
+        """Get all unique document sources in this collection."""
+        results = self.collection.get(include=["metadatas"])
+        return {metadata["source"] for metadata in results["metadatas"]}
+
 
 class RAG(BaseModel):
     def __init__(self, **kwargs) -> None:
-        """ A class for Retrival Augument Generation using the ollama library. """
+        """A class for Retrieval Augmented Generation using the ollama library."""
         super().__init__(**kwargs)
 
         self.ollama_client = Client()
@@ -105,15 +101,6 @@ class RAG(BaseModel):
         # Initialize default collection
         self.get_or_create_collection("default")
 
-    def get_or_create_collection(self, collection_name: str) -> RAGCollection:
-        """Get or create a RAG collection."""
-        if collection_name not in self.collections:
-            self.collections[collection_name] = RAGCollection(
-                collection_name, self.chroma_client
-            )
-        return self.collections[collection_name]
-
-
     def _load_existing_collections_and_refs(self):
         """Load existing collections and document references from the ChromaDB client."""
         try:
@@ -125,7 +112,9 @@ class RAG(BaseModel):
                 self.collections[collection_name] = collection
 
                 # Load document references from the metadata
-                metadatas = collection.collection.get(include=["metadatas"])["metadatas"]
+                metadatas = collection.collection.get(include=["metadatas"])[
+                    "metadatas"
+                ]
                 for metadata in metadatas:
                     document_id = metadata.get("id")
                     source = metadata.get("source")
@@ -133,12 +122,19 @@ class RAG(BaseModel):
                         self.document_refs[document_id] = DocumentReference(
                             collection_name=collection_name,
                             document_id=document_id,
-                            source=source
+                            source=source,
                         )
+
         except Exception as e:
             print(f"Error loading existing collections or document references: {e}")
 
-
+    def get_or_create_collection(self, collection_name: str) -> RAGCollection:
+        """Get or create a RAG collection."""
+        if collection_name not in self.collections:
+            self.collections[collection_name] = RAGCollection(
+                collection_name, self.chroma_client
+            )
+        return self.collections[collection_name]
 
     def add_document(
         self, collection_name: str, file_path: str, document_type: str = None
@@ -154,7 +150,7 @@ class RAG(BaseModel):
         collection = self.get_or_create_collection(collection_name)
         chunk_ids = collection.add_document(file_path, chunks)
 
-        # Store document references
+        # Store document references - now specific to this collection
         for chunk_id in chunk_ids:
             self.document_refs[chunk_id] = DocumentReference(
                 collection_name=collection_name, document_id=chunk_id, source=file_path
@@ -233,6 +229,8 @@ class RAG(BaseModel):
 
         if sum(len(chunk.split()) for chunk in context_chunks) > 1500:
             context_chunks = [self.summarize_chunks(context_chunks)]
+            
+        print(f"{context_chunks=}")
 
         prompt = (
             f"[CONTEXT]\n{'\n'.join(context_chunks)}\n\n"
@@ -263,4 +261,5 @@ class RAG(BaseModel):
             return []
 
         collection = self.collections[collection_name]
-        return collection.collection.get(include=["metadatas"])["metadatas"]
+        results = collection.collection.get(include=["metadatas"])
+        return results["metadatas"]
