@@ -98,11 +98,6 @@ class RAGManagementUI:
         )
         self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        self.refresh_button = ttk.Button(
-            self.data_store_frame, text="Refresh", command=self.refresh_data_store
-        )
-        self.refresh_button.pack(side=tk.RIGHT, padx=5, pady=5)
-
         # Query Testing Section
         self.query_frame = ttk.LabelFrame(self.window, text="Test RAG Query")
         self.query_frame.pack(fill=tk.X, padx=10, pady=5)
