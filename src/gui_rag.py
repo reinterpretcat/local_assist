@@ -105,12 +105,6 @@ class RAGManagementUI:
         self.query_entry = ttk.Entry(self.query_frame, width=70)
         self.query_entry.pack(side=tk.LEFT, padx=5, pady=5)
 
-        self.use_selected_var = tk.BooleanVar(value=False)
-        self.use_selected_checkbox = ttk.Checkbutton(
-            self.query_frame, text="Query Selected Only", variable=self.use_selected_var
-        )
-        self.use_selected_checkbox.pack(side=tk.LEFT, padx=5, pady=5)
-
         self.query_button = ttk.Button(
             self.query_frame, text="Test Query", command=self.test_query
         )
@@ -342,37 +336,56 @@ class RAGManagementUI:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
     def test_query(self):
-        """Test a RAG query."""
+        """Test a RAG query with multiple selected collections."""
         query = self.query_entry.get()
         if not query:
             messagebox.showwarning("Warning", "Please enter a query.")
             return
 
         try:
-            selected_ids = None
-            if self.use_selected_var.get():
-                selected_items = self.data_store_tree.selection()
-                if selected_items:
-                    selected_ids = []
-                    document_refs = self.rag_model.get_document_refs()
+            selected_ids = {}
+            selected_collections = set()
+            selected_items = self.data_store_tree.selection()
 
-                    for item in selected_items:
-                        if item.startswith("doc_"):
-                            source_path = self.data_store_tree.item(item)["tags"][0]
-                            # Get all document IDs associated with this source file
-                            doc_ids = [
-                                ref.document_id
-                                for ref in document_refs.values()
-                                if ref.source == source_path
-                            ]
-                            selected_ids.extend(doc_ids)
+            if selected_items:
+                document_refs = self.rag_model.get_document_refs()
 
+                for item in selected_items:
+                    if item.startswith("doc_"):
+                        # Document selected
+                        source_path = self.data_store_tree.item(item)["tags"][0]
+                        collection_name = item.split("_")[1]  # Extract collection name from item ID
+                        selected_collections.add(collection_name)
+
+                        # Get all document IDs associated with this source file
+                        doc_ids = [
+                            ref.document_id
+                            for ref in document_refs.values()
+                            if ref.source == source_path
+                        ]
+                        if collection_name not in selected_ids:
+                            selected_ids[collection_name] = []
+                        selected_ids[collection_name].extend(doc_ids)
+                    elif item.startswith("collection_"):
+                        # Entire collection selected
+                        collection_name = item.split("_", 1)[1]
+                        selected_collections.add(collection_name)
+
+                        # Add all document IDs for the collection
+                        for ref in document_refs.values():
+                            if ref.collection_name == collection_name:
+                                if collection_name not in selected_ids:
+                                    selected_ids[collection_name] = []
+                                selected_ids[collection_name].append(ref.document_id)
+
+            # Pass list of selected collections and their document IDs
             generator = self.rag_model.forward(
                 user_query=query,
-                collection_name=self.current_collection,
+                collection_names=list(selected_collections),  # Pass list of collections
                 selected_ids=selected_ids,
             )
 
+            # Clear and enable the result box
             self.query_result.config(state=tk.NORMAL)
             self.query_result.delete(1.0, tk.END)
 

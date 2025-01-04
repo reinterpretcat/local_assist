@@ -215,12 +215,14 @@ class RAG(BaseModel):
     def retrieve_and_limit_context(
         self,
         query: str,
-        collection_name: str = None,
+        collection_names: List[str] = None,
         selected_ids: List[str] = None,
     ) -> List[str]:
         """Retrieve and filter relevant chunks while preserving their natural order."""
-        if collection_name and collection_name in self.collections:
-            collections_to_query = [self.collections[collection_name]]
+        if collection_names:
+            collections_to_query = [
+                self.collections[name] for name in collection_names if name in self.collections
+            ]
         else:
             collections_to_query = list(self.collections.values())
 
@@ -232,7 +234,11 @@ class RAG(BaseModel):
 
         all_chunks = []
         for collection in collections_to_query:
-            results = collection.query(query, self.top_k, selected_ids)
+            # Filter selected IDs for this collection
+            ids_to_query = selected_ids.get(collection.name) if selected_ids else None
+
+            # Query the collection
+            results = collection.query(query, self.top_k, ids_to_query)
 
             print_system_message(
                 f"query for '{collection}' {results=}",
@@ -327,13 +333,13 @@ class RAG(BaseModel):
     def forward(
         self,
         user_query: str,
-        collection_name: str = None,
+        collection_names: List[str] = None,
         selected_ids: List[str] = None,
     ) -> Iterator[str]:
         """Generate a response using RAG with filtered and optimized context."""
         context_chunks = self.retrieve_and_limit_context(
             query=user_query,
-            collection_name=collection_name,
+            collection_names=collection_names,
             selected_ids=selected_ids,
         )
 
