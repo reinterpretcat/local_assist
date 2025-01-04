@@ -7,7 +7,7 @@ import logging
 import time
 
 from .audio import AudioIO
-from .gui_rag import RAGManagementUI
+from .gui_rag import RAGManagementUI, RAGPromptEditor
 from .models import LLM, STT, TTS, RAG
 from .utils import compress_messages, print_system_message
 from .settings import default_theme
@@ -83,7 +83,9 @@ class AIChatUI:
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
         rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-        rag_menu.add_command(label="Manage RAG Data", command=self.toggle_rag_panel)
+        rag_menu.add_command(label="Toggle Collections", command=self.toggle_rag_panel)
+        rag_menu.add_command(label="Edit Prompts", command=self.open_rag_prompts_dialog)
+
         self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
 
         # Main PanedWindow
@@ -822,6 +824,18 @@ class AIChatUI:
         else:
             self.rag_panel.frame.pack(fill=tk.BOTH, expand=True)
         self.rag_visible = not self.rag_visible
+
+    def open_rag_prompts_dialog(self):
+        def update_prompts(updated_summary, updated_context):
+            self.rag_model.summarize_prompt = updated_summary
+            self.rag_model.context_prompt = updated_context
+
+        RAGPromptEditor(
+            root=self.root,
+            summarize_prompt=self.rag_model.summarize_prompt,
+            context_prompt=self.rag_model.context_prompt,
+            on_save_callback=update_prompts,
+        )
 
     def open_llm_settings_dialog(self):
         """Open a dialog to set LLM settings."""
