@@ -203,23 +203,17 @@ class RAG(BaseModel):
         token_limit: int = 1500,
         min_relevance: float = 0.3,
     ) -> List[str]:
-        """Retrieve and filter relevant chunks based on token limits."""
+        """Retrieve and filter relevant chunks while preserving their natural order."""
         if collection_name and collection_name in self.collections:
             collections_to_query = [self.collections[collection_name]]
         else:
             collections_to_query = list(self.collections.values())
 
-        print_system_message(
-            f"{collections_to_query=}",
-            color=Fore.LIGHTWHITE_EX,
-            log_level=logging.DEBUG,
-        )
-
         all_chunks = []
         for collection in collections_to_query:
             results = collection.query(query, top_k, selected_ids)
 
-            # Combine results with metadata and scores
+            # Group chunks by their source document
             for idx, (chunk, metadata, distance) in enumerate(
                 zip(
                     results["documents"][0],
@@ -227,8 +221,9 @@ class RAG(BaseModel):
                     results["distances"][0],
                 )
             ):
-                # Convert cosine distance to similarity
-                relevance_score = 1 - (distance / 2)
+                relevance_score = 1 - (
+                    distance / 2
+                )  # Convert cosine distance to similarity
                 if relevance_score >= min_relevance:
                     all_chunks.append(
                         {
@@ -236,23 +231,41 @@ class RAG(BaseModel):
                             "tokens": len(chunk.split()),
                             "relevance": relevance_score,
                             "metadata": metadata,
-                            "index": idx,
+                            "source": metadata.get("source", "unknown"),
+                            "source_position": metadata.get("chunk_index", idx),
                         }
                     )
 
-        # Sort chunks by relevance
-        all_chunks = sorted(all_chunks, key=lambda x: x["relevance"], reverse=True)
+        selected_text = self.limit_context(all_chunks, token_limit)
 
-        # Select text chunks while respecting token limits
+        return selected_text
+
+    def limit_context(self, all_chunks, token_limit):
+        """
+        Group chunks by source and sort each group by source_position respecting the token limit
+        """
+        grouped_chunks = {}
+        for chunk in all_chunks:
+            source = chunk["source"]
+            if source not in grouped_chunks:
+                grouped_chunks[source] = []
+            grouped_chunks[source].append(chunk)
+
+        # Sort each group by source_position to maintain document order
+        for source in grouped_chunks:
+            grouped_chunks[source].sort(key=lambda x: x["source_position"])
+
+        # Flatten grouped chunks while respecting the token limit
         selected_text = []
         selected_total_tokens = 0
 
-        for chunk in all_chunks:
-            if selected_total_tokens + chunk["tokens"] <= token_limit:
-                selected_text.append(chunk["text"])
-                selected_total_tokens += chunk["tokens"]
-            else:
-                break
+        for source in grouped_chunks:
+            for chunk in grouped_chunks[source]:
+                if selected_total_tokens + chunk["tokens"] <= token_limit:
+                    selected_text.append(chunk["text"])
+                    selected_total_tokens += chunk["tokens"]
+                else:
+                    break
 
         print_system_message(
             f"all_chunks={[c["metadata"]["id"] for c in all_chunks]}, {selected_total_tokens=}, selected text chunks={len(selected_text)}",
