@@ -87,6 +87,20 @@ class RAG(BaseModel):
         """A class for Retrieval Augmented Generation using the ollama library."""
         super().__init__(**kwargs)
 
+        self.summarize_prompt = """You are a precise document summarizer. Create a concise summary that:
+    1. Preserves key information (dates, numbers, names, technical details)
+    2. Maintains the logical flow of information
+    3. Focuses on factual content rather than narrative
+    4. Uses clear structure with paragraphs for different topics
+    
+    Prioritize accuracy of technical details and specific information over brevity."""
+
+        self.context_prompt = """You are a helpful assistant that provides accurate answers based on the given context.
+    Follow these guidelines:
+    1. Only use information from the provided context
+    2. If the context doesn't contain enough information, acknowledge the limitations
+    3. Maintain a natural, conversational tone while being precise"""
+
         self.ollama_client = Client()
         self.chroma_client = chromadb.PersistentClient(
             path=kwargs.get("persist_directory"),
@@ -257,46 +271,34 @@ class RAG(BaseModel):
 
         # Flatten grouped chunks while respecting the token limit
         selected_text = []
+        selected_chunk_ids = []
         selected_total_tokens = 0
 
         for source in grouped_chunks:
             for chunk in grouped_chunks[source]:
                 if selected_total_tokens + chunk["tokens"] <= token_limit:
                     selected_text.append(chunk["text"])
+                    selected_chunk_ids.append(chunk["metadata"]["id"])
                     selected_total_tokens += chunk["tokens"]
                 else:
                     break
 
         print_system_message(
-            f"all_chunks={[c["metadata"]["id"] for c in all_chunks]}, {selected_total_tokens=}, selected text chunks={len(selected_text)}",
+            f"all_chunks={[c["metadata"]["id"] for c in all_chunks]}, {selected_chunk_ids=} {selected_total_tokens=}",
             color=Fore.LIGHTWHITE_EX,
             log_level=logging.DEBUG,
         )
 
         return selected_text
 
-    def summarize_chunks(
-        self, chunks: List[str], token_limit: int = 1500, preserve_key_info: bool = True
-    ) -> str:
+    def summarize_chunks(self, chunks: List[str], token_limit) -> str:
         """Summarize the retrieved chunks if their combined length exceeds the token limit."""
 
-        content = "\n\n".join(chunks)
-
-        system_prompt = """You are a precise document summarizer. Create a concise summary that:
-    1. Preserves key information (dates, numbers, names, technical details)
-    2. Maintains the logical flow of information
-    3. Focuses on factual content rather than narrative
-    4. Uses clear structure with paragraphs for different topics
-    """
-
-        if preserve_key_info:
-            system_prompt += "\nPrioritize accuracy of technical details and specific information over brevity."
-
         messages = [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": self.summarize_prompt},
             {
                 "role": "user",
-                "content": f"Summarize the following content:\n\n{content}",
+                "content": f"Summarize the following content:\n\n{"\n\n".join(chunks)}",
             },
         ]
 
@@ -335,23 +337,12 @@ class RAG(BaseModel):
 
         context_text = "\n".join(context_chunks)
 
-        # Construct prompt with clear sections and instructions
-        system_prompt = """You are a helpful assistant that provides accurate answers based on the given context.
-    Follow these guidelines:
-    1. Only use information from the provided context
-    2. If the context doesn't contain enough information, acknowledge the limitations
-    3. Maintain a natural, conversational tone while being precise"""
-
+        # Construct messages with clear sections and instructions
         messages = [
-            {"role": "system", "content": system_prompt},
+            {"role": "system", "content": self.context_prompt},
             {
                 "role": "user",
-                "content": f"""Please answer based on the following context and query:
-    [CONTEXT]
-    {context_text}
-
-    [QUERY]
-    {user_query}""",
+                "content": f"Please answer based on the following context and query:\n[CONTEXT]\n{context_text}\n[QUERY]\n{user_query}",
             },
         ]
 
