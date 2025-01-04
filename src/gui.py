@@ -48,28 +48,25 @@ class AIChatUI:
         self.rag_model = rag_model
 
         self.tts_lock = threading.Lock()
-        self.active_tts_threads = 0  # # Counter for active TTS chunks
+        self.active_tts_threads = 0  # Counter for active TTS chunks
 
         self.chats = {}
         self.chat_history = []  # To store the conversation history
 
         self.tts_enabled = True  # A flag to track whether tts is enabled or not
         self.is_recording = False  # Tracks the recording state
-        self.cancel_response = False  # Flag to cancel AI response
+        self.cancel_response = False  #  Flag to cancel AI response
 
         self.listening_message_index = (
             None  # Tracks the position of the listening message
         )
         self.audio_io = AudioIO()
 
-        # Default theme (light mode)
         self.theme = default_theme
 
-        # Configure layout
         self.root.geometry("2048x1436")
         self.apply_theme()
 
-        # Top menu for options
         self.menu_bar = tk.Menu(root)
         root.config(menu=self.menu_bar)
 
@@ -86,19 +83,18 @@ class AIChatUI:
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
         rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-        rag_menu.add_command(
-            label="Manage RAG Data", command=self.open_rag_management_ui
-        )
+        rag_menu.add_command(label="Manage RAG Data", command=self.toggle_rag_panel)
         self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
 
-        # Main layout with two frames (main content + input frame)
-        self.main_frame = tk.Frame(root, bg=self.theme["bg"])
-        self.main_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        # Main PanedWindow
+        self.main_paned_window = tk.PanedWindow(root, orient=tk.HORIZONTAL)
+        self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
-        # Left panel for chat list
-        self.left_panel = tk.Frame(self.main_frame, width=200, bg=self.theme["bg"])
-        self.left_panel.pack(side=tk.LEFT, fill=tk.Y)
+        # Left panel for chat list and RAG
+        self.left_panel = tk.Frame(self.main_paned_window, bg=self.theme["bg"])
+        self.main_paned_window.add(self.left_panel, minsize=200)
 
+        # Chat list
         self.chat_list = tk.Listbox(
             self.left_panel,
             bg=self.theme["list_bg"],
@@ -149,9 +145,16 @@ class AIChatUI:
         )
         self.delete_button.pack(padx=10, pady=5, fill=tk.X)
 
+        # RAG UI
+        self.rag_panel = RAGManagementUI(self.left_panel, self.rag_model)
+        self.rag_panel.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        self.rag_visible = True
+
         # Right panel for chat display
-        self.chat_display_frame = tk.Frame(self.main_frame, bg=self.theme["chat_bg"])
-        self.chat_display_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.chat_display_frame = tk.Frame(
+            self.main_paned_window, bg=self.theme["chat_bg"]
+        )
+        self.main_paned_window.add(self.chat_display_frame, minsize=800)
 
         self.chat_display = tk.Text(
             self.chat_display_frame,
@@ -163,7 +166,6 @@ class AIChatUI:
         )
         self.chat_display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-        # configure different colors for user and ai
         self.chat_display.tag_configure(
             RoleTags.USER,
             foreground=self.theme["user"]["color_prefix"],
@@ -221,6 +223,7 @@ class AIChatUI:
 
         self.update_chat_list()
         self.create_default_chat()
+        self.toggle_rag_panel()
 
     def apply_theme(self):
         """Apply the current theme to the root window."""
@@ -812,9 +815,13 @@ class AIChatUI:
         else:
             self.append_system_message(f"Unknown command '{command}")
 
-    def open_rag_management_ui(self):
-        """Open the RAG Management window."""
-        RAGManagementUI(self.root, self.rag_model)
+    def toggle_rag_panel(self):
+        """Toggle the visibility of the RAG panel."""
+        if self.rag_visible:
+            self.rag_panel.frame.pack_forget()
+        else:
+            self.rag_panel.frame.pack(fill=tk.BOTH, expand=True)
+        self.rag_visible = not self.rag_visible
 
     def open_llm_settings_dialog(self):
         """Open a dialog to set LLM settings."""

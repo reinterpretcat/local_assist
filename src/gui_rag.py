@@ -12,30 +12,23 @@ class RAGManagementUI:
         self.rag_model = rag
         self.current_collection: Optional[str] = None
 
-        # Create the RAG Management window
-        self.window = tk.Toplevel(parent)
-        self.window.title("RAG Management")
-        self.window.geometry("1024x786")
-        self.window.transient(parent)
-        self.window.grab_set()
+        self.frame = ttk.Frame(parent)
 
         # Collection Management Section
-        self.collection_frame = ttk.LabelFrame(
-            self.window, text="Collection Management"
-        )
+        self.collection_frame = ttk.LabelFrame(self.frame, text="Collection Management")
         self.collection_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Collection management buttons
         self.new_collection_button = ttk.Button(
             self.collection_frame,
-            text="New Collection",
+            text="New",
             command=self.create_new_collection,
         )
         self.new_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         self.rename_collection_button = ttk.Button(
             self.collection_frame,
-            text="Rename Collection",
+            text="Rename",
             command=self.rename_collection,
         )
         self.rename_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
@@ -46,7 +39,7 @@ class RAGManagementUI:
         self.delete_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
         # Data Store Section
-        self.data_store_frame = ttk.LabelFrame(self.window, text="Data Store")
+        self.data_store_frame = ttk.LabelFrame(self.frame, text="Data Store")
         self.data_store_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
 
         # Create a frame to hold the Treeview and scrollbars
@@ -73,7 +66,7 @@ class RAGManagementUI:
         self.data_store_tree.heading("Type", text="File Type")
 
         # Set column widths
-        self.data_store_tree.column("Name", width=800, minwidth=200)
+        self.data_store_tree.column("Name", width=400, minwidth=200)
         self.data_store_tree.column("Type", width=100, minwidth=80)
 
         # Create vertical scrollbar
@@ -98,22 +91,10 @@ class RAGManagementUI:
         )
         self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        # Query Testing Section
-        self.query_frame = ttk.LabelFrame(self.window, text="Test RAG Query")
-        self.query_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        self.query_entry = ttk.Entry(self.query_frame, width=70)
-        self.query_entry.pack(side=tk.LEFT, padx=5, pady=5)
-
-        self.query_button = ttk.Button(
-            self.query_frame, text="Test Query", command=self.test_query
+        self.context_button = ttk.Button(
+            self.data_store_frame, text="Set Context", command=self.set_context
         )
-        self.query_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        self.query_result = tk.Text(
-            self.window, wrap=tk.WORD, height=8, state=tk.DISABLED, bg="#f9f9f9"
-        )
-        self.query_result.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
+        self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
         # Initialize the UI
         self.refresh_data_store()
@@ -200,6 +181,10 @@ class RAGManagementUI:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to upload file: {e}")
+
+    def set_context(self):
+        """Sets context to selected chat."""
+        pass
 
     def refresh_data_store(self):
         """Refresh the data store display with hierarchical view."""
@@ -335,73 +320,73 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
-    def test_query(self):
-        """Test a RAG query with multiple selected collections."""
-        query = self.query_entry.get()
-        if not query:
-            messagebox.showwarning("Warning", "Please enter a query.")
-            return
+    # def test_query(self):
+    #     """Test a RAG query with multiple selected collections."""
+    #     query = self.query_entry.get()
+    #     if not query:
+    #         messagebox.showwarning("Warning", "Please enter a query.")
+    #         return
 
-        try:
-            selected_ids = {}
-            selected_collections = set()
-            selected_items = self.data_store_tree.selection()
+    #     try:
+    #         selected_ids = {}
+    #         selected_collections = set()
+    #         selected_items = self.data_store_tree.selection()
 
-            if selected_items:
-                document_refs = self.rag_model.get_document_refs()
+    #         if selected_items:
+    #             document_refs = self.rag_model.get_document_refs()
 
-                for item in selected_items:
-                    if item.startswith("doc_"):
-                        # Document selected
-                        source_path = self.data_store_tree.item(item)["tags"][0]
-                        collection_name = item.split("_")[1]  # Extract collection name from item ID
-                        selected_collections.add(collection_name)
+    #             for item in selected_items:
+    #                 if item.startswith("doc_"):
+    #                     # Document selected
+    #                     source_path = self.data_store_tree.item(item)["tags"][0]
+    #                     collection_name = item.split("_")[1]  # Extract collection name from item ID
+    #                     selected_collections.add(collection_name)
 
-                        # Get all document IDs associated with this source file
-                        doc_ids = [
-                            ref.document_id
-                            for ref in document_refs.values()
-                            if ref.source == source_path
-                        ]
-                        if collection_name not in selected_ids:
-                            selected_ids[collection_name] = []
-                        selected_ids[collection_name].extend(doc_ids)
-                    elif item.startswith("collection_"):
-                        # Entire collection selected
-                        collection_name = item.split("_", 1)[1]
-                        selected_collections.add(collection_name)
+    #                     # Get all document IDs associated with this source file
+    #                     doc_ids = [
+    #                         ref.document_id
+    #                         for ref in document_refs.values()
+    #                         if ref.source == source_path
+    #                     ]
+    #                     if collection_name not in selected_ids:
+    #                         selected_ids[collection_name] = []
+    #                     selected_ids[collection_name].extend(doc_ids)
+    #                 elif item.startswith("collection_"):
+    #                     # Entire collection selected
+    #                     collection_name = item.split("_", 1)[1]
+    #                     selected_collections.add(collection_name)
 
-                        # Add all document IDs for the collection
-                        for ref in document_refs.values():
-                            if ref.collection_name == collection_name:
-                                if collection_name not in selected_ids:
-                                    selected_ids[collection_name] = []
-                                selected_ids[collection_name].append(ref.document_id)
+    #                     # Add all document IDs for the collection
+    #                     for ref in document_refs.values():
+    #                         if ref.collection_name == collection_name:
+    #                             if collection_name not in selected_ids:
+    #                                 selected_ids[collection_name] = []
+    #                             selected_ids[collection_name].append(ref.document_id)
 
-            # Pass list of selected collections and their document IDs
-            generator = self.rag_model.forward(
-                user_query=query,
-                collection_names=list(selected_collections),  # Pass list of collections
-                selected_ids=selected_ids,
-            )
+    #         # Pass list of selected collections and their document IDs
+    #         generator = self.rag_model.forward(
+    #             user_query=query,
+    #             collection_names=list(selected_collections),  # Pass list of collections
+    #             selected_ids=selected_ids,
+    #         )
 
-            # Clear and enable the result box
-            self.query_result.config(state=tk.NORMAL)
-            self.query_result.delete(1.0, tk.END)
+    #         # Clear and enable the result box
+    #         self.query_result.config(state=tk.NORMAL)
+    #         self.query_result.delete(1.0, tk.END)
 
-            def process_tokens():
-                try:
-                    token = next(generator)
-                    self.query_result.insert(tk.END, token)
-                    self.query_result.see(tk.END)
-                    self.query_result.after(10, process_tokens)
-                except StopIteration:
-                    self.query_result.config(state=tk.DISABLED)
-                except Exception as e:
-                    messagebox.showerror("Error", f"Failed to stream tokens: {e}")
-                    self.query_result.config(state=tk.DISABLED)
+    #         def process_tokens():
+    #             try:
+    #                 token = next(generator)
+    #                 self.query_result.insert(tk.END, token)
+    #                 self.query_result.see(tk.END)
+    #                 self.query_result.after(10, process_tokens)
+    #             except StopIteration:
+    #                 self.query_result.config(state=tk.DISABLED)
+    #             except Exception as e:
+    #                 messagebox.showerror("Error", f"Failed to stream tokens: {e}")
+    #                 self.query_result.config(state=tk.DISABLED)
 
-            process_tokens()
+    #         process_tokens()
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to test query: {e}")
+    #     except Exception as e:
+    #         messagebox.showerror("Error", f"Failed to test query: {e}")
