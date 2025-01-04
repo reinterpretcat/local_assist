@@ -73,7 +73,7 @@ class RAGManagementUI:
         self.data_store_tree.heading("Type", text="File Type")
 
         # Set column widths
-        self.data_store_tree.column("Name", width=500, minwidth=200)
+        self.data_store_tree.column("Name", width=800, minwidth=200)
         self.data_store_tree.column("Type", width=100, minwidth=80)
 
         # Create vertical scrollbar
@@ -147,7 +147,6 @@ class RAGManagementUI:
             self.current_collection = parent.replace("collection_", "")
 
         self.update_button_states()
-
 
     def update_button_states(self):
         """Update button states based on current selection."""
@@ -267,7 +266,6 @@ class RAGManagementUI:
             messagebox.showerror("Error", f"Failed to refresh data store: {e}")
 
         self.update_button_states()
-
 
     def delete_selected(self):
         """Delete selected items (files or collections)."""
