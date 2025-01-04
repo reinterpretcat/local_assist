@@ -87,19 +87,8 @@ class RAG(BaseModel):
         """A class for Retrieval Augmented Generation using the ollama library."""
         super().__init__(**kwargs)
 
-        self.summarize_prompt = """You are a precise document summarizer. Create a concise summary that:
-    1. Preserves key information (dates, numbers, names, technical details)
-    2. Maintains the logical flow of information
-    3. Focuses on factual content rather than narrative
-    4. Uses clear structure with paragraphs for different topics
-    
-    Prioritize accuracy of technical details and specific information over brevity."""
-
-        self.context_prompt = """You are a helpful assistant that provides accurate answers based on the given context.
-    Follow these guidelines:
-    1. Only use information from the provided context
-    2. If the context doesn't contain enough information, acknowledge the limitations
-    3. Maintain a natural, conversational tone while being precise"""
+        self.summarize_prompt = kwargs.get("summarize_prompt")
+        self.context_prompt = kwargs.get("context_prompt")
 
         self.ollama_client = Client()
         self.chroma_client = chromadb.PersistentClient(

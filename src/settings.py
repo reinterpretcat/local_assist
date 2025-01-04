@@ -30,6 +30,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+# theme colors (WIP, partial support)
 default_theme = {
     "bg": "#f7f7f8",
     "fg": "#000000",
@@ -47,10 +48,11 @@ default_theme = {
 }
 
 default_config = {
+    # LLM config
     "llm": {
         "disable_chat_history": False,
         "model": "llama3.1:8b-instruct-q4_0",
-        # NOTE OLLama options are supported
+        # NOTE Passed as ollama client's Options
         # "options": {
         #     # adjusts creativity. Lower values for precise responses, higher values for creative answers.
         #     "temperature": 0.7,
@@ -67,15 +69,31 @@ default_config = {
         #     "num_predict": 20
         # }
     },
+    # retrieval augument generation config
     "rag": {
         "model": "llama3.1:8b-instruct-q4_0",
-        "persist_directory": ".chromadb"  
+        "persist_directory": ".chromadb",
+        # summarization prompt is used to extract information from documents
+        "summarize_prompt": """You are a precise document summarizer. Create a concise summary that:
+    1. Preserves key information (dates, numbers, names, technical details)
+    2. Maintains the logical flow of information
+    3. Focuses on factual content rather than narrative
+    4. Uses clear structure with paragraphs for different topics
+    Prioritize accuracy of technical details and specific information over brevity.""",
+        # context prompt is used to chat over used documents
+        "context_prompt": """You are a helpful assistant that provides accurate answers based on the given context.
+    Follow these guidelines:
+    1. Only use information from the provided context
+    2. If the context doesn't contain enough information, acknowledge the limitations
+    3. Maintain a natural, conversational tone while being precise""",
     },
+    # speech to text config
     "stt": {
         "device": settings.TORCH_DEVICE,
         "generation_args": {"batch_size": 8},
         "model": "openai/whisper-small.en",
     },
+    # text to speech config
     "tts": {
         "device": settings.TORCH_DEVICE,
         "model": "tts_models/en/ljspeech/glow-tts",
