@@ -89,6 +89,9 @@ class RAG(BaseModel):
 
         self.summarize_prompt = kwargs.get("summarize_prompt")
         self.context_prompt = kwargs.get("context_prompt")
+        self.token_limit = int(kwargs.get("token_limit"))
+        self.min_relevance = float(kwargs.get("min_relevance"))
+        self.top_k = int(kwargs.get("top_k"))
 
         self.ollama_client = Client()
         self.chroma_client = chromadb.PersistentClient(
@@ -202,9 +205,6 @@ class RAG(BaseModel):
         query: str,
         collection_name: str = None,
         selected_ids: List[str] = None,
-        top_k: int = 10,
-        token_limit: int = 1500,
-        min_relevance: float = 0.3,
     ) -> List[str]:
         """Retrieve and filter relevant chunks while preserving their natural order."""
         if collection_name and collection_name in self.collections:
@@ -220,7 +220,13 @@ class RAG(BaseModel):
 
         all_chunks = []
         for collection in collections_to_query:
-            results = collection.query(query, top_k, selected_ids)
+            results = collection.query(query, self.top_k, selected_ids)
+
+            print_system_message(
+                f"query for '{collection}' {results=}",
+                color=Fore.LIGHTWHITE_EX,
+                log_level=logging.DEBUG,
+            )
 
             # Group chunks by their source document
             for idx, (chunk, metadata, distance) in enumerate(
@@ -230,10 +236,9 @@ class RAG(BaseModel):
                     results["distances"][0],
                 )
             ):
-                relevance_score = 1 - (
-                    distance / 2
-                )  # Convert cosine distance to similarity
-                if relevance_score >= min_relevance:
+                # Convert cosine distance to similarity
+                relevance_score = 1 - (distance / 2)
+                if relevance_score >= self.min_relevance:
                     all_chunks.append(
                         {
                             "text": chunk,
@@ -245,11 +250,11 @@ class RAG(BaseModel):
                         }
                     )
 
-        selected_text = self.limit_context(all_chunks, token_limit)
+        selected_text = self.limit_context(all_chunks)
 
         return selected_text
 
-    def limit_context(self, all_chunks, token_limit):
+    def limit_context(self, all_chunks):
         """
         Group chunks by source and sort each group by source_position respecting the token limit
         """
@@ -271,7 +276,7 @@ class RAG(BaseModel):
 
         for source in grouped_chunks:
             for chunk in grouped_chunks[source]:
-                if selected_total_tokens + chunk["tokens"] <= token_limit:
+                if selected_total_tokens + chunk["tokens"] <= self.token_limit:
                     selected_text.append(chunk["text"])
                     selected_chunk_ids.append(chunk["metadata"]["id"])
                     selected_total_tokens += chunk["tokens"]
@@ -286,7 +291,7 @@ class RAG(BaseModel):
 
         return selected_text
 
-    def summarize_chunks(self, chunks: List[str], token_limit) -> str:
+    def summarize_chunks(self, chunks: List[str]) -> str:
         """Summarize the retrieved chunks if their combined length exceeds the token limit."""
 
         messages = [
@@ -302,8 +307,8 @@ class RAG(BaseModel):
 
         # Ensure the summary fits within the token limit
         summary = response["content"]
-        if len(summary.split()) > token_limit:
-            summary = " ".join(summary.split()[:token_limit]) + "..."
+        if len(summary.split()) > self.token_limit:
+            summary = " ".join(summary.split()[: self.token_limit]) + "..."
         return summary
 
     def forward(
@@ -311,24 +316,18 @@ class RAG(BaseModel):
         user_query: str,
         collection_name: str = None,
         selected_ids: List[str] = None,
-        token_limit: int = 1500,
     ) -> Iterator[str]:
         """Generate a response using RAG with filtered and optimized context."""
         context_chunks = self.retrieve_and_limit_context(
             query=user_query,
             collection_name=collection_name,
             selected_ids=selected_ids,
-            top_k=10,
-            token_limit=token_limit,
-            min_relevance=0.1,
         )
 
         # Summarize chunks if the combined length exceeds token_limit
         total_tokens = sum(len(chunk.split()) for chunk in context_chunks)
-        if total_tokens > token_limit:
-            context_chunks = [
-                self.summarize_chunks(context_chunks, token_limit=token_limit)
-            ]
+        if total_tokens > self.token_limit:
+            context_chunks = [self.summarize_chunks(context_chunks)]
 
         context_text = "\n".join(context_chunks)
 

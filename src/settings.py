@@ -71,8 +71,16 @@ default_config = {
     },
     # retrieval augument generation config
     "rag": {
+        # LLM to use
         "model": "llama3.1:8b-instruct-q4_0",
+        # where to store data
         "persist_directory": ".chromadb",
+        # how many tokens to request
+        "token_limit": 1500,
+        # summarization relevance threshold
+        "min_relevance": 0.1,
+        # maximum number of results (chunks) to retrieve from store
+        "top_k": 10,
         # summarization prompt is used to extract information from documents
         "summarize_prompt": """You are a precise document summarizer. Create a concise summary that:
     1. Preserves key information (dates, numbers, names, technical details)
