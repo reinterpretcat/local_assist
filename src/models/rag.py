@@ -262,12 +262,33 @@ class RAG(BaseModel):
 
         return selected_text
 
-    def summarize_chunks(self, chunks: List[str], token_limit: int = 1500) -> str:
+    def summarize_chunks(
+        self, chunks: List[str], token_limit: int = 1500, preserve_key_info: bool = True
+    ) -> str:
         """Summarize the retrieved chunks if their combined length exceeds the token limit."""
-        prompt = "Summarize the following information concisely:\n\n" + "\n\n".join(
-            chunks
-        )
-        response = self.ollama_client.chat([{"role": "user", "content": prompt}])
+
+        content = "\n\n".join(chunks)
+
+        system_prompt = """You are a precise document summarizer. Create a concise summary that:
+    1. Preserves key information (dates, numbers, names, technical details)
+    2. Maintains the logical flow of information
+    3. Focuses on factual content rather than narrative
+    4. Uses clear structure with paragraphs for different topics
+    """
+
+        if preserve_key_info:
+            system_prompt += "\nPrioritize accuracy of technical details and specific information over brevity."
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"Summarize the following content:\n\n{content}",
+            },
+        ]
+
+        # TODO use options, e.g. to limit tokens
+        response = self.ollama_client.chat(model=self.model_id, messages=messages)
 
         # Ensure the summary fits within the token limit
         summary = response["content"]
@@ -299,15 +320,30 @@ class RAG(BaseModel):
                 self.summarize_chunks(context_chunks, token_limit=token_limit)
             ]
 
-        # Construct the prompt
-        prompt = (
-            f"[CONTEXT]\n{'\n'.join(context_chunks)}\n\n"
-            f"[QUERY]\n{user_query}\n\n"
-            f"[INSTRUCTION]\nAnswer based on the provided context."
-        )
+        context_text = "\n".join(context_chunks)
+
+        # Construct prompt with clear sections and instructions
+        system_prompt = """You are a helpful assistant that provides accurate answers based on the given context.
+    Follow these guidelines:
+    1. Only use information from the provided context
+    2. If the context doesn't contain enough information, acknowledge the limitations
+    3. Maintain a natural, conversational tone while being precise"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"""Please answer based on the following context and query:
+    [CONTEXT]
+    {context_text}
+
+    [QUERY]
+    {user_query}""",
+            },
+        ]
 
         print_system_message(
-            f"{prompt=}",
+            f"RAG {messages=}",
             color=Fore.LIGHTWHITE_EX,
             log_level=logging.DEBUG,
         )
@@ -315,7 +351,7 @@ class RAG(BaseModel):
         # Generate response token by token
         stream = self.ollama_client.chat(
             model=self.model_id,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             stream=True,
         )
 
