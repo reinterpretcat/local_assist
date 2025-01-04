@@ -25,12 +25,6 @@ class RAGManagementUI:
         )
         self.collection_frame.pack(fill=tk.X, padx=10, pady=5)
 
-        # Current collection label
-        self.collection_label = ttk.Label(
-            self.collection_frame, text="Current Collection: None"
-        )
-        self.collection_label.pack(side=tk.LEFT, padx=5, pady=5)
-
         # Collection management buttons
         self.new_collection_button = ttk.Button(
             self.collection_frame,
@@ -152,13 +146,8 @@ class RAGManagementUI:
             # If the item is a document, use its parent collection
             self.current_collection = parent.replace("collection_", "")
 
-        self.update_collection_label()
         self.update_button_states()
 
-    def update_collection_label(self):
-        """Update the current collection label."""
-        label_text = f"Current Collection: {self.current_collection or 'None'}"
-        self.collection_label.config(text=label_text)
 
     def update_button_states(self):
         """Update button states based on current selection."""
@@ -176,7 +165,6 @@ class RAGManagementUI:
                 self.rag_model.get_or_create_collection(name)
                 self.current_collection = name
                 self.refresh_data_store()
-                self.update_collection_label()
 
                 # Expand the newly created collection
                 collection_id = f"collection_{name}"
@@ -278,7 +266,6 @@ class RAGManagementUI:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to refresh data store: {e}")
 
-        self.update_collection_label()
         self.update_button_states()
 
 
