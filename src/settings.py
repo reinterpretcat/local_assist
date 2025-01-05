@@ -78,14 +78,14 @@ default_config = {
             # "seed": 123,
             # "num_ctx": 1024
             # "num_predict": 20
-            "num_ctx": 4096,
-            "temperature": 0.3,
-            "top_p": 0.8,  # More focused token selection
+            "num_ctx": 2048,
+            #"temperature": 0.3,
+            #"top_p": 0.8,  # More focused token selection
         },
         # where to store data
         "persist_directory": ".chromadb",
         # how many tokens to request
-        "token_limit": 4096,
+        "token_limit": 2048,
         # summarization relevance threshold
         "min_relevance": 0.1,
         # maximum number of results (chunks) to retrieve from store

@@ -188,7 +188,7 @@ class ContextManager:
         response = chat_callback(messages)
 
         # Post-process the summary to ensure quality
-        summary = self._post_process_chunk_summary(response["content"])
+        summary = self._post_process_chunk_summary(response)
 
         if len(summary.split()) > self.token_limit:
             summary = " ".join(summary.split()[: self.token_limit]) + "..."
@@ -368,7 +368,7 @@ class RAG(BaseModel):
                 model=self.model_id,
                 messages=messages,
                 options=self.options,
-            )
+            )["message"]["content"]
 
         context_text = self.context_manager.get_context_text(
             user_query=user_query,
