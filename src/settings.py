@@ -89,7 +89,7 @@ default_config = {
         # summarization relevance threshold
         "min_relevance": 0.1,
         # maximum number of results (chunks) to retrieve from store
-        "top_k": 1024,
+        "top_k": 256,
         # summarization prompt is used to extract information from documents
         "summarize_prompt": """You are a precise document summarizer. Create a concise summary that:
     1. Preserves key information (dates, numbers, names, technical details)
