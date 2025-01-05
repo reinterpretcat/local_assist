@@ -37,7 +37,6 @@ class LLM(BaseModel):
         self.system_prompt: Optional[str] = kwargs.get("system_prompt")
 
         self.options: Optional[Options] = kwargs.get("options")
-        print(f"{self.options=}")
 
         if self.system_prompt:
             self.messages.append({"role": "system", "content": self.system_prompt})

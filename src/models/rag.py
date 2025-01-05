@@ -221,7 +221,9 @@ class RAG(BaseModel):
         """Retrieve and filter relevant chunks while preserving their natural order."""
         if collection_names:
             collections_to_query = [
-                self.collections[name] for name in collection_names if name in self.collections
+                self.collections[name]
+                for name in collection_names
+                if name in self.collections
             ]
         else:
             collections_to_query = list(self.collections.values())
@@ -330,13 +332,14 @@ class RAG(BaseModel):
             summary = " ".join(summary.split()[: self.token_limit]) + "..."
         return summary
 
-    def forward(
+    def get_init_messages(
         self,
         user_query: str,
         collection_names: List[str] = None,
         selected_ids: List[str] = None,
-    ) -> Iterator[str]:
-        """Generate a response using RAG with filtered and optimized context."""
+    ) -> List[Dict[str, str]]:
+        """Generates init messages for RAG chat."""
+
         context_chunks = self.retrieve_and_limit_context(
             query=user_query,
             collection_names=collection_names,
@@ -359,10 +362,20 @@ class RAG(BaseModel):
             },
         ]
 
-        print_system_message(
-            f"RAG {messages=}",
-            color=Fore.LIGHTWHITE_EX,
-            log_level=logging.DEBUG,
+        return messages
+
+    def forward(
+        self,
+        user_query: str,
+        collection_names: List[str] = None,
+        selected_ids: List[str] = None,
+    ) -> Iterator[str]:
+        """Generate a response using RAG with filtered and optimized context."""
+
+        messages = self.get_init_messages(
+            user_query=user_query,
+            collection_names=collection_names,
+            selected_ids=selected_ids,
         )
 
         # Generate response token by token
