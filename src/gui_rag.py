@@ -92,7 +92,7 @@ class RAGManagementUI:
         self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         self.context_button = ttk.Button(
-            self.data_store_frame, text="Set Context", command=self.set_context
+            self.data_store_frame, text="Set Query", command=self.set_query
         )
         self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
@@ -125,6 +125,7 @@ class RAGManagementUI:
             state="normal" if has_collection else "disabled"
         )
         self.upload_button.config(state="normal" if has_collection else "disabled")
+        self.context_button.config(state="normal" if has_collection else "disabled")
 
     def create_new_collection(self):
         """Create a new collection."""
@@ -181,10 +182,6 @@ class RAGManagementUI:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to upload file: {e}")
-
-    def set_context(self):
-        """Sets context to selected chat."""
-        pass
 
     def refresh_data_store(self):
         """Refresh the data store display with hierarchical view."""
@@ -320,6 +317,19 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
+    def set_query(self):
+        """Sets context to selected chat."""
+
+        def on_save_callback():
+            pass
+
+        RAGQueryEditor(
+            self.parent,
+            summarize_prompt=self.rag_model.summarize_prompt,
+            context_prompt=self.rag_model.context_prompt,
+            on_save_callback=on_save_callback,
+        )
+
     # def test_query(self):
     #     """Test a RAG query with multiple selected collections."""
     #     query = self.query_entry.get()
@@ -392,7 +402,7 @@ class RAGManagementUI:
     #         messagebox.showerror("Error", f"Failed to test query: {e}")
 
 
-class RAGPromptEditor:
+class RAGQueryEditor:
     def __init__(self, root, summarize_prompt, context_prompt, on_save_callback):
         """
         A window to edit summarize_prompt and context_prompt.
@@ -404,7 +414,7 @@ class RAGPromptEditor:
             on_save_callback: Function to call when the user saves the changes.
         """
         self.root = tk.Toplevel(root)
-        self.root.title("Edit Prompts")
+        self.root.title("Edit RAG Prompts and Query")
 
         self.on_save_callback = on_save_callback
 
@@ -424,19 +434,28 @@ class RAGPromptEditor:
         self.context_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         self.context_text.insert("1.0", context_prompt)
 
-        # Buttons for Save and Cancel
-        self.button_frame = ttk.Frame(self.root)
-        self.button_frame.pack(fill=tk.X, pady=10)
+        # Create fields for user query
+        self.query_label = ttk.Label(self.root, text="User Query:")
+        self.query_label.pack(anchor="w", padx=10, pady=(10, 0))
 
-        self.save_button = ttk.Button(self.button_frame, text="Save", command=self.save)
-        self.save_button.pack(side=tk.RIGHT, padx=5)
+        self.query_text = tk.Text(self.root, wrap=tk.WORD, height=4)
+        self.query_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
-        self.cancel_button = ttk.Button(
-            self.button_frame, text="Cancel", command=self.root.destroy
-        )
-        self.cancel_button.pack(side=tk.RIGHT, padx=5)
+        self.add_apply_cancel_buttons(on_save=self.save)
+        self.autoscale()
 
-        # Autoscale window size and center it
+    def save(self):
+        """Handle saving the updated prompts and user query."""
+        user_query = self.query_text.get("1.0", tk.END).strip()
+        updated_summary = self.summary_text.get("1.0", tk.END).strip()
+        updated_context = self.context_text.get("1.0", tk.END).strip()
+
+        # Trigger the save callback with the updated values
+        self.on_save_callback(user_query, updated_summary, updated_context)
+        self.root.destroy()
+
+    def autoscale(self):
+        """Autoscale window size and center it"""
         self.root.update_idletasks()  # Ensure geometry is calculated
         width = self.root.winfo_reqwidth()
         height = self.root.winfo_reqheight()
@@ -446,11 +465,15 @@ class RAGPromptEditor:
         y = (screen_height - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
 
-    def save(self):
-        """Handle saving the updated prompts."""
-        updated_summary = self.summary_text.get("1.0", tk.END).strip()
-        updated_context = self.context_text.get("1.0", tk.END).strip()
+    def add_apply_cancel_buttons(self, on_save):
+        """Adds buttons for Apply and Cancel"""
+        self.button_frame = ttk.Frame(self.root)
+        self.button_frame.pack(fill=tk.X, pady=10)
 
-        # Trigger the save callback with the updated values
-        self.on_save_callback(updated_summary, updated_context)
-        self.root.destroy()
+        self.apply_button = ttk.Button(self.button_frame, text="Apply", command=on_save)
+        self.apply_button.pack(side=tk.RIGHT, padx=5)
+
+        self.cancel_button = ttk.Button(
+            self.button_frame, text="Cancel", command=self.root.destroy
+        )
+        self.cancel_button.pack(side=tk.RIGHT, padx=5)
