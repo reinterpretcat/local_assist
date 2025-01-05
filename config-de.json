@@ -8,7 +8,10 @@
         }
     },
     "rag": {
-        "model": "cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0"
+        "model": "cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0",
+        "options": {
+            "num_ctx": 4096
+        }
     },
     "stt": {
         "device": "cuda",

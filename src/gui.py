@@ -685,13 +685,18 @@ class AIChatUI:
 
     def reinsert_messages_from_history(self):
         """Reinsert messages with appropriate tags."""
-        for message in self.chat_history:
+        for idx, message in enumerate(self.chat_history):
             if message["role"] == RoleNames.USER:
                 self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
             elif message["role"] == RoleNames.ASSISTANT:
                 self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
             elif message["role"] == RoleNames.TOOL:
                 self.chat_display.insert(tk.END, "Tool: ", RoleTags.TOOL)
+            elif idx == 0 and message["role"] == "system":
+                print_system_message(
+                    f"skip initial system message: {message}", color=Fore.LIGHTBLUE_EX
+                )
+                continue
 
             self.chat_display.insert(
                 tk.END, f"{message['content']}\n", RoleTags.CONTENT

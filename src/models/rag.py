@@ -4,7 +4,7 @@ from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 import chromadb
 from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-from ollama import Client
+from ollama import Client, Options
 import os
 from pathlib import Path
 from .common import BaseModel
@@ -113,16 +113,16 @@ class RAG(BaseModel):
             database=DEFAULT_DATABASE,
         )
 
+        # LLM options
+        self.options: Optional[Options] = kwargs.get("options")
+
         # Dictionary to store all collections
         self.collections: Dict[str, RAGCollection] = {}
 
         # Dictionary to store document references
         self.document_refs: Dict[str, DocumentReference] = {}
 
-        # Load existing collections and document refs
         self._load_existing_collections_and_refs()
-
-        # Initialize default collection
         self.get_or_create_collection("default")
 
     def _load_existing_collections_and_refs(self):
@@ -323,8 +323,11 @@ class RAG(BaseModel):
             },
         ]
 
-        # TODO use options, e.g. to limit tokens
-        response = self.ollama_client.chat(model=self.model_id, messages=messages)
+        response = self.ollama_client.chat(
+            model=self.model_id,
+            messages=messages,
+            options=self.options,
+        )
 
         # Ensure the summary fits within the token limit
         summary = response["content"]
@@ -383,6 +386,7 @@ class RAG(BaseModel):
             model=self.model_id,
             messages=messages,
             stream=True,
+            options=self.options,
         )
 
         for chunk in stream:

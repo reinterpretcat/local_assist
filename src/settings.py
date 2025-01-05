@@ -71,8 +71,15 @@ default_config = {
     },
     # retrieval augument generation config
     "rag": {
-        # LLM to use
+        # LLM to use for RAG
         "model": "llama3.1:8b-instruct-q4_0",
+        # NOTE same as for llm, but used only for RAG
+        # "options": {
+        #     "temperature": 0.7,
+        #     "seed": 123,
+        #     "num_ctx": 1024
+        #     "num_predict": 20
+        # }
         # where to store data
         "persist_directory": ".chromadb",
         # how many tokens to request
