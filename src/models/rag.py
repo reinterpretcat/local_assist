@@ -26,6 +26,7 @@ class RAGCollection:
     def __init__(self, collection_name: str, chroma_client):
         self.name = collection_name
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
+
         self.collection = chroma_client.get_or_create_collection(
             name=collection_name,
             # https://docs.trychroma.com/docs/collections/configure
@@ -94,6 +95,251 @@ class RAGCollection:
         return {metadata["source"] for metadata in results["metadatas"]}
 
 
+class ImprovedContextManager:
+    def __init__(self, **kwargs):
+
+        self.token_limit = int(kwargs.get("token_limit"))
+        self.min_relevance = float(kwargs.get("min_relevance"))
+        self.top_k = int(kwargs.get("top_k"))
+
+        # Common quote marks across different languages/styles
+        self.quote_pairs = [
+            ('"', '"'),  # English double quotes
+            ("'", "'"),  # English single quotes
+            ("«", "»"),  # French/Russian quotation marks
+            ("„", '"'),  # German quotation marks
+            ('"', '"'),  # Curved double quotes
+            (""", """),  # Curved single quotes
+            ("「", "」"),  # Japanese/Chinese quotes
+            ("《", "》"),  # Chinese/Korean quotes
+            ("‹", "›"),  # Single angle quotes
+            ("（", "）"),  # Full-width parentheses
+        ]
+
+    def retrieve_and_limit_context(
+        self,
+        query: str,
+        collections: List[RAGCollection] = None,
+        selected_ids: List[str] = None,
+    ) -> List[str]:
+        """Retrieve and filter relevant chunks while preserving their natural order."""
+
+        all_chunks = []
+        for collection in collections:
+            # Filter selected IDs for this collection
+            ids_to_query = selected_ids.get(collection.name) if selected_ids else None
+            results = collection.query(query, self.top_k, ids_to_query)
+
+            for idx, (chunk, metadata, distance) in enumerate(
+                zip(
+                    results["documents"][0],
+                    results["metadatas"][0],
+                    results["distances"][0],
+                )
+            ):
+                relevance_score = 1 - (distance / 2)
+                if relevance_score >= self.min_relevance:
+                    all_chunks.append(
+                        {
+                            "text": chunk,
+                            "tokens": len(chunk.split()),
+                            "relevance": relevance_score,
+                            "metadata": metadata,
+                            "source": metadata.get("source", "unknown"),
+                            "source_position": metadata.get("chunk_index", idx),
+                        }
+                    )
+
+        selected_text = self._limit_context(all_chunks)
+        return selected_text
+
+    def summarize_chunks(
+        self, summarize_prompt, chunks: List[str], chat_callback
+    ) -> str:
+        """
+        Language-independent chunk summarization with context preservation.
+        """
+        # Combine related chunks before summarization
+        grouped_chunks = self._group_related_chunks(chunks)
+
+        messages = [
+            {"role": "system", "content": summarize_prompt},
+            {
+                "role": "user",
+                "content": f"Summarize while preserving context, dialogue, and language style:\n\n{'\n\n'.join(grouped_chunks)}",
+            },
+        ]
+
+        response = chat_callback(messages)
+
+        # Post-process the summary to ensure quality
+        summary = self._post_process_summary(response["content"])
+
+        return summary
+
+    def _limit_context(self, all_chunks):
+        """Group chunks by source and sort them while respecting the token limit."""
+        grouped_chunks = {}
+        for chunk in all_chunks:
+            source = chunk["source"]
+            if source not in grouped_chunks:
+                grouped_chunks[source] = []
+            grouped_chunks[source].append(chunk)
+
+        for source in grouped_chunks:
+            grouped_chunks[source].sort(key=lambda x: x["source_position"])
+
+        selected_text = []
+        selected_total_tokens = 0
+
+        for source in grouped_chunks:
+            for chunk in grouped_chunks[source]:
+                if selected_total_tokens + chunk["tokens"] <= self.token_limit:
+                    selected_text.append(chunk["text"])
+                    selected_total_tokens += chunk["tokens"]
+                else:
+                    break
+
+        return selected_text
+
+    def _group_related_chunks(self, chunks: List[str]) -> List[str]:
+        """
+        Group related chunks based on narrative continuity, independent of language.
+        """
+        grouped = []
+        current_group = []
+
+        for chunk in chunks:
+            # Check if chunk is related to current group
+            if not current_group or self._are_chunks_related(current_group[-1], chunk):
+                current_group.append(chunk)
+            else:
+                # Start new group if not related
+                if current_group:
+                    grouped.append("\n".join(current_group))
+                current_group = [chunk]
+
+        # Add final group
+        if current_group:
+            grouped.append("\n".join(current_group))
+
+        return grouped
+
+    def _are_chunks_related(self, chunk1: str, chunk2: str) -> bool:
+        """
+        Determine if two chunks are narratively related, using language-agnostic markers.
+        """
+        # Check for dialogue using any quote style
+        has_dialogue = self._has_dialogue(chunk1) and self._has_dialogue(chunk2)
+
+        # Check for scene continuity
+        same_scene = self._check_same_scene(chunk1, chunk2)
+
+        return has_dialogue or same_scene
+
+    def _has_dialogue(self, text: str) -> bool:
+        """
+        Check for presence of dialogue using various quote styles.
+        """
+        return any(
+            opening in text or closing in text for opening, closing in self.quote_pairs
+        )
+
+    def _check_same_scene(self, chunk1: str, chunk2: str) -> bool:
+        """
+        Check if chunks are from the same scene using structural analysis.
+        """
+        # Look for paragraph breaks
+        if chunk2.startswith("\n\n") or chunk2.startswith("\r\n\r\n"):
+            return False
+
+        # Check for speaker changes in dialogue
+        if self._has_dialogue(chunk2):
+            speakers1 = self._extract_speakers(chunk1)
+            speakers2 = self._extract_speakers(chunk2)
+            return bool(speakers1.intersection(speakers2))
+
+        return True
+
+    def _extract_speakers(self, text: str) -> Set[str]:
+        """
+        Extract potential speaker names from dialogue, using general patterns.
+        """
+        speakers = set()
+
+        # Look for common dialogue attribution patterns
+        for opening, closing in self.quote_pairs:
+            # Split by quote marks
+            parts = text.split(opening)
+            for part in parts[1:]:  # Skip first part (before any quotes)
+                if closing in part:
+                    # Look for words before/after quotes that might be speaker attribution
+                    context = part.split(closing)[1].strip()
+                    # Extract word sequences that might be names/speakers
+                    words = context.split()[:2]  # Take up to 2 words after quote
+                    if words:
+                        speakers.add(" ".join(words))
+
+        return speakers
+
+    def _post_process_summary(self, summary: str) -> str:
+        """
+        Clean up and improve the summary output while preserving language-specific formatting.
+        """
+        # Preserve original quote styles
+        processed_summary = summary
+
+        # Split into lines while preserving empty lines
+        lines = processed_summary.split("\n")
+        processed_lines = []
+
+        current_quote_style = None
+        for line in lines:
+            # Preserve empty lines
+            if not line.strip():
+                processed_lines.append(line)
+                continue
+
+            # Detect quote style being used in this line
+            for opening, closing in self.quote_pairs:
+                if opening in line or closing in line:
+                    current_quote_style = (opening, closing)
+                    break
+
+            # Ensure dialogue starts on new lines
+            if current_quote_style and current_quote_style[0] in line:
+                opening, closing = current_quote_style
+                if not line.strip().startswith(opening):
+                    dialogue_parts = line.split(opening)
+                    processed_lines.extend(
+                        [
+                            dialogue_parts[0].strip(),
+                            opening + opening.join(dialogue_parts[1:]),
+                        ]
+                    )
+                else:
+                    processed_lines.append(line)
+            else:
+                processed_lines.append(line)
+
+        processed_summary = "\n".join(processed_lines)
+
+        # Truncate if over token limit while preserving quote pairs
+        if len(processed_summary.split()) > self.token_limit:
+            words = processed_summary.split()
+            truncated = " ".join(words[: self.token_limit - 1])
+
+            # Balance any unmatched quotes
+            for opening, closing in self.quote_pairs:
+                if truncated.count(opening) > truncated.count(closing):
+                    truncated += closing
+
+            truncated += "..."
+            return truncated
+
+        return processed_summary
+
+
 class RAG(BaseModel):
     def __init__(self, **kwargs) -> None:
         """A class for Retrieval Augmented Generation using the ollama library."""
@@ -101,9 +347,8 @@ class RAG(BaseModel):
 
         self.summarize_prompt = kwargs.get("summarize_prompt")
         self.context_prompt = kwargs.get("context_prompt")
-        self.token_limit = int(kwargs.get("token_limit"))
-        self.min_relevance = float(kwargs.get("min_relevance"))
-        self.top_k = int(kwargs.get("top_k"))
+
+        self.context_manager = ImprovedContextManager(**kwargs)
 
         self.ollama_client = Client()
         self.chroma_client = chromadb.PersistentClient(
@@ -212,13 +457,14 @@ class RAG(BaseModel):
             with open(file_path, "r", encoding="utf-8") as f:
                 return f.read().split("\n\n")
 
-    def retrieve_and_limit_context(
+    def get_init_messages(
         self,
-        query: str,
+        user_query: str,
         collection_names: List[str] = None,
         selected_ids: List[str] = None,
-    ) -> List[str]:
-        """Retrieve and filter relevant chunks while preserving their natural order."""
+    ) -> List[Dict[str, str]]:
+        """Generates init messages for RAG chat."""
+
         if collection_names:
             collections_to_query = [
                 self.collections[name]
@@ -228,131 +474,29 @@ class RAG(BaseModel):
         else:
             collections_to_query = list(self.collections.values())
 
-        print_system_message(
-            f"{collections_to_query=}",
-            color=Fore.LIGHTWHITE_EX,
-            log_level=logging.DEBUG,
-        )
-
-        all_chunks = []
-        for collection in collections_to_query:
-            # Filter selected IDs for this collection
-            ids_to_query = selected_ids.get(collection.name) if selected_ids else None
-
-            # Query the collection
-            results = collection.query(query, self.top_k, ids_to_query)
-
-            print_system_message(
-                f"query for '{collection}' {results=}",
-                color=Fore.LIGHTWHITE_EX,
-                log_level=logging.DEBUG,
-            )
-
-            # Group chunks by their source document
-            for idx, (chunk, metadata, distance) in enumerate(
-                zip(
-                    results["documents"][0],
-                    results["metadatas"][0],
-                    results["distances"][0],
-                )
-            ):
-
-                # Convert (1 - cosine distance) to similarity
-                relevance_score = 1 - (distance / 2)
-                if relevance_score >= self.min_relevance:
-                    all_chunks.append(
-                        {
-                            "text": chunk,
-                            "tokens": len(chunk.split()),
-                            "relevance": relevance_score,
-                            "metadata": metadata,
-                            "source": metadata.get("source", "unknown"),
-                            "source_position": metadata.get("chunk_index", idx),
-                        }
-                    )
-
-        selected_text = self.limit_context(all_chunks)
-
-        return selected_text
-
-    def limit_context(self, all_chunks):
-        """
-        Group chunks by source and sort each group by source_position respecting the token limit
-        """
-        grouped_chunks = {}
-        for chunk in all_chunks:
-            source = chunk["source"]
-            if source not in grouped_chunks:
-                grouped_chunks[source] = []
-            grouped_chunks[source].append(chunk)
-
-        # Sort each group by source_position to maintain document order
-        for source in grouped_chunks:
-            grouped_chunks[source].sort(key=lambda x: x["source_position"])
-
-        # Flatten grouped chunks while respecting the token limit
-        selected_text = []
-        selected_chunk_ids = []
-        selected_total_tokens = 0
-
-        for source in grouped_chunks:
-            for chunk in grouped_chunks[source]:
-                if selected_total_tokens + chunk["tokens"] <= self.token_limit:
-                    selected_text.append(chunk["text"])
-                    selected_chunk_ids.append(chunk["metadata"]["id"])
-                    selected_total_tokens += chunk["tokens"]
-                else:
-                    break
-
-        print_system_message(
-            f"all_chunks={[(c["metadata"]["id"], c["relevance"]) for c in all_chunks]}, {selected_chunk_ids=} {selected_total_tokens=}",
-            color=Fore.LIGHTWHITE_EX,
-            log_level=logging.DEBUG,
-        )
-
-        return selected_text
-
-    def summarize_chunks(self, chunks: List[str]) -> str:
-        """Summarize the retrieved chunks if their combined length exceeds the token limit."""
-
-        messages = [
-            {"role": "system", "content": self.summarize_prompt},
-            {
-                "role": "user",
-                "content": f"Summarize the following content:\n\n{"\n\n".join(chunks)}",
-            },
-        ]
-
-        response = self.ollama_client.chat(
-            model=self.model_id,
-            messages=messages,
-            options=self.options,
-        )
-
-        # Ensure the summary fits within the token limit
-        summary = response["content"]
-        if len(summary.split()) > self.token_limit:
-            summary = " ".join(summary.split()[: self.token_limit]) + "..."
-        return summary
-
-    def get_init_messages(
-        self,
-        user_query: str,
-        collection_names: List[str] = None,
-        selected_ids: List[str] = None,
-    ) -> List[Dict[str, str]]:
-        """Generates init messages for RAG chat."""
-
-        context_chunks = self.retrieve_and_limit_context(
+        context_chunks = self.context_manager.retrieve_and_limit_context(
             query=user_query,
-            collection_names=collection_names,
+            collections=collections_to_query,
             selected_ids=selected_ids,
         )
 
+        def summarize_messages(messages):
+            return self.ollama_client.chat(
+                model=self.model_id,
+                messages=messages,
+                options=self.options,
+            )
+
         # Summarize chunks if the combined length exceeds token_limit
         total_tokens = sum(len(chunk.split()) for chunk in context_chunks)
-        if total_tokens > self.token_limit:
-            context_chunks = [self.summarize_chunks(context_chunks)]
+        if total_tokens > self.context_manager.token_limit:
+            context_chunks = [
+                self.context_manager.summarize_chunks(
+                    self.summarize_prompt,
+                    context_chunks,
+                    chat_callback=summarize_messages,
+                )
+            ]
 
         context_text = "\n".join(context_chunks)
 

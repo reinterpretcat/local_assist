@@ -74,20 +74,22 @@ default_config = {
         # LLM to use for RAG
         "model": "llama3.1:8b-instruct-q4_0",
         # NOTE same as for llm, but used only for RAG
-        # "options": {
-        #     "temperature": 0.7,
-        #     "seed": 123,
-        #     "num_ctx": 1024
-        #     "num_predict": 20
-        # }
+        "options": {
+            # "seed": 123,
+            # "num_ctx": 1024
+            # "num_predict": 20
+            "num_ctx": 4096,
+            "temperature": 0.3,
+            "top_p": 0.8,  # More focused token selection
+        },
         # where to store data
         "persist_directory": ".chromadb",
         # how many tokens to request
-        "token_limit": 1500,
+        "token_limit": 4096,
         # summarization relevance threshold
         "min_relevance": 0.1,
         # maximum number of results (chunks) to retrieve from store
-        "top_k": 10,
+        "top_k": 1024,
         # summarization prompt is used to extract information from documents
         "summarize_prompt": """You are a precise document summarizer. Create a concise summary that:
     1. Preserves key information (dates, numbers, names, technical details)
