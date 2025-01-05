@@ -70,6 +70,43 @@ def handle_command(self, command):
             if args[1] == "prompt":
                 self.append_system_message(f"{self.llm_model.system_prompt}")
 
+    elif command == "/stats":
+        # Chat statistics
+
+        total_messages = len(self.chat_history)
+        total_words = sum(
+            len(message["content"].split()) for message in self.chat_history
+        )
+
+        role_message_count = {}
+        role_word_count = {}
+
+        for message in self.chat_history:
+            role = message["role"]
+            words_in_message = len(message["content"].split())
+            # Update message count per role
+            role_message_count[role] = role_message_count.get(role, 0) + 1
+            # Update word count per role
+            role_word_count[role] = role_word_count.get(role, 0) + words_in_message
+
+        # Format the statistics
+        stats_message = (
+            f"Chat Statistics:\n"
+            f"- Total messages: {total_messages}\n"
+            f"- Total words: {total_words}\n"
+        )
+
+        stats_message += "- Messages per role:\n"
+        for role, count in role_message_count.items():
+            stats_message += f"  {role}: {count} messages\n"
+
+        stats_message += "- Words per role:\n"
+        for role, count in role_word_count.items():
+            stats_message += f"  {role}: {count} words\n"
+
+        # Display the statistics as a system message
+        self.append_system_message(stats_message)
+
     elif command.startswith("/restore"):
         if len(args) == 1:
             self.append_system_message(
@@ -137,6 +174,7 @@ def handle_command(self, command):
             "/compress - Compresses history of currenlty selected chat\n"
             "/tts      - Manage text-to-speech\n"
             "/show     - A subcommand to display state info\n"
+            "/stats    - A chat statistics\n"
             "/restore  - A subcommand to restore original state\n"
             "/remove   - Removes messages from the selected chat\n"
             "\n/help   - Display this help message",
