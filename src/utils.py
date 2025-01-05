@@ -120,7 +120,7 @@ def print_system_message(
     )
 
 
-def compress_messages(messages):
+def compress_messages(messages, keep_first: int, keep_last: int, max_words: int):
     import re
 
     def summarize_message(role: Optional[str], message: str, max_words) -> str:
@@ -146,10 +146,22 @@ def compress_messages(messages):
                 return truncated + "..."
         return truncated
 
-    def compress_old_messages(messages, keep_last, max_words):
-        """Compress all but the last `keep_last` messages."""
-        if len(messages) > keep_last:
-            for i in range(len(messages) - keep_last):
+    def compress_old_messages(messages, keep_first, keep_last, max_words):
+        """
+        Compress all but the first `keep_first` and last `keep_last` messages.
+
+        Args:
+            messages: List of messages to compress.
+            keep_first: Number of messages to keep unchanged from the start.
+            keep_last: Number of messages to keep unchanged from the end.
+            max_words: Maximum number of words to keep in each compressed message.
+
+        Returns:
+            List of messages with middle messages compressed.
+        """
+        if len(messages) > (keep_first + keep_last):
+            # Compress only the middle messages
+            for i in range(keep_first, len(messages) - keep_last):
                 messages[i]["content"] = summarize_message(
                     messages[i]["role"], messages[i]["content"], max_words
                 )
@@ -159,7 +171,7 @@ def compress_messages(messages):
         """Remove redundant messages from the history."""
         return [msg for msg in messages if not (msg["role"] == "tool")]
 
-    messages = compress_old_messages(messages, keep_last=1, max_words=10)
+    messages = compress_old_messages(messages, keep_first, keep_last, max_words)
     messages = filter_non_critical_messages(messages)
 
     return messages

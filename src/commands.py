@@ -1,22 +1,39 @@
 import tkinter as tk
+from tkinter import messagebox
+
+
+def update_chat_history(self, history):
+    selection = self.chat_list.curselection()
+    if not selection:
+        messagebox.showerror("Clear command", "No chat selected.")
+        return
+
+    selected_index = selection[0]
+    chat_name = self.chat_list.get(selected_index)
+
+    self.chat_history = history
+    self.llm_model.load_history(self.chat_history)
+
+    self.chats[chat_name] = history
+    self.load_chat(chat_name)
 
 
 def handle_command(self, command):
     args = command.split()
 
-    if command == "/clear":
-        # Clear all messages from the chat window
-        self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.delete(1.0, tk.END)  # Remove all text
-        self.chat_display.config(state=tk.DISABLED)
-
-        self.chat_history = []
-        self.llm_model.load_history(self.chat_history)
-        selection = self.chat_list.curselection()
-        if selection:
-            selected_index = selection[0]
-            chat_name = self.chat_list.get(selected_index)
-            self.chats[chat_name] = []
+    if command.startswith("/clear"):
+        if len(args) == 2:
+            # Clear all messages for given role from the chat window
+            role = args[1]
+            if role == "system":
+                messagebox.showerror("Clear command", "System role cannot be cleared.")
+                return
+            update_chat_history(
+                self, [msg for msg in self.chat_history if not (msg["role"] == role)]
+            )
+        else:
+            # Clear all messages from the chat window
+            update_chat_history(self, [])
 
     elif command.startswith("/tts"):
         if len(args) == 1:
@@ -71,14 +88,58 @@ def handle_command(self, command):
                         f"Prompt set to: `{self.llm_model.system_prompt}`."
                     )
 
+    elif command.startswith("/compress"):
+        if len(args) == 1:
+            self.append_system_message(
+                "Syntax for compress command:\n"
+                "/compress keep_first keep_last max_words - Compresses history of currenlty selected chat\n"
+            )
+
+        elif len(args) == 4:
+            keep_first = int(args[1])
+            keep_last = int(args[2])
+            max_words = int(args[3])
+            self.compress_active_chat(
+                keep_first=keep_first, keep_last=keep_last, max_words=max_words
+            )
+
+    elif command.startswith("/remove"):
+        if len(args) != 2 and len(args) != 3:
+            self.append_system_message(
+                "Syntax for message removal command:\n"
+                "/remove last_n  - Removes last n commands of currenlty selected chat\n"
+                "/remove from to - Removes messages in [from, to], range of currenlty selected chat\n"
+            )
+
+        elif len(args) == 2:
+            last_n = int(args[1])
+            if last_n < 0 or last_n > len(self.chat_history):
+                pass
+            else:
+                update_chat_history(self, self.chat_history[:-last_n])
+
+        elif len(args) == 3:
+            start = int(args[1])
+            end = int(args[2])
+            if start < 0 or end >= len(self.chat_history) or start > end:
+                self.append_system_message(
+                    f"Invalid range: start must be >= 0, end must be < {len(self.chat_history)}, and start <= end."
+                )
+            else:
+                update_chat_history(
+                    self, self.chat_history[:start] + self.chat_history[end + 1 :]
+                )
+
     elif command == "/help":
         self.append_system_message(
             "Available commands:\n"
-            "/clear    - Clear the chat history\n"
+            "/clear    - Clear the chat history (optionally, role can be specified)\n"
+            "/compress - Compresses history of currenlty selected chat\n"
             "/tts      - Manage text-to-speech\n"
             "/show     - A subcommand to display state info\n"
             "/restore  - A subcommand to restore original state\n"
-            "/help     - Display this help message",
+            "/remove   - Removes messages from the selected chat\n"
+            "\n/help   - Display this help message",
         )
     else:
         self.append_system_message(f"Unknown command '{command}")

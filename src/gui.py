@@ -102,7 +102,7 @@ class AIChatUI:
 
         # Left panel for chat list and RAG
         self.left_panel = tk.Frame(self.main_paned_window, bg=self.theme["bg"])
-        self.main_paned_window.add(self.left_panel, minsize=200)
+        self.main_paned_window.add(self.left_panel)
 
         # Chat list
         self.chat_list = tk.Listbox(
@@ -166,7 +166,7 @@ class AIChatUI:
         self.chat_display_frame = tk.Frame(
             self.main_paned_window, bg=self.theme["chat_bg"]
         )
-        self.main_paned_window.add(self.chat_display_frame, minsize=800)
+        self.main_paned_window.add(self.chat_display_frame)
 
         self.chat_display = tk.Text(
             self.chat_display_frame,
@@ -714,19 +714,24 @@ class AIChatUI:
         self.chat_display.config(state=tk.DISABLED)
         self.llm_model.load_history(self.chat_history)
 
-    def compress_active_chat(self):
+    def compress_active_chat(self, keep_first=1, keep_last=4, max_words=32):
         """Compress chat history for the selected chat or all chats."""
         selection = self.chat_list.curselection()
         if selection:
             # Compress the selected chat's history
             selected_chat = self.chat_list.get(selection)
             if selected_chat in self.chats:
-                self.chats[selected_chat] = compress_messages(self.chats[selected_chat])
+                self.chats[selected_chat] = compress_messages(
+                    self.chats[selected_chat],
+                    keep_first=keep_first,
+                    keep_last=keep_last,
+                    max_words=max_words,
+                )
                 self.llm_model.load_history(self.chats[selected_chat])  # Sync with LLM
                 self.load_chat(selected_chat)  # Refresh the chat display
                 messagebox.showinfo(
                     "Compress Chat",
-                    f"Chat history for '{selected_chat}' compressed successfully!",
+                    f"Chat history for '{selected_chat}' compressed successfully with {keep_first=}, {keep_last=}, {max_words=}.",
                 )
             else:
                 messagebox.showerror("Compress Chat", "Selected chat not found.")
