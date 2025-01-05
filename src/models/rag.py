@@ -122,6 +122,7 @@ class ContextManager:
         collections: List[RAGCollection],
         selected_ids: Dict[str, List[str]],
         chat_callback,
+        progress_callback,
     ) -> str:
         # Retrieve and group relevant chunks
         grouped_chunks = self._retrieve_and_limit_context(
@@ -143,6 +144,11 @@ class ContextManager:
 
         context_text_blocks = []
         accumulated_summary = ""
+
+        total_chunks: float = sum(
+            [len(source_chunks) for _, source_chunks in grouped_chunks.items()]
+        )
+        processed_chunks: float = 0
 
         # Process chunks source by source
         for group_idx, (source, source_chunks) in enumerate(grouped_chunks.items()):
@@ -176,6 +182,10 @@ class ContextManager:
                     accumulated_summary = self._update_accumulated_summary(
                         accumulated_summary, summary
                     )
+                if progress_callback:
+                    processed_chunks += 1
+                    progress = int((processed_chunks / total_chunks) * 100)
+                    progress_callback(progress)
 
             if source_summaries:
                 # Combine summaries for this source
@@ -522,6 +532,7 @@ class RAG(BaseModel):
         user_query: str,
         collection_names: List[str] = None,
         selected_ids: List[str] = None,
+        progress_callback=None,
     ) -> List[Dict[str, str]]:
         """Generates init messages for RAG chat."""
 
@@ -551,6 +562,7 @@ class RAG(BaseModel):
             collections=collections_to_query,
             selected_ids=selected_ids,
             chat_callback=summarize_messages,
+            progress_callback=progress_callback,
         )
 
         # Construct messages with clear sections and instructions

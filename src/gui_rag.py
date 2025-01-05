@@ -319,7 +319,7 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
-    def get_messages(self, user_query):
+    def get_messages(self, user_query, progress_callback=None):
         """Gets a RAG messages with multiple selected collections."""
         try:
             selected_ids = {}
@@ -363,6 +363,7 @@ class RAGManagementUI:
                 user_query=user_query,
                 collection_names=list(selected_collections),  # Pass list of collections
                 selected_ids=selected_ids,
+                progress_callback=progress_callback,
             )
 
         except Exception as e:
@@ -371,23 +372,33 @@ class RAGManagementUI:
     def set_query(self):
         """Sets context to selected chat."""
 
-        def on_save_callback(user_query, updated_summary, updated_context):
-            self.rag_model.summarize_prompt = updated_summary
-            self.rag_model.context_prompt = updated_context
-            messages = self.get_messages(user_query)
-
-            self.on_chat_start(messages)
-
-        RAGQueryEditor(
+        editor = RAGQueryEditor(
             self.parent,
             summarize_prompt=self.rag_model.summarize_prompt,
             context_prompt=self.rag_model.context_prompt,
-            on_save_callback=on_save_callback,
         )
+
+        def progress_callback(progress):
+            """Update the progress bar based on the progress_callback."""
+            editor.progress_bar["value"] = progress
+            editor.root.update_idletasks()
+
+            if progress < 100:
+                editor.root.after(100, self.parent)
+
+        def on_save_callback(user_query, updated_summary, updated_context):
+            self.rag_model.summarize_prompt = updated_summary
+            self.rag_model.context_prompt = updated_context
+            messages = self.get_messages(
+                user_query, progress_callback=progress_callback
+            )
+            self.on_chat_start(messages)
+
+        editor.on_save_callback = on_save_callback
 
 
 class RAGQueryEditor:
-    def __init__(self, root, summarize_prompt, context_prompt, on_save_callback):
+    def __init__(self, root, summarize_prompt, context_prompt):
         """
         A window to edit summarize_prompt and context_prompt.
 
@@ -399,8 +410,6 @@ class RAGQueryEditor:
         """
         self.root = tk.Toplevel(root)
         self.root.title("Edit RAG Prompts and Query")
-
-        self.on_save_callback = on_save_callback
 
         # Create fields for summarize_prompt
         self.summary_label = ttk.Label(self.root, text="Summarize Prompt:")
@@ -424,6 +433,20 @@ class RAGQueryEditor:
 
         self.query_text = tk.Text(self.root, wrap=tk.WORD, height=4)
         self.query_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+        # Progress Bar
+        self.progress_frame = ttk.Frame(self.root)
+        self.progress_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
+
+        self.progress_label = ttk.Label(
+            self.progress_frame, text="Processing Progress:"
+        )
+        self.progress_label.pack(anchor="w")
+
+        self.progress_bar = ttk.Progressbar(
+            self.progress_frame, orient="horizontal", length=300, mode="determinate"
+        )
+        self.progress_bar.pack(fill=tk.X, pady=5)
 
         self.add_apply_cancel_buttons(on_save=self.save)
         self.autoscale()
