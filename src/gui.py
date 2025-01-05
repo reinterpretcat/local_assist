@@ -73,7 +73,25 @@ class AIChatUI:
 
         self.theme = default_theme
 
-        self.root.geometry("2048x1436")
+        # Calculate window size based on screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Set window size to 60% of screen size
+        window_width = int(screen_width * 0.6)
+        window_height = int(screen_height * 0.6)
+
+        # Calculate position for center of screen
+        x_position = (screen_width - window_width) // 2
+        y_position = (screen_height - window_height) // 2
+
+        # Set geometry with format: 'widthxheight+x+y'
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+
+        min_width = int(screen_width * 0.3)  # 30% of screen width
+        min_height = int(screen_height * 0.3)  # 30% of screen height
+        self.root.minsize(min_width, min_height)
+
         self.apply_theme()
 
         self.menu_bar = tk.Menu(root)
@@ -100,8 +118,26 @@ class AIChatUI:
         self.main_paned_window = tk.PanedWindow(root, orient=tk.HORIZONTAL)
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
+        left_panel_width = int(window_width * 0.25)  # 25% of window width
+        min_left_panel_width = int(window_width * 0.15)  # 15% minimum
+
+        # Set initial sash position
+        def configure_sash(event=None):
+            self.root.update_idletasks()
+            self.main_paned_window.sash_place(0, left_panel_width, 0)
+            # Set minimum size for the paned window sections
+            self.main_paned_window.paneconfigure(
+                self.left_panel,
+                minsize=min_left_panel_width,
+            )
+
+        # Bind the configuration to when the window is fully loaded
+        self.root.bind("<Map>", configure_sash)
+
         # Left panel for chat list and RAG
         self.left_panel = tk.Frame(self.main_paned_window, bg=self.theme["bg"])
+        # self.left_panel.configure(width=600)  # Set minimum width
+        self.left_panel.pack_propagate(False)  # Prevent the panel from shrinking
         self.main_paned_window.add(self.left_panel)
 
         # Chat list
@@ -111,6 +147,7 @@ class AIChatUI:
             fg=self.theme["list_fg"],
             font=("Arial", 12),
             selectmode=tk.SINGLE,
+            width=0,  # Let it expand to frame width
         )
         self.chat_list.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         self.chat_list.bind("<<ListboxSelect>>", self.load_selected_chat)
