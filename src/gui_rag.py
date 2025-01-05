@@ -6,10 +6,12 @@ from .models import RAG, DocumentReference
 
 
 class RAGManagementUI:
-    def __init__(self, parent, rag: RAG):
+    def __init__(self, parent, rag: RAG, on_chat_start):
         """Initialize the RAG Management UI."""
         self.parent = parent
         self.rag_model = rag
+        self.on_chat_start = on_chat_start
+
         self.current_collection: Optional[str] = None
 
         self.frame = ttk.Frame(parent)
@@ -317,11 +319,64 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
+    def get_messages(self, user_query):
+        """Gets a RAG messages with multiple selected collections."""
+        try:
+            selected_ids = {}
+            selected_collections = set()
+            selected_items = self.data_store_tree.selection()
+
+            if selected_items:
+                document_refs = self.rag_model.get_document_refs()
+
+                for item in selected_items:
+                    if item.startswith("doc_"):
+                        # Document selected
+                        source_path = self.data_store_tree.item(item)["tags"][0]
+                        collection_name = item.split("_")[
+                            1
+                        ]  # Extract collection name from item ID
+                        selected_collections.add(collection_name)
+
+                        # Get all document IDs associated with this source file
+                        doc_ids = [
+                            ref.document_id
+                            for ref in document_refs.values()
+                            if ref.source == source_path
+                        ]
+                        if collection_name not in selected_ids:
+                            selected_ids[collection_name] = []
+                        selected_ids[collection_name].extend(doc_ids)
+                    elif item.startswith("collection_"):
+                        # Entire collection selected
+                        collection_name = item.split("_", 1)[1]
+                        selected_collections.add(collection_name)
+
+                        # Add all document IDs for the collection
+                        for ref in document_refs.values():
+                            if ref.collection_name == collection_name:
+                                if collection_name not in selected_ids:
+                                    selected_ids[collection_name] = []
+                                selected_ids[collection_name].append(ref.document_id)
+
+            return self.rag_model.get_init_messages(
+                user_query=user_query,
+                collection_names=list(selected_collections),  # Pass list of collections
+                selected_ids=selected_ids,
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to get chat messages: {e}")
+
     def set_query(self):
         """Sets context to selected chat."""
 
-        def on_save_callback():
-            pass
+        def on_save_callback(user_query, updated_summary, updated_context):
+            self.rag_model.summarize_prompt = updated_summary
+            self.rag_model.context_prompt = updated_context
+            messages = self.get_messages(user_query)
+
+            self.on_chat_start(messages)
 
         RAGQueryEditor(
             self.parent,
@@ -329,77 +384,6 @@ class RAGManagementUI:
             context_prompt=self.rag_model.context_prompt,
             on_save_callback=on_save_callback,
         )
-
-    # def test_query(self):
-    #     """Test a RAG query with multiple selected collections."""
-    #     query = self.query_entry.get()
-    #     if not query:
-    #         messagebox.showwarning("Warning", "Please enter a query.")
-    #         return
-
-    #     try:
-    #         selected_ids = {}
-    #         selected_collections = set()
-    #         selected_items = self.data_store_tree.selection()
-
-    #         if selected_items:
-    #             document_refs = self.rag_model.get_document_refs()
-
-    #             for item in selected_items:
-    #                 if item.startswith("doc_"):
-    #                     # Document selected
-    #                     source_path = self.data_store_tree.item(item)["tags"][0]
-    #                     collection_name = item.split("_")[1]  # Extract collection name from item ID
-    #                     selected_collections.add(collection_name)
-
-    #                     # Get all document IDs associated with this source file
-    #                     doc_ids = [
-    #                         ref.document_id
-    #                         for ref in document_refs.values()
-    #                         if ref.source == source_path
-    #                     ]
-    #                     if collection_name not in selected_ids:
-    #                         selected_ids[collection_name] = []
-    #                     selected_ids[collection_name].extend(doc_ids)
-    #                 elif item.startswith("collection_"):
-    #                     # Entire collection selected
-    #                     collection_name = item.split("_", 1)[1]
-    #                     selected_collections.add(collection_name)
-
-    #                     # Add all document IDs for the collection
-    #                     for ref in document_refs.values():
-    #                         if ref.collection_name == collection_name:
-    #                             if collection_name not in selected_ids:
-    #                                 selected_ids[collection_name] = []
-    #                             selected_ids[collection_name].append(ref.document_id)
-
-    #         # Pass list of selected collections and their document IDs
-    #         generator = self.rag_model.forward(
-    #             user_query=query,
-    #             collection_names=list(selected_collections),  # Pass list of collections
-    #             selected_ids=selected_ids,
-    #         )
-
-    #         # Clear and enable the result box
-    #         self.query_result.config(state=tk.NORMAL)
-    #         self.query_result.delete(1.0, tk.END)
-
-    #         def process_tokens():
-    #             try:
-    #                 token = next(generator)
-    #                 self.query_result.insert(tk.END, token)
-    #                 self.query_result.see(tk.END)
-    #                 self.query_result.after(10, process_tokens)
-    #             except StopIteration:
-    #                 self.query_result.config(state=tk.DISABLED)
-    #             except Exception as e:
-    #                 messagebox.showerror("Error", f"Failed to stream tokens: {e}")
-    #                 self.query_result.config(state=tk.DISABLED)
-
-    #         process_tokens()
-
-    #     except Exception as e:
-    #         messagebox.showerror("Error", f"Failed to test query: {e}")
 
 
 class RAGQueryEditor:
@@ -449,6 +433,12 @@ class RAGQueryEditor:
         user_query = self.query_text.get("1.0", tk.END).strip()
         updated_summary = self.summary_text.get("1.0", tk.END).strip()
         updated_context = self.context_text.get("1.0", tk.END).strip()
+
+        if not user_query or not updated_summary or not updated_context:
+            messagebox.showwarning(
+                "Warning", "Please enter a query, summary and context."
+            )
+            return
 
         # Trigger the save callback with the updated values
         self.on_save_callback(user_query, updated_summary, updated_context)

@@ -147,7 +147,9 @@ class AIChatUI:
         self.delete_button.pack(padx=10, pady=5, fill=tk.X)
 
         # RAG UI
-        self.rag_panel = RAGManagementUI(self.left_panel, self.rag_model)
+        self.rag_panel = RAGManagementUI(
+            self.left_panel, self.rag_model, on_chat_start=self.on_rag_chat_start
+        )
         self.rag_panel.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         self.rag_visible = True
 
@@ -664,7 +666,7 @@ class AIChatUI:
         elif chat_name in self.chats:
             messagebox.showerror("New Chat", "A chat with this name already exists.")
 
-    def load_selected_chat(self, event):
+    def load_selected_chat(self, event=None):
         """Load the selected chat into the chat display."""
         selection = self.chat_list.curselection()
         if selection:
@@ -815,6 +817,22 @@ class AIChatUI:
             )
         else:
             self.append_system_message(f"Unknown command '{command}")
+
+    def on_rag_chat_start(self, messages):
+        selection = self.chat_list.curselection()
+        if len(messages) != 2:
+            messagebox.showerror("RAG Chat", f"Unexpected messages: {messages}.")
+            return
+
+        if selection:
+            selected_chat = self.chat_list.get(selection)
+            self.chats[selected_chat] = [messages[0]]
+            self.chat_history = self.chats[selected_chat]
+
+            self.load_selected_chat()
+            self.handle_user_message(messages[1]["content"])
+        else:
+            messagebox.showerror("RAG Chat", "No selected chats.")
 
     def toggle_rag_panel(self):
         """Toggle the visibility of the RAG panel."""
