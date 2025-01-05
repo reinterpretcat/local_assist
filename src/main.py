@@ -40,7 +40,7 @@ async def _real_main(**kwargs):
         return 2
 
     root = tk.Tk()
-    app = AIChatUI(root, llm_model, stt_model, tts_model, rag_model)
+    app = AIChatUI(root, config, llm_model, stt_model, tts_model, rag_model)
 
     root.mainloop()
 

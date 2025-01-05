@@ -38,10 +38,18 @@ class RoleNames:
 
 class AIChatUI:
     def __init__(
-        self, root, llm_model: LLM, stt_model: STT, tts_model: TTS, rag_model: RAG
+        self,
+        root,
+        config,
+        llm_model: LLM,
+        stt_model: STT,
+        tts_model: TTS,
+        rag_model: RAG,
     ):
         self.root = root
         self.root.title("AI Assistance Chat")
+
+        self.config = config
 
         self.llm_model = llm_model
         self.stt_model = stt_model
@@ -770,7 +778,6 @@ class AIChatUI:
 
         except AttributeError:
             print_system_message("No audio captured. Press record to try again.")
-
 
     def on_rag_chat_start(self, messages):
         selection = self.chat_list.curselection()

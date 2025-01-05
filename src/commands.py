@@ -2,6 +2,8 @@ import tkinter as tk
 
 
 def handle_command(self, command):
+    args = command.split()
+
     if command == "/clear":
         # Clear all messages from the chat window
         self.chat_display.config(state=tk.NORMAL)
@@ -17,7 +19,6 @@ def handle_command(self, command):
             self.chats[chat_name] = []
 
     elif command.startswith("/tts"):
-        args = command.split()
         if len(args) == 1:
             self.append_system_message(
                 "Syntax for TTS commands:\n"
@@ -41,7 +42,7 @@ def handle_command(self, command):
                 "Too many arguments. Use /tts on, /tts off",
             )
 
-    elif command == "/show":
+    elif command.startswith("/show"):
         if len(args) == 1:
             self.append_system_message(
                 "Syntax for show command:\n"
@@ -50,14 +51,34 @@ def handle_command(self, command):
 
         elif len(args) == 2:
             if args[1] == "prompt":
-                self.append_system_message(f"{self.llm_model.system_prompt}.")
+                self.append_system_message(f"{self.llm_model.system_prompt}")
+
+    elif command.startswith("/restore"):
+        if len(args) == 1:
+            self.append_system_message(
+                "Syntax for retore command:\n"
+                "/restore prompt - Restores system llm prompt from the config\n"
+            )
+
+        elif len(args) == 2:
+            if args[1] == "prompt":
+                system_prompt = self.config.get("llm", {}).get("system_prompt")
+                if not system_prompt:
+                    self.append_system_message(f"No prompt specified in the config.")
+                else:
+                    self.llm_model.set_system_prompt(system_prompt)
+                    self.append_system_message(
+                        f"Prompt set to: `{self.llm_model.system_prompt}`."
+                    )
 
     elif command == "/help":
         self.append_system_message(
             "Available commands:\n"
-            "/clear - Clear the chat history\n"
-            "/tts   - Manage text-to-speech (use '/tts' for detailed options)\n"
-            "/help  - Display this help message",
+            "/clear    - Clear the chat history\n"
+            "/tts      - Manage text-to-speech\n"
+            "/show     - A subcommand to display state info\n"
+            "/restore  - A subcommand to restore original state\n"
+            "/help     - Display this help message",
         )
     else:
         self.append_system_message(f"Unknown command '{command}")
