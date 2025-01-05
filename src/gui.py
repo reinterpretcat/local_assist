@@ -713,6 +713,7 @@ class AIChatUI:
 
         self.chat_display.config(state=tk.DISABLED)
         self.llm_model.load_history(self.chat_history)
+        self.chat_display.yview_moveto(1.0)  # Scroll to the end
 
     def compress_active_chat(self, keep_first=1, keep_last=4, max_words=32):
         """Compress chat history for the selected chat or all chats."""
