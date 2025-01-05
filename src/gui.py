@@ -66,9 +66,6 @@ class AIChatUI:
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  #  Flag to cancel AI response
 
-        self.listening_message_index = (
-            None  # Tracks the position of the listening message
-        )
         self.audio_io = AudioIO()
 
         self.theme = default_theme
@@ -683,19 +680,7 @@ class AIChatUI:
             self.chat_history[-1]["content"] += f"{token}"
 
     def append_system_message(self, message):
-        before = self.chat_display.index(tk.END)
         self.append_to_chat(RoleNames.TOOL, message)
-        after = self.chat_display.index(tk.END)
-        self.listening_message_index = (before, after)
-
-    def remove_last_system_message(self):
-        if self.listening_message_index:
-            before, after = self.listening_message_index
-            self.chat_display.config(state=tk.NORMAL)
-            self.chat_display.delete(before, after)
-
-            self.chat_display.config(state=tk.DISABLED)
-            self.listening_message_index = None
 
     def new_chat(self):
         """Start a new chat."""
