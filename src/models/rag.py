@@ -1,5 +1,6 @@
 from dataclasses import dataclass
-from typing import List, Iterator, Optional, Dict, Set
+from collections import defaultdict
+from typing import List, Iterator, Optional, Dict, Set, Any
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 import chromadb
@@ -8,7 +9,6 @@ from ollama import Client, Options
 import os
 from pathlib import Path
 from .common import BaseModel
-import logging
 from colorama import Fore
 from ..utils import print_system_message
 
@@ -95,59 +95,116 @@ class RAGCollection:
         return {metadata["source"] for metadata in results["metadatas"]}
 
 
+@dataclass
+class ChunkInfo:
+    text: str
+    tokens: int
+    relevance: float
+    metadata: Dict[str, Any]
+    source: str
+    source_position: int
+
+
 class ContextManager:
     def __init__(self, **kwargs):
+        self.token_limit = int(kwargs.get("token_limit", 4000))
+        self.min_relevance = float(kwargs.get("min_relevance", 0.7))
+        self.top_k = int(kwargs.get("top_k", 5))
 
-        self.token_limit = int(kwargs.get("token_limit"))
-        self.min_relevance = float(kwargs.get("min_relevance"))
-        self.top_k = int(kwargs.get("top_k"))
+    def _estimate_tokens(self, text: str) -> int:
+        """Estimate token count using word-based approximation."""
+        return int(len(text.split()) * 1.3)
 
     def get_context_text(
         self,
         user_query: str,
         summarize_prompt: str,
         collections: List[RAGCollection],
-        selected_ids: List[str],
+        selected_ids: Dict[str, List[str]],
         chat_callback,
-    ):
-
-        context_chunks = self._retrieve_and_limit_context(
+    ) -> str:
+        # Retrieve and group relevant chunks
+        grouped_chunks = self._retrieve_and_limit_context(
             query=user_query,
             collections=collections,
             selected_ids=selected_ids,
         )
-        
-        print_system_message(f"raw {len(context_chunks)=}")
 
-        # Summarize chunks if the combined length exceeds token_limit
-        total_tokens = sum(len(chunk.split()) for chunk in context_chunks)
-        if total_tokens > self.token_limit:
-            context_chunks = [
-                self._summarize_chunks(
-                    summarize_prompt,
-                    context_chunks,
+        if not grouped_chunks:
+            return "No relevant context found."
+
+        # Calculate token limit per chunk based on number of chunks
+        total_chunks = sum(len(chunks) for chunks in grouped_chunks.values())
+        # Reserve 20% of tokens for prompts and overhead
+        available_tokens = int(self.token_limit * 0.8)
+        chunk_token_limit = (
+            available_tokens // total_chunks if total_chunks > 0 else available_tokens
+        )
+
+        context_text_blocks = []
+        accumulated_summary = ""
+
+        # Process chunks source by source
+        for group_idx, (source, source_chunks) in enumerate(grouped_chunks.items()):
+            print_system_message(
+                f"process group {group_idx} from {len(grouped_chunks.items())}"
+            )
+
+            source_summaries = []
+            for chunk_idx, chunk in enumerate(source_chunks):
+                print_system_message(
+                    f"process chunk {chunk_idx} from {len(source_chunks)}"
+                )
+
+                if not isinstance(chunk.text, str) or not chunk.text.strip():
+                    continue
+
+                # TODO can use  source, chunk.metadata to keep a reference to document
+
+                # Summarize the chunk
+                summary = self._summarize_chunks(
+                    summarize_prompt=summarize_prompt,
+                    context=accumulated_summary,
+                    chunk=chunk.text,  # Make sure we're passing the actual text content
+                    chunk_token_limit=chunk_token_limit,
                     chat_callback=chat_callback,
                 )
-            ]
-            
-        print_system_message(f"final {len(context_chunks)=}")
 
-        return "\n".join(context_chunks)
+                if summary:
+                    source_summaries.append(summary)
+                    # Update accumulated summary and context messages
+                    accumulated_summary = self._update_accumulated_summary(
+                        accumulated_summary, summary
+                    )
+
+            if source_summaries:
+                # Combine summaries for this source
+                source_block = self._format_source_block(source, source_summaries)
+                context_text_blocks.append(source_block)
+
+        if not context_text_blocks:
+            return "No meaningful summaries generated from the context."
+
+        # Final cleanup and structuring
+        return self._create_final_context(context_text_blocks)
 
     def _retrieve_and_limit_context(
         self,
         query: str,
         collections: List[RAGCollection] = None,
-        selected_ids: List[str] = None,
-    ) -> List[str]:
+        selected_ids: Dict[str, List[str]] = None,
+    ) -> Dict[str, List[ChunkInfo]]:
         """Retrieve and filter relevant chunks while preserving their natural order."""
-
         all_chunks = []
-        for collection in collections:
-            # Filter selected IDs for this collection
-            ids_to_query = selected_ids.get(collection.name) if selected_ids else None
-            results = collection.query(query, self.top_k, ids_to_query)
 
+        for collection in collections:
+            # Get selected IDs for this collection
+            collection_ids = selected_ids.get(collection.name) if selected_ids else None
+
+            # Query the collection
+            results = collection.query(query, self.top_k, collection_ids)
+
+            # Process results
             for idx, (chunk, metadata, distance) in enumerate(
                 zip(
                     results["documents"][0],
@@ -155,78 +212,190 @@ class ContextManager:
                     results["distances"][0],
                 )
             ):
+                # Calculate relevance score (convert distance to similarity)
                 relevance_score = 1 - (distance / 2)
-                if relevance_score >= self.min_relevance:
-                    all_chunks.append(
-                        {
-                            "text": chunk,
-                            "tokens": len(chunk.split()),
-                            "relevance": relevance_score,
-                            "metadata": metadata,
-                            "source": metadata.get("source", "unknown"),
-                            "source_position": metadata.get("chunk_index", idx),
-                        }
-                    )
-        
-        print_system_message(f"{len(all_chunks)=}")
 
-        return self._group_context_chunks(all_chunks)
+                # Filter by minimum relevance
+                if relevance_score >= self.min_relevance:
+                    chunk_info = ChunkInfo(
+                        text=chunk,
+                        tokens=self._estimate_tokens(chunk),
+                        relevance=relevance_score,
+                        metadata=metadata,
+                        source=metadata.get("source", "unknown"),
+                        source_position=metadata.get("chunk_index", idx),
+                    )
+                    all_chunks.append(chunk_info)
+
+        return self._group_chunks(all_chunks)
+
+    def _group_chunks(
+        self,
+        chunks: List[ChunkInfo],
+    ) -> Dict[str, List[ChunkInfo]]:
+        """Group chunks by source and merge them if possible while respecting the context_size limit."""
+
+        # Reserve 10% of tokens for prompts and overhead
+        available_tokens = int(self.token_limit * 0.9)
+
+        # First group by source
+        initial_groups = defaultdict(list)
+        for chunk in chunks:
+            initial_groups[chunk.source].append(chunk)
+
+        # Sort each group by source_position
+        for source in initial_groups:
+            initial_groups[source].sort(key=lambda x: x.source_position)
+
+        # Merge chunks within each source group
+        final_groups = {}
+        for source, source_chunks in initial_groups.items():
+            merged_chunks = []
+            current_merged = None
+
+            for chunk in source_chunks:
+                if current_merged is None:
+                    # Start a new merged chunk
+                    current_merged = ChunkInfo(
+                        text=chunk.text,
+                        tokens=chunk.tokens,
+                        relevance=chunk.relevance,
+                        metadata=chunk.metadata.copy(),
+                        source=chunk.source,
+                        source_position=chunk.source_position,
+                    )
+                else:
+                    # Check if we can merge with the current chunk
+                    combined_tokens = current_merged.tokens + chunk.tokens
+                    if combined_tokens <= available_tokens:
+                        # Merge chunks
+                        current_merged.text = f"{current_merged.text}\n\n{chunk.text}"
+                        current_merged.tokens = combined_tokens
+                        # Update relevance as weighted average
+                        total_tokens = current_merged.tokens
+                        current_merged.relevance = (
+                            current_merged.relevance * (total_tokens - chunk.tokens)
+                            + chunk.relevance * chunk.tokens
+                        ) / total_tokens
+                        # Update metadata to indicate merged chunk
+                        current_merged.metadata.update(
+                            {
+                                "merged_chunk": True,
+                                "original_positions": current_merged.metadata.get(
+                                    "original_positions",
+                                    [current_merged.source_position],
+                                )
+                                + [chunk.source_position],
+                            }
+                        )
+                    else:
+                        # Add current merged chunk to results and start a new one
+                        merged_chunks.append(current_merged)
+                        current_merged = ChunkInfo(
+                            text=chunk.text,
+                            tokens=chunk.tokens,
+                            relevance=chunk.relevance,
+                            metadata=chunk.metadata.copy(),
+                            source=chunk.source,
+                            source_position=chunk.source_position,
+                        )
+
+            # Add the last merged chunk if exists
+            if current_merged is not None:
+                merged_chunks.append(current_merged)
+
+            final_groups[source] = merged_chunks
+
+        return dict(final_groups)
 
     def _summarize_chunks(
-        self, summarize_prompt, chunks: List[str], chat_callback
+        self,
+        summarize_prompt: str,
+        context: str,
+        chunk: str,
+        chunk_token_limit: int,
+        chat_callback,
     ) -> str:
-        """Summarize the retrieved chunks."""
+        """Summarize chunk while considering previous context."""
 
+        # Construct the summarization prompt that includes the chunk content
+        chunk_prompt = (
+            f"Please provide a summary for a query, if necessary using previous contexts in approximately {chunk_token_limit} words.\n\n"
+            f"[CONTEXT]{context}\n"
+            f"[QUERY]\n{chunk}"
+        )
+
+        # Prepare the messages for the LLM
         messages = [
             {"role": "system", "content": summarize_prompt},
-            {
-                "role": "user",
-                "content": f"Summarize while preserving context, dialogue, and language style:\n\n{'\n\n'.join(chunks)}",
-            },
+            {"role": "user", "content": chunk_prompt},
         ]
 
-        response = chat_callback(messages)
+        print(f"{messages=}")
 
-        # Post-process the summary to ensure quality
-        summary = self._post_process_chunk_summary(response)
+        summary = chat_callback(messages).strip()
 
-        if len(summary.split()) > self.token_limit:
-            summary = " ".join(summary.split()[: self.token_limit]) + "..."
+        print(f"received: {summary=}")
+
+        # Ensure summary is within token limit
+        if self._estimate_tokens(summary) > chunk_token_limit:
+            words = summary.split()
+            estimated_words_limit = int(chunk_token_limit / 1.3)
+            summary = " ".join(words[:estimated_words_limit])
 
         return summary
 
-    def _group_context_chunks(self, all_chunks):
-        """Group chunks by source and sort them."""
-        grouped_chunks = {}
-        for chunk in all_chunks:
-            source = chunk["source"]
-            if source not in grouped_chunks:
-                grouped_chunks[source] = []
-            grouped_chunks[source].append(chunk)
+    def _update_accumulated_summary(
+        self, current_summary: str, new_summary: str
+    ) -> str:
+        if not current_summary:
+            return new_summary
 
-        for source in grouped_chunks:
-            grouped_chunks[source].sort(key=lambda x: x["source_position"])
+        combined = f"{current_summary}\n\nAdditional context: {new_summary}"
+        if self._estimate_tokens(combined) > self.token_limit:
+            words = combined.split()
+            estimated_words_limit = int(self.token_limit / 1.3)
+            combined = " ".join(words[-estimated_words_limit:])
+        return combined
 
-        selected_text = []
-        selected_total_tokens = 0
+    def _format_source_block(self, source: str, summaries: List[str]) -> str:
+        formatted = f"\n### Source: {source}\n\n"
+        formatted += "\n".join(summaries)
+        return formatted
 
-        for source in grouped_chunks:
-            for chunk in grouped_chunks[source]:
-                selected_text.append(chunk["text"])
-                selected_total_tokens += chunk["tokens"]
+    def _create_final_context(self, context_blocks: List[str]) -> str:
+        final_context = "\n\n".join(context_blocks)
+        final_context = self._post_process_chunk_summary(final_context)
 
-        print_system_message(f"{len(selected_text)=}")
-        print_system_message(f"{selected_total_tokens=}")
+        if self._estimate_tokens(final_context) > self.token_limit:
+            words = final_context.split()
+            estimated_words_limit = int(self.token_limit / 1.3)
+            final_context = " ".join(words[:estimated_words_limit])
 
-        return selected_text
+        return final_context
 
     def _post_process_chunk_summary(self, summary: str) -> str:
-        """Clean up and improve the summary"""
-        processed_summary = summary
+        """Clean up and improve the summary structure"""
+        # Remove multiple consecutive newlines
+        while "\n\n\n" in summary:
+            summary = summary.replace("\n\n\n", "\n\n")
 
-        # TODO do some modifications to have better structured and cleaned up text
+        # Ensure consistent heading formatting
+        summary = summary.replace("####", "###")
 
-        return processed_summary
+        # Clean up whitespace around headings
+        lines = summary.split("\n")
+        cleaned_lines = []
+        for i, line in enumerate(lines):
+            if line.startswith("###"):
+                if i > 0:
+                    cleaned_lines.append("")
+                cleaned_lines.append(line)
+                cleaned_lines.append("")
+            else:
+                cleaned_lines.append(line)
+
+        return "\n".join(cleaned_lines).strip()
 
 
 class RAG(BaseModel):
@@ -236,6 +405,8 @@ class RAG(BaseModel):
 
         self.summarize_prompt = kwargs.get("summarize_prompt")
         self.context_prompt = kwargs.get("context_prompt")
+
+        self.summary_chunk_prompt = kwargs.get("summary_chunk_prompt")
 
         self.context_manager = ContextManager(**kwargs)
 
@@ -364,11 +535,15 @@ class RAG(BaseModel):
             collections_to_query = list(self.collections.values())
 
         def summarize_messages(messages):
-            return self.ollama_client.chat(
-                model=self.model_id,
-                messages=messages,
-                options=self.options,
-            )["message"]["content"]
+            return (
+                self.ollama_client.chat(
+                    model=self.model_id,
+                    messages=messages,
+                    options=self.options,
+                )
+                .get("message", {})
+                .get("content", "")
+            )
 
         context_text = self.context_manager.get_context_text(
             user_query=user_query,

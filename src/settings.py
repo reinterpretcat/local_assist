@@ -96,6 +96,8 @@ default_config = {
     2. Maintains the logical flow of information
     3. Focuses on factual content rather than narrative
     4. Uses clear structure with paragraphs for different topics
+    5. Uses original language of the text
+    6. Returns rather empty string if cannot summarize
     Prioritize accuracy of technical details and specific information over brevity.""",
         # context prompt is used to chat over used documents
         "context_prompt": """You are a helpful assistant that provides accurate answers based on the given context.
