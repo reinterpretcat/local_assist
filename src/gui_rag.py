@@ -378,9 +378,13 @@ class RAGManagementUI:
             context_prompt=self.rag_model.context_prompt,
         )
 
-        def progress_callback(progress):
+        def progress_callback(current, total):
             """Update the progress bar based on the progress_callback."""
+            progress = int((current / total) * 100)
             editor.progress_bar["value"] = progress
+            editor.progress_label.configure(
+                text=f"Processing Progress: {current} of {total}"
+            )
             editor.root.update_idletasks()
 
             if progress < 100:
@@ -389,6 +393,8 @@ class RAGManagementUI:
         def on_save_callback(user_query, updated_summary, updated_context):
             self.rag_model.summarize_prompt = updated_summary
             self.rag_model.context_prompt = updated_context
+            editor.progress_label.configure(text=f"Processing Progress: starting..")
+            editor.root.update_idletasks()
             messages = self.get_messages(
                 user_query, progress_callback=progress_callback
             )
@@ -439,7 +445,7 @@ class RAGQueryEditor:
         self.progress_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
 
         self.progress_label = ttk.Label(
-            self.progress_frame, text="Processing Progress:"
+            self.progress_frame, text="Processing Progress: not started"
         )
         self.progress_label.pack(anchor="w")
 

@@ -184,8 +184,7 @@ class ContextManager:
                     )
                 if progress_callback:
                     processed_chunks += 1
-                    progress = int((processed_chunks / total_chunks) * 100)
-                    progress_callback(progress)
+                    progress_callback(processed_chunks, total_chunks)
 
             if source_summaries:
                 # Combine summaries for this source
@@ -361,7 +360,7 @@ class ContextManager:
         if not current_summary:
             return new_summary
 
-        combined = f"{current_summary}\n\nAdditional context: {new_summary}"
+        combined = f"{current_summary}\n\n{new_summary}"
         if self._estimate_tokens(combined) > self.token_limit:
             words = combined.split()
             estimated_words_limit = int(self.token_limit / 1.3)

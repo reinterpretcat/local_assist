@@ -78,18 +78,18 @@ default_config = {
             # "seed": 123,
             # "num_ctx": 1024
             # "num_predict": 20
-            "num_ctx": 2048,
-            #"temperature": 0.3,
-            #"top_p": 0.8,  # More focused token selection
+            "num_ctx": 4096,
+            # "temperature": 0.3,
+            # "top_p": 0.8,  # More focused token selection
         },
         # where to store data
         "persist_directory": ".chromadb",
         # how many tokens to request
-        "token_limit": 2048,
+        "token_limit": 4096,
         # summarization relevance threshold
         "min_relevance": 0.1,
         # maximum number of results (chunks) to retrieve from store
-        "top_k": 256,
+        "top_k": 2048,
         # summarization prompt is used to extract information from documents
         "summarize_prompt": """You are a precise document summarizer. Create a concise summary that:
     1. Preserves key information (dates, numbers, names, technical details)
