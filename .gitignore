@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 pyvenv.cfg
 .idea/
+.vscode/
 
 history*.json
 example*.txt

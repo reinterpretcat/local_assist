@@ -1,6 +1,7 @@
 from colorama import Fore
 import tkinter as tk
 from tkinter import filedialog, simpledialog, messagebox
+from tkinter.scrolledtext import ScrolledText
 import json
 import threading
 import logging
@@ -13,6 +14,7 @@ from .commands import handle_command
 from .models import LLM, STT, TTS, RAG
 from .utils import compress_messages, print_system_message
 from .settings import default_theme
+from .uxui import render_markdown, setup_markdown_tags
 
 
 class RoleTags:
@@ -207,7 +209,7 @@ class AIChatUI:
         )
         self.main_paned_window.add(self.chat_display_frame)
 
-        self.chat_display = tk.Text(
+        self.chat_display = ScrolledText(
             self.chat_display_frame,
             wrap=tk.WORD,
             state=tk.DISABLED,
@@ -278,6 +280,7 @@ class AIChatUI:
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
         self.root.bind("<Escape>", self.cancel_ai_response)
 
+        setup_markdown_tags(self.chat_display)
         self.update_chat_list()
         self.create_default_chat()
         self.toggle_rag_panel()
@@ -687,7 +690,7 @@ class AIChatUI:
             self.chat_display.insert(tk.END, "\n")
 
         self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-        self.chat_display.insert(tk.END, f"{content}\n", RoleTags.CONTENT)
+        render_markdown(self.chat_display, content)
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)
 
@@ -766,9 +769,7 @@ class AIChatUI:
                 )
                 continue
 
-            self.chat_display.insert(
-                tk.END, f"{message['content']}\n", RoleTags.CONTENT
-            )
+            render_markdown(self.chat_display, message["content"])
 
         self.chat_display.config(state=tk.DISABLED)
         self.llm_model.load_history(self.chat_history)
