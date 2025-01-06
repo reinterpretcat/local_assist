@@ -574,7 +574,8 @@ class AIChatUI:
         """Display AI response token by token."""
         if self.cancel_response:
             # Stop the AI response generation
-            self.audio_io.stop_playing()
+            if self.tts_model:
+                self.audio_io.stop_playing()
             self.append_to_chat_partial(RoleNames.ASSISTANT, "(canceled)")
             self.check_tts_completion()
             return
@@ -630,7 +631,6 @@ class AIChatUI:
 
     def speak_text(self, text):
         """Speak the given text using TTS."""
-
         if not self.tts_enabled:
             return
 
@@ -669,7 +669,7 @@ class AIChatUI:
 
     def check_tts_completion(self):
         """Check if all TTS threads are complete and finalize response."""
-        if self.active_tts_threads == 0:
+        if not self.tts_model or self.active_tts_threads == 0:
             self.cancel_response = False  # Reset the flag
             self.finish_ai_response()
         else:
@@ -838,6 +838,9 @@ class AIChatUI:
 
     def stop_recording(self):
         """Stop recording and process the audio."""
+        if not self.tts_model:
+            return
+
         try:
             self.audio_io.stop_recording()
 
