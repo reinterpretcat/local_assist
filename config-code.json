@@ -6,11 +6,7 @@
             "num_ctx": 4096
         }
     },
-    "rag": {
-        "model": "qwen2.5-coder:7b",
-        "persist_directory": ".chromadb_code",
-        "options": {
-            "num_ctx": 4096
-        }
-    }
+    "rag": null,
+    "tts": null,
+    "stt": null
 }

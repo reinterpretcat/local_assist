@@ -5,6 +5,7 @@ import json
 import threading
 import logging
 import time
+from typing import Optional
 
 from .audio import AudioIO
 from .gui_rag import RAGManagementUI
@@ -42,9 +43,9 @@ class AIChatUI:
         root,
         config,
         llm_model: LLM,
-        stt_model: STT,
-        tts_model: TTS,
-        rag_model: RAG,
+        stt_model: Optional[STT],
+        tts_model: Optional[TTS],
+        rag_model: Optional[RAG],
     ):
         self.root = root
         self.root.title("AI Assistance Chat")
@@ -62,11 +63,14 @@ class AIChatUI:
         self.chats = {}
         self.chat_history = []  # To store the conversation history
 
-        self.tts_enabled = True  # A flag to track whether tts is enabled or not
+        self.tts_enabled = (
+            True if self.tts_model else False
+        )  # A flag to track whether tts is enabled or not
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  #  Flag to cancel AI response
 
-        self.audio_io = AudioIO()
+        if self.tts_model:
+            self.audio_io = AudioIO()
 
         self.theme = default_theme
 
@@ -106,10 +110,10 @@ class AIChatUI:
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
-        rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-        rag_menu.add_command(label="Toggle Panel", command=self.toggle_rag_panel)
-
-        self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
+        if self.rag_model:
+            rag_menu = tk.Menu(self.menu_bar, tearoff=0)
+            rag_menu.add_command(label="Toggle Panel", command=self.toggle_rag_panel)
+            self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
 
         # Main PanedWindow
         self.main_paned_window = tk.PanedWindow(root, orient=tk.HORIZONTAL)
@@ -190,11 +194,12 @@ class AIChatUI:
         self.delete_button.pack(padx=10, pady=5, fill=tk.X)
 
         # RAG UI
-        self.rag_panel = RAGManagementUI(
-            self.left_panel, self.rag_model, on_chat_start=self.on_rag_chat_start
-        )
-        self.rag_panel.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        self.rag_visible = True
+        if self.rag_model:
+            self.rag_panel = RAGManagementUI(
+                self.left_panel, self.rag_model, on_chat_start=self.on_rag_chat_start
+            )
+            self.rag_panel.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+            self.rag_visible = True
 
         # Right panel for chat display
         self.chat_display_frame = tk.Frame(
@@ -260,6 +265,7 @@ class AIChatUI:
             font=("Arial", 12),
         )
         self.record_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
+        self.record_button.config(state=tk.NORMAL if self.tts_model else tk.DISABLED)
 
         self.send_button = tk.Button(
             self.input_frame,
@@ -333,7 +339,7 @@ class AIChatUI:
         """Enable user input and send button."""
         self.user_input.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
-        self.record_button.config(state=tk.NORMAL)
+        self.record_button.config(state=tk.NORMAL if self.tts_model else tk.DISABLED)
         self.compress_button.config(state=tk.NORMAL)
 
     def update_theme(self):
@@ -855,6 +861,9 @@ class AIChatUI:
 
     def toggle_rag_panel(self):
         """Toggle the visibility of the RAG panel."""
+        if not self.rag_model:
+            return
+
         if self.rag_visible:
             self.rag_panel.frame.pack_forget()
         else:

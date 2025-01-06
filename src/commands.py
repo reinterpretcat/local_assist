@@ -45,6 +45,11 @@ def handle_command(self, command):
             )
         elif len(args) == 2:
             if args[1] == "on":
+                if not self.tts_model:
+                    self.append_system_message(
+                        f"tts is DISABLED in config and cannot be enabled by this command"
+                    )
+                    return
                 self.tts_enabled = True
                 self.append_system_message("Text-to-speech enabled.")
             elif args[1] == "off":
