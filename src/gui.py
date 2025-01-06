@@ -74,9 +74,9 @@ class AIChatUI:
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
 
-        # Set window size to 60% of screen size
-        window_width = int(screen_width * 0.6)
-        window_height = int(screen_height * 0.6)
+        # Set window size to 70% of screen size
+        window_width = int(screen_width * 0.7)
+        window_height = int(screen_height * 0.7)
 
         # Calculate position for center of screen
         x_position = (screen_width - window_width) // 2
@@ -235,16 +235,21 @@ class AIChatUI:
         )
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.user_input = tk.Entry(
+        self.user_input = tk.Text(
             self.input_frame,
             font=("Arial", 12),
             bg=self.theme["input_bg"],
             fg=self.theme["input_fg"],
             relief=tk.FLAT,
             bd=5,
+            height=1,  # Default height in text lines
+            wrap=tk.WORD,
         )
         self.user_input.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill=tk.X, expand=True)
-        self.user_input.bind("<Return>", self.handle_user_input)
+        self.user_input.bind("<Control-a>", self.select_all)
+        self.user_input.bind("<Return>", self.handle_return_key)
+        self.user_input.bind("<Shift-Return>", self.insert_newline)
+        self.user_input.bind("<<Modified>>", self.update_height)
 
         self.record_button = tk.Button(
             self.input_frame,
@@ -288,6 +293,34 @@ class AIChatUI:
                 )
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
+
+    def handle_return_key(self, event):
+        """Handle Return key press - submit if alone, newline if with Shift"""
+        if not event.state & 0x1:  # No Shift key
+            self.handle_user_input()
+            return "break"  # Prevent default newline
+        return None  # Allow default newline behavior with Shift
+
+    def insert_newline(self, event=None):
+        """Insert newline on Shift+Return"""
+        self.user_input.insert("insert", "\n")
+        return "break"
+
+    def update_height(self, event=None):
+        """Dynamically adjust text widget height based on content"""
+        MAX_LINES = 5
+        if self.user_input.edit_modified():
+            content = self.user_input.get("1.0", "end-1c")
+            num_lines = len(content.split("\n"))
+            new_height = min(max(num_lines, 1), MAX_LINES)
+            self.user_input.configure(height=new_height)
+            self.user_input.edit_modified(False)
+
+    def select_all(self, event=None):
+        """Select all text in the input widget"""
+        self.user_input.tag_add(tk.SEL, "1.0", tk.END)
+        self.user_input.mark_set(tk.INSERT, tk.END)
+        return "break"  # Prevents default behavior
 
     def disable_input(self):
         """Disable user input and send button."""
@@ -497,10 +530,10 @@ class AIChatUI:
 
     def handle_user_input(self, event=None):
         """Handle user input from input."""
-        user_message = self.user_input.get().strip()
+        user_message = self.user_input.get("1.0", "end-1c").strip()
         if not user_message:
             return
-        self.user_input.delete(0, tk.END)
+        self.user_input.delete("1.0", tk.END)
 
         # Handle special commands
         if user_message.startswith("/"):
@@ -666,9 +699,7 @@ class AIChatUI:
             if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
                 self.chat_display.insert(tk.END, "\n")
             self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-            self.chat_history.append(
-                {"role": role, "content": ""}
-            )  # Add new history entry
+            self.chat_history.append({"role": role, "content": ""})
 
         # Append the token to the display
         self.chat_display.insert(tk.END, f"{token}")
@@ -802,7 +833,6 @@ class AIChatUI:
         """Stop recording and process the audio."""
         try:
             self.audio_io.stop_recording()
-            self.remove_last_system_message()
 
         except AttributeError:
             print_system_message("No audio captured. Press record to try again.")

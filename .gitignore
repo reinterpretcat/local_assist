@@ -17,4 +17,4 @@ temp/
 /lib
 /share
 
-/.chromadb
+/.chromadb*

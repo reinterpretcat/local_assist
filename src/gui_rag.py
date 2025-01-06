@@ -439,6 +439,7 @@ class RAGQueryEditor:
 
         self.query_text = tk.Text(self.root, wrap=tk.WORD, height=4)
         self.query_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        self.query_text.focus_set()
 
         # Progress Bar
         self.progress_frame = ttk.Frame(self.root)
@@ -454,7 +455,14 @@ class RAGQueryEditor:
         )
         self.progress_bar.pack(fill=tk.X, pady=5)
 
-        self.add_apply_cancel_buttons(on_save=self.save)
+        self.button_frame = ttk.Frame(self.root)
+        self.button_frame.pack(fill=tk.X, pady=10)
+
+        self.apply_button = ttk.Button(
+            self.button_frame, text="Apply", command=self.save
+        )
+        self.apply_button.pack(anchor="center")
+
         self.autoscale()
 
     def save(self):
@@ -483,16 +491,3 @@ class RAGQueryEditor:
         x = (screen_width - width) // 2
         y = (screen_height - height) // 2
         self.root.geometry(f"{width}x{height}+{x}+{y}")
-
-    def add_apply_cancel_buttons(self, on_save):
-        """Adds buttons for Apply and Cancel"""
-        self.button_frame = ttk.Frame(self.root)
-        self.button_frame.pack(fill=tk.X, pady=10)
-
-        self.apply_button = ttk.Button(self.button_frame, text="Apply", command=on_save)
-        self.apply_button.pack(side=tk.RIGHT, padx=5)
-
-        self.cancel_button = ttk.Button(
-            self.button_frame, text="Cancel", command=self.root.destroy
-        )
-        self.cancel_button.pack(side=tk.RIGHT, padx=5)

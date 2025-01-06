@@ -10,7 +10,12 @@ The GUI itself built using LLM in a few days (I'm not expert in Python), so the 
 ## Installation
 
 1. Install Ollama: https://ollama.com/download
-2. Download LLM model `ollama pull <model_name>`, for example `ollama pull llama3.1:8b-instruct-q4_0`
+2. Download LLM model `ollama pull <model_name>`, for example
+```shell
+    ollama pull llama3.1:8b-instruct-q4_0
+    ollama pull qwen2.5-coder:7b
+    ollama pull cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0
+```
 3. Install dependencies via `pip install -r requirements.txt`
 4. Run `python3 -m src.main`
 
