@@ -14,7 +14,7 @@ from .commands import handle_command
 from .models import LLM, STT, TTS, RAG
 from .utils import compress_messages, print_system_message
 from .settings import default_theme
-from .uxui import render_markdown, setup_markdown_tags
+from .uxui import has_markdown_syntax, render_markdown, setup_markdown_tags
 
 
 class RoleTags:
@@ -65,9 +65,8 @@ class AIChatUI:
         self.chats = {}
         self.chat_history = []  # To store the conversation history
 
-        self.tts_enabled = (
-            True if self.tts_model else False
-        )  # A flag to track whether tts is enabled or not
+        # A flag to track whether tts is enabled or not
+        self.tts_enabled = True if self.tts_model else False
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  #  Flag to cancel AI response
 
@@ -629,6 +628,34 @@ class AIChatUI:
         )  # Revert button to Send
         self.enable_input()  # Re-enable inputs
 
+    def finish_ai_response(self):
+        """Finalize the AI response display after generation and TTS complete."""
+        self.enable_input()
+        self.enable_chat_list()
+        self.send_button.config(text="Send", command=self.handle_user_input)
+
+        last_message = self.chat_history[-1]
+
+        if last_message["role"] == RoleNames.ASSISTANT:
+            last_message = last_message["content"]
+
+            # Rerender the message in case of markdown syntax
+            if has_markdown_syntax(last_message):
+                self.chat_display.config(state=tk.NORMAL)
+
+                tag_indices = self.chat_display.tag_ranges(RoleTags.ASSISTANT)
+                if tag_indices:
+                    start_index = tag_indices[-2]
+                    self.chat_display.delete(start_index, tk.END)
+                    if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
+                        self.chat_display.insert(tk.END, "\n")
+                    self.chat_display.insert(
+                        tk.END, f"{RoleNames.ASSISTANT}: ", RoleTags.ASSISTANT
+                    )
+                    render_markdown(self.chat_display, last_message)
+
+                self.chat_display.config(state=tk.DISABLED)
+
     def speak_text(self, text):
         """Speak the given text using TTS."""
         if not self.tts_enabled:
@@ -674,12 +701,6 @@ class AIChatUI:
             self.finish_ai_response()
         else:
             self.root.after(100, self.check_tts_completion)
-
-    def finish_ai_response(self):
-        """Finalize the AI response display after generation and TTS complete."""
-        self.enable_input()
-        self.enable_chat_list()
-        self.send_button.config(text="Send", command=self.handle_user_input)
 
     def append_to_chat(self, role, content):
         """Append a message to the chat display."""

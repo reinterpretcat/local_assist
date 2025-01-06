@@ -10,6 +10,8 @@ def setup_markdown_tags(chat_display: ScrolledText):
 def render_markdown(chat_display: ScrolledText, message):
     MarkdownProcessor(chat_display).render_markdown(message)
 
+def has_markdown_syntax(text):
+    return MarkdownProcessor.has_markdown_syntax(text)
 
 class MarkdownProcessor:
 
@@ -33,7 +35,8 @@ class MarkdownProcessor:
     def __init__(self, chat_display: ScrolledText):
         self.chat_display = chat_display
 
-    def has_markdown_syntax(self, text):
+    @staticmethod
+    def has_markdown_syntax(text):
         """Check if the given text contains Markdown syntax that can be processed."""
         return bool(MarkdownProcessor.MARKDOWN_PATTERNS.search(text))
 
@@ -93,7 +96,7 @@ class MarkdownProcessor:
         )
 
     def render_markdown(self, text):
-        if not self.has_markdown_syntax(text):
+        if not MarkdownProcessor.has_markdown_syntax(text):
             print("no markdown")
             self.chat_display.insert(tk.END, text + "\n")
             return
