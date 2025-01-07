@@ -65,7 +65,8 @@ class AIChatUI:
         # A flag to track whether tts is enabled or not
         self.tts_enabled = True if self.tts_model else False
         self.is_recording = False  # Tracks the recording state
-        self.cancel_response = False  #  Flag to cancel AI response
+        self.cancel_response = False  # Flag to cancel AI response
+        self.markdown_enabled = True  # Flag for markdown post processing
 
         if self.tts_model:
             self.audio_io = AudioIO()
@@ -599,7 +600,7 @@ class AIChatUI:
             last_message = last_message["content"]
 
             # Rerender the message in case of markdown syntax
-            if has_markdown_syntax(last_message):
+            if self.markdown_enabled and has_markdown_syntax(last_message):
                 self.chat_display.config(state=tk.NORMAL)
 
                 tag_indices = self.chat_display.tag_ranges(RoleTags.ASSISTANT)
@@ -670,7 +671,7 @@ class AIChatUI:
             self.chat_display.insert(tk.END, "\n")
 
         self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-        render_markdown(self.chat_display, content)
+        self.append_markdown(content)
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)
 
@@ -698,6 +699,12 @@ class AIChatUI:
         # Update chat history
         if self.chat_history and self.chat_history[-1]["role"] == role:
             self.chat_history[-1]["content"] += f"{token}"
+
+    def append_markdown(self, text):
+        if self.markdown_enabled:
+            render_markdown(self.chat_display, text)
+        else:
+            self.chat_display.insert(tk.END, text + "\n")
 
     def append_system_message(self, message):
         self.append_to_chat(RoleNames.TOOL, message)
@@ -749,7 +756,7 @@ class AIChatUI:
                 )
                 continue
 
-            render_markdown(self.chat_display, message["content"])
+            self.append_markdown(message["content"])
 
         self.chat_display.config(state=tk.DISABLED)
         self.llm_model.load_history(self.chat_history)

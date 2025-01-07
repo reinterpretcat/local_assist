@@ -99,10 +99,8 @@ class MarkdownProcessor:
 
     def render_markdown(self, text):
         if not MarkdownProcessor.has_markdown_syntax(text):
-            print("no markdown")
             self.chat_display.insert(tk.END, text + "\n")
             return
-        print("markdown")
 
         # Remove ```markdown wrapper if present
         text = re.sub(r"```markdown\n(.*?)\n```", r"\1", text, flags=re.DOTALL)

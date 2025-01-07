@@ -21,7 +21,21 @@ def update_chat_history(self, history):
 def handle_command(self, command):
     args = command.split()
 
-    if command.startswith("/clear"):
+    if command == "/help":
+        self.append_system_message(
+            "Available commands:\n"
+            "/clear    - Clear the chat history (optionally, role can be specified)\n"
+            "/compress - Compresses history of currenlty selected chat\n"
+            "/tts      - Manage text-to-speech\n"
+            "/show     - A subcommand to display state info\n"
+            "/stats    - A chat statistics\n"
+            "/markdown  - Manage markdown post processing\n"
+            "/restore  - A subcommand to restore original state\n"
+            "/remove   - Removes messages from the selected chat\n"
+            "\n/help   - Display this help message",
+        )
+
+    elif command.startswith("/clear"):
         if len(args) == 2:
             # Clear all messages for given role from the chat window
             role = args[1]
@@ -31,14 +45,20 @@ def handle_command(self, command):
             update_chat_history(
                 self, [msg for msg in self.chat_history if not (msg["role"] == role)]
             )
-        else:
+        elif len(args) == 1:
             # Clear all messages from the chat window
             update_chat_history(self, [])
+        else:
+            self.append_system_message(
+                "Syntax for clear command:\n"
+                "/clear        -  Clears all messages\n"
+                "/clear [role] -  Clears all messages for specific role\n"
+            )
 
     elif command.startswith("/tts"):
         if len(args) == 1:
             self.append_system_message(
-                "Syntax for TTS commands:\n"
+                "Syntax for TTS command:\n"
                 "/tts on  - Enable text-to-speech\n"
                 "/tts off - Disable text-to-speech\n"
                 "/tts     - Show this help message",
@@ -112,6 +132,32 @@ def handle_command(self, command):
         # Display the statistics as a system message
         self.append_system_message(stats_message)
 
+    elif command.startswith("/markdown"):
+        if len(args) == 1:
+            self.append_system_message(
+                "Syntax for markdown command:\n"
+                "/markdown on  - Enable markdown post processing\n"
+                "/markdown off - Disable tmarkdown post procesing\n"
+                "/markdown     - Show this help message",
+            )
+        elif len(args) == 2:
+            if args[1] == "on":
+                self.markdown_enabled = True
+                self.append_system_message("Markdown enabled.")
+            elif args[1] == "off":
+                self.markdown_enabled = False
+                self.append_system_message("Markdown disabled.")
+            else:
+                self.append_system_message(
+                    f"Invalid argument '{args[1]}'. Use /markdown on, /markdown off",
+                )
+                return
+            update_chat_history(self, self.chat_history)
+        else:
+            self.append_system_message(
+                "Too many arguments. Use /tts on, /tts off",
+            )
+
     elif command.startswith("/restore"):
         if len(args) == 1:
             self.append_system_message(
@@ -171,18 +217,5 @@ def handle_command(self, command):
                 update_chat_history(
                     self, self.chat_history[:start] + self.chat_history[end + 1 :]
                 )
-
-    elif command == "/help":
-        self.append_system_message(
-            "Available commands:\n"
-            "/clear    - Clear the chat history (optionally, role can be specified)\n"
-            "/compress - Compresses history of currenlty selected chat\n"
-            "/tts      - Manage text-to-speech\n"
-            "/show     - A subcommand to display state info\n"
-            "/stats    - A chat statistics\n"
-            "/restore  - A subcommand to restore original state\n"
-            "/remove   - Removes messages from the selected chat\n"
-            "\n/help   - Display this help message",
-        )
     else:
         self.append_system_message(f"Unknown command '{command}")
