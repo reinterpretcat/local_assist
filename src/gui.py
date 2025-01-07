@@ -103,7 +103,8 @@ class AIChatUI:
 
         settings_menu = tk.Menu(self.menu_bar, tearoff=0)
         settings_menu.add_command(
-            label="LLM Settings", command=lambda: open_llm_settings_dialog(self.root, self.llm_model)
+            label="LLM Settings",
+            command=lambda: open_llm_settings_dialog(self.root, self.llm_model),
         )
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
@@ -240,21 +241,8 @@ class AIChatUI:
         )
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.user_input = tk.Text(
-            self.input_frame,
-            font=("Arial", 12),
-            bg=self.theme["input_bg"],
-            fg=self.theme["input_fg"],
-            relief=tk.FLAT,
-            bd=5,
-            height=1,  # Default height in text lines
-            wrap=tk.WORD,
-        )
-        self.user_input.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill=tk.X, expand=True)
-        self.user_input.bind("<Control-a>", self.select_all)
-        self.user_input.bind("<Return>", self.handle_return_key)
-        self.user_input.bind("<Shift-Return>", self.insert_newline)
-        self.user_input.bind("<<Modified>>", self.update_height)
+        self.input_holder = ChatInput(self)
+        self.user_input = self.input_holder.user_input
 
         self.record_button = tk.Button(
             self.input_frame,
@@ -300,34 +288,6 @@ class AIChatUI:
                 )
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
-
-    def handle_return_key(self, event):
-        """Handle Return key press - submit if alone, newline if with Shift"""
-        if not event.state & 0x1:  # No Shift key
-            self.handle_user_input()
-            return "break"  # Prevent default newline
-        return None  # Allow default newline behavior with Shift
-
-    def insert_newline(self, event=None):
-        """Insert newline on Shift+Return"""
-        self.user_input.insert("insert", "\n")
-        return "break"
-
-    def update_height(self, event=None):
-        """Dynamically adjust text widget height based on content"""
-        MAX_LINES = 5
-        if self.user_input.edit_modified():
-            content = self.user_input.get("1.0", "end-1c")
-            num_lines = len(content.split("\n"))
-            new_height = min(max(num_lines, 1), MAX_LINES)
-            self.user_input.configure(height=new_height)
-            self.user_input.edit_modified(False)
-
-    def select_all(self, event=None):
-        """Select all text in the input widget"""
-        self.user_input.tag_add(tk.SEL, "1.0", tk.END)
-        self.user_input.mark_set(tk.INSERT, tk.END)
-        return "break"  # Prevents default behavior
 
     def disable_input(self):
         """Disable user input and send button."""
