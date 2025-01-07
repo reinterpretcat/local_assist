@@ -10,8 +10,10 @@ def setup_markdown_tags(chat_display: ScrolledText):
 def render_markdown(chat_display: ScrolledText, message):
     MarkdownProcessor(chat_display).render_markdown(message)
 
+
 def has_markdown_syntax(text):
     return MarkdownProcessor.has_markdown_syntax(text)
+
 
 class MarkdownProcessor:
 

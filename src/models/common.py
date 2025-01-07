@@ -6,7 +6,7 @@ Models.
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-from ..settings import settings
+from ..tools import settings
 
 
 class BaseModel(ABC):

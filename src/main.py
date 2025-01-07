@@ -12,7 +12,7 @@ from json import loads
 from . import __version__
 from .gui import AIChatUI
 from .models import LLM, RAG, STT, TTS
-from .settings import default_config
+from .tools import default_config
 from .utils import deep_merge_dicts, print_system_message
 
 

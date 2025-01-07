@@ -7,7 +7,7 @@ from typing import Dict, Union
 
 from numpy import ndarray
 
-from ..settings import settings
+from ..tools import settings
 from .common import BaseModel
 
 

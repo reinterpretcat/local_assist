@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Union
 import numpy as np
 import pygame.mixer
 
-from .utils import print_system_message, suppress_stdout_stderr
+from ..utils import print_system_message, suppress_stdout_stderr
 
 
 class AudioIO:

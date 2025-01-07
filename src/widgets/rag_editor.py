@@ -2,7 +2,7 @@ import tkinter as tk
 import os
 from tkinter import ttk, filedialog, messagebox
 from typing import Optional, Dict
-from .models import RAG, DocumentReference
+from ..models import RAG, DocumentReference
 
 
 class RAGManagementUI:

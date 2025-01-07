@@ -8,13 +8,10 @@ import logging
 import time
 from typing import Optional
 
-from .audio import AudioIO
-from .gui_rag import RAGManagementUI
-from .commands import handle_command
 from .models import LLM, STT, TTS, RAG
 from .utils import compress_messages, print_system_message
-from .settings import default_theme
-from .uxui import has_markdown_syntax, render_markdown, setup_markdown_tags
+from .tools import *
+from .widgets import *
 
 
 class RoleTags:
@@ -106,14 +103,16 @@ class AIChatUI:
 
         settings_menu = tk.Menu(self.menu_bar, tearoff=0)
         settings_menu.add_command(
-            label="LLM Settings", command=self.open_llm_settings_dialog
+            label="LLM Settings", command=lambda: open_llm_settings_dialog(self.root, self.llm_model)
         )
         settings_menu.add_command(label="Change Theme", command=self.load_theme)
         self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
 
         if self.rag_model:
             rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-            rag_menu.add_command(label="Toggle Panel", command=self.toggle_rag_panel)
+            rag_menu.add_command(
+                label="Toggle RAG Editor", command=self.toggle_rag_panel
+            )
             self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
 
         # Main PanedWindow
@@ -894,32 +893,3 @@ class AIChatUI:
         else:
             self.rag_panel.frame.pack(fill=tk.BOTH, expand=True)
         self.rag_visible = not self.rag_visible
-
-    def open_llm_settings_dialog(self):
-        """Open a dialog to set LLM settings."""
-        settings_window = tk.Toplevel(self.root)
-        settings_window.title("LLM System Prompt")
-
-        current_prompt = self.llm_model.system_prompt
-
-        # System Prompt
-        tk.Label(
-            settings_window, text="System Prompt:", font=("Arial", 12, "bold")
-        ).pack(anchor="w", padx=10, pady=5)
-        prompt_text = tk.Text(settings_window, wrap=tk.WORD, height=8, width=50)
-        prompt_text.insert(tk.END, current_prompt)
-        prompt_text.pack(padx=10, pady=5, fill=tk.BOTH, expand=True)
-
-        # Save Button
-        def save_settings():
-            self.llm_model.set_system_prompt(prompt_text.get(1.0, tk.END).strip())
-            settings_window.destroy()
-
-        tk.Button(
-            settings_window, text="Save", command=save_settings, bg="green", fg="white"
-        ).pack(pady=10)
-
-        # Center the settings window
-        settings_window.transient(self.root)
-        settings_window.grab_set()
-        settings_window.wait_window(settings_window)
