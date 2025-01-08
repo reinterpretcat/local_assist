@@ -31,7 +31,7 @@ def add_chat_menu(self):
     self.settings_menu = tk.Menu(self.menu_bar, tearoff=0)
     self.settings_menu.add_command(
         label=pad_label("LLM Settings"),
-        command=lambda: open_llm_settings_dialog(self.root, self.llm_model),
+        command=lambda: open_llm_settings_dialog(self.root, self.theme, self.llm_model),
     )
     self.settings_menu.add_command(
         label=pad_label("Change Theme"), command=self.load_theme

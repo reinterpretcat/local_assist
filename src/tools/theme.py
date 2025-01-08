@@ -1,4 +1,5 @@
 from tkinter import ttk
+from typing import Dict
 
 dark_theme = {
     "bg": "#2f343f",  # Arc-Dark background
@@ -42,6 +43,19 @@ def apply_app_theme(self):
     if hasattr(self, "rag_panel"):
         self.rag_panel.theme = self.theme
         apply_rag_theme(self.rag_panel)
+
+
+def get_button_config(theme: Dict) -> Dict:
+    # Configure buttons with common style
+    return {
+        "bg": theme["button_bg"],
+        "fg": theme["button_fg"],
+        "activebackground": theme["button_bg_hover"],
+        "activeforeground": theme["button_fg"],
+        "font": ("Arial", 12),
+        "relief": "solid",
+        "borderwidth": 1,
+    }
 
 
 def apply_chat_theme(self):
@@ -90,17 +104,7 @@ def apply_chat_theme(self):
         borderwidth=1,
     )
 
-    # Configure buttons
-    button_config = {
-        "bg": self.theme["button_bg"],
-        "fg": self.theme["button_fg"],
-        "activebackground": self.theme["button_bg_hover"],
-        "activeforeground": self.theme["button_fg"],
-        "font": ("Arial", 12),
-        "relief": "solid",
-        "borderwidth": 1,
-    }
-
+    button_config = get_button_config(self.theme)
     for button in [
         self.new_chat_button,
         self.rename_button,
@@ -180,6 +184,7 @@ def apply_rag_theme(self):
         "borderwidth": 1,
     }
 
+    button_config = get_button_config(self.theme)
     for button in [
         self.new_collection_button,
         self.rename_collection_button,
