@@ -38,8 +38,8 @@ ollama pull mistral:7b
 # Code-specific models
 ollama pull qwen2.5-coder:7b
 
-# Language learning models
-ollama pull cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0  # German
+# Language learning models (German)
+ollama pull cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0
 ```
 
 3. Install Python dependencies:
@@ -70,8 +70,8 @@ python3 -c 'import torch; print(torch.cuda.is_available())'
 # German learning mode
 python3 -m src.main --config config-de.json
 
-# Russian conversation mode
-python3 -m src.main --config config-ru.json
+# Code assistant mode
+python3 -m src.main --config config-code.json
 ```
 
 ## RAG (Retrieval-Augmented Generation)
