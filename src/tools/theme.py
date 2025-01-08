@@ -8,9 +8,9 @@ dark_theme = {
     "input_bg": "#3b4048",
     "input_fg": "#d3dae3",
     "input_border": "#3b4048",
-    "button_bg": "#4c566a",  # Arc-Dark button background
-    "button_bg_hover": "#5e6a82",  # Arc-Dark button hover background
-    "button_fg": "#d3dae3",  # Same as foreground color
+    "button_bg": "#4c566a",
+    "button_bg_hover": "#5e6a82",
+    "button_fg": "#d3dae3",
     "button_border": "#4c566a",
     "button_danger_bg": "#bf616a",
     "button_danger_bg_hover": "#a54242",
@@ -30,6 +30,7 @@ dark_theme = {
     "tree_fg": "#d3dae3",
     "tree_select_bg": "#4c566a",
     "tree_select_fg": "#ffffff",
+    "menu_bg": "#353a45",
     "user": {"color_prefix": "#81a1c1", "bg": "#2f343f", "border": "#3b4048"},
     "assistant": {"color_prefix": "#88c0d0", "bg": "#2f343f", "border": "#3b4048"},
     "tool": {"color_prefix": "#d3dae3", "bg": "#2f343f", "border": "#3b4048"},
@@ -58,7 +59,7 @@ def apply_chat_theme(self):
 
     # Configure menu
     self.menu_bar.configure(
-        bg=self.theme["bg"],
+        bg=self.theme["menu_bg"],
         fg=self.theme["fg"],
         activebackground=self.theme["button_bg"],
         activeforeground=self.theme["button_fg"],
@@ -67,7 +68,7 @@ def apply_chat_theme(self):
 
     for menu in self.menu_bar.winfo_children():
         menu.configure(
-            bg=self.theme["bg"],
+            bg=self.theme["menu_bg"],
             fg=self.theme["fg"],
             activebackground=self.theme["button_bg"],
             activeforeground=self.theme["button_fg"],
