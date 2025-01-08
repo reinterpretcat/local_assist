@@ -27,7 +27,8 @@ def handle_command(self, command):
             "Available commands:\n"
             "/clear    - Clear the chat history (optionally, role can be specified)\n"
             "/compress - Compresses history of currenlty selected chat\n"
-            "/config   - Show configuration"
+            "/config   - Show configuration\n"
+            "/echo     - Echoes message from `tool` role\n"
             "/tts      - Manage text-to-speech\n"
             "/show     - A subcommand to display state info\n"
             "/stats    - A chat statistics\n"
@@ -79,6 +80,9 @@ def handle_command(self, command):
             self.append_system_message(
                 f"\n{json.dumps(get_nested_value(self.config, args[1]), indent=2)}"
             )
+    elif command.startswith("/echo"):
+        if len(args) != 1:
+            self.append_system_message(command[len("/echo") :])
 
     elif command.startswith("/tts"):
         if len(args) == 1:
