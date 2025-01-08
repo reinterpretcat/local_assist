@@ -4,7 +4,7 @@ This module defines the application settings using the Pydantic library.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from torch import cuda
-
+from .theme import dark_theme
 
 class Settings(BaseSettings):
     """
@@ -29,23 +29,8 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+default_theme = dark_theme
 
-# theme colors (WIP, partial support)
-default_theme = {
-    "bg": "#f7f7f8",
-    "fg": "#000000",
-    "input_bg": "#e8eaed",
-    "input_fg": "#000000",
-    "button_bg": "#10a37f",
-    "button_fg": "#ffffff",
-    "list_bg": "#ffffff",
-    "list_fg": "#000000",
-    "chat_bg": "#ffffff",
-    "chat_fg": "#000000",
-    "tool": {"color_prefix": "red"},
-    "assistant": {"color_prefix": "green"},
-    "user": {"color_prefix": "blue"},
-}
 
 default_config = {
     # LLM config

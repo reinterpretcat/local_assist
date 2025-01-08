@@ -3,12 +3,12 @@ from tkinter.scrolledtext import ScrolledText
 import re
 
 
-def setup_markdown_tags(chat_display: ScrolledText):
-    MarkdownProcessor(chat_display).setup_markdown_tags()
+def setup_markdown_tags(chat_display: ScrolledText, theme: dict = None):
+    MarkdownProcessor(chat_display, theme).setup_markdown_tags()
 
 
-def render_markdown(chat_display: ScrolledText, message):
-    MarkdownProcessor(chat_display).render_markdown(message)
+def render_markdown(chat_display: ScrolledText, message, theme: dict = None):
+    MarkdownProcessor(chat_display, theme).render_markdown(message)
 
 
 def has_markdown_syntax(text):
@@ -34,8 +34,13 @@ class MarkdownProcessor:
         re.MULTILINE | re.DOTALL,  # Support multiline and dotall mode
     )
 
-    def __init__(self, chat_display: ScrolledText):
+    def __init__(self, chat_display: ScrolledText, theme: dict = None):
         self.chat_display = chat_display
+        self.theme = theme or {
+            "fg": "black",
+            "input_bg": "white",
+            "input_fg": "black",
+        }
 
     @staticmethod
     def has_markdown_syntax(text):
@@ -44,23 +49,35 @@ class MarkdownProcessor:
 
     def setup_markdown_tags(self):
         # Basic styles
-        self.chat_display.tag_configure("bold", font=("Arial", 12, "bold"))
-        self.chat_display.tag_configure("italic", font=("Arial", 12, "italic"))
-        self.chat_display.tag_configure("strike", overstrike=1)
         self.chat_display.tag_configure(
-            "code", font=("Courier", 12), background="#f0f0f0"
+            "bold", font=("Arial", 12, "bold"), foreground=self.theme["fg"]
+        )
+        self.chat_display.tag_configure(
+            "italic", font=("Arial", 12, "italic"), foreground=self.theme["fg"]
+        )
+        self.chat_display.tag_configure(
+            "strike", overstrike=1, foreground=self.theme["fg"]
+        )
+        self.chat_display.tag_configure(
+            "code",
+            font=("Courier", 12),
+            background=self.theme["input_bg"],
+            foreground=self.theme["input_fg"],
         )
 
         # Headers
         for i in range(1, 7):
             size = 20 - (i * 2)
-            self.chat_display.tag_configure(f"h{i}", font=("Arial", size, "bold"))
+            self.chat_display.tag_configure(
+                f"h{i}", font=("Arial", size, "bold"), foreground=self.theme["fg"]
+            )
 
         # Code blocks
         self.chat_display.tag_configure(
             "codeblock",
             font=("Courier", 12),
-            background="#f0f0f0",
+            background=self.theme["input_bg"],
+            foreground=self.theme["input_fg"],
             spacing1=10,
             spacing3=10,
             lmargin1=20,
@@ -68,33 +85,49 @@ class MarkdownProcessor:
         )
 
         # Lists
-        self.chat_display.tag_configure("bullet", lmargin1=20, lmargin2=40)
-        self.chat_display.tag_configure("ordered", lmargin1=20, lmargin2=40)
+        self.chat_display.tag_configure(
+            "bullet", lmargin1=20, lmargin2=40, foreground=self.theme["fg"]
+        )
+        self.chat_display.tag_configure(
+            "ordered", lmargin1=20, lmargin2=40, foreground=self.theme["fg"]
+        )
 
         # Blockquote
         self.chat_display.tag_configure(
             "blockquote",
             lmargin1=20,
             lmargin2=20,
-            background="#f9f9f9",
+            background=self.theme["input_bg"],
+            foreground=self.theme["input_fg"],
             spacing1=5,
             spacing3=5,
         )
 
         # Table tags
-        self.chat_display.tag_configure("table", spacing1=5, spacing3=5)
         self.chat_display.tag_configure(
-            "th", font=("Arial", 12, "bold"), background="#f0f0f0"
+            "table", spacing1=5, spacing3=5, foreground=self.theme["fg"]
         )
-        self.chat_display.tag_configure("td", font=("Arial", 12))
+        self.chat_display.tag_configure(
+            "th",
+            font=("Arial", 12, "bold"),
+            background=self.theme["input_bg"],
+            foreground=self.theme["input_fg"],
+        )
+        self.chat_display.tag_configure(
+            "td", font=("Arial", 12), foreground=self.theme["fg"]
+        )
 
         # Task list
-        self.chat_display.tag_configure("task-done", foreground="green")
-        self.chat_display.tag_configure("task-pending", foreground="gray")
+        self.chat_display.tag_configure("task-done", foreground=self.theme["fg"])
+        self.chat_display.tag_configure("task-pending", foreground=self.theme["fg"])
 
         # Horizontal rule
         self.chat_display.tag_configure(
-            "hr", font=("Arial", 1), spacing1=10, spacing3=10, background="gray"
+            "hr",
+            font=("Arial", 1),
+            spacing1=10,
+            spacing3=10,
+            background=self.theme["input_bg"],
         )
 
     def render_markdown(self, text):

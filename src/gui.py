@@ -66,7 +66,7 @@ class AIChatUI:
         self.tts_enabled = True if self.tts_model else False
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  # Flag to cancel AI response
-        self.markdown_enabled = True  # Flag for markdown post processing
+        self.markdown_enabled = False  # Flag for markdown post processing
 
         if self.tts_model:
             self.audio_io = AudioIO()
@@ -92,30 +92,32 @@ class AIChatUI:
         min_height = int(screen_height * 0.3)  # 30% of screen height
         self.root.minsize(min_width, min_height)
 
-        self.apply_theme()
-
         self.menu_bar = tk.Menu(root)
         root.config(menu=self.menu_bar)
 
-        file_menu = tk.Menu(self.menu_bar, tearoff=0)
-        file_menu.add_command(label="Save Chats", command=self.save_chats_to_file)
-        file_menu.add_command(label="Load Chats", command=self.load_chats_from_file)
-        self.menu_bar.add_cascade(label="File", menu=file_menu)
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.file_menu.add_command(label="Save Chats", command=self.save_chats_to_file)
+        self.file_menu.add_command(
+            label="Load Chats", command=self.load_chats_from_file
+        )
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
-        settings_menu = tk.Menu(self.menu_bar, tearoff=0)
-        settings_menu.add_command(
+        self.settings_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.settings_menu.add_command(
             label="LLM Settings",
             command=lambda: open_llm_settings_dialog(self.root, self.llm_model),
         )
-        settings_menu.add_command(label="Change Theme", command=self.load_theme)
-        self.menu_bar.add_cascade(label="Settings", menu=settings_menu)
+        self.settings_menu.add_command(label="Change Theme", command=self.load_theme)
+        self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
 
         if self.rag_model:
-            rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-            rag_menu.add_command(
+            self.rag_menu = tk.Menu(self.menu_bar, tearoff=0)
+            self.rag_menu.add_command(
                 label="Toggle RAG Editor", command=self.toggle_rag_panel
             )
-            self.menu_bar.add_cascade(label="RAG", menu=rag_menu)
+            self.menu_bar.add_cascade(label="RAG", menu=self.rag_menu)
+        else:
+            self.rag_menu = None
 
         # Main PanedWindow
         self.main_paned_window = tk.PanedWindow(root, orient=tk.HORIZONTAL)
@@ -138,7 +140,7 @@ class AIChatUI:
         self.root.bind("<Map>", configure_sash)
 
         # Left panel for chat list and RAG
-        self.left_panel = tk.Frame(self.main_paned_window, bg=self.theme["bg"])
+        self.left_panel = tk.Frame(self.main_paned_window)
         # self.left_panel.configure(width=600)  # Set minimum width
         self.left_panel.pack_propagate(False)  # Prevent the panel from shrinking
         self.main_paned_window.add(self.left_panel)
@@ -146,8 +148,6 @@ class AIChatUI:
         # Chat list
         self.chat_list = tk.Listbox(
             self.left_panel,
-            bg=self.theme["list_bg"],
-            fg=self.theme["list_fg"],
             font=("Arial", 12),
             selectmode=tk.SINGLE,
             width=0,  # Let it expand to frame width
@@ -159,8 +159,6 @@ class AIChatUI:
             self.left_panel,
             text="New Chat",
             command=self.new_chat,
-            bg=self.theme["button_bg"],
-            fg=self.theme["button_fg"],
             font=("Arial", 12),
         )
         self.new_chat_button.pack(padx=10, pady=5, fill=tk.X)
@@ -169,8 +167,6 @@ class AIChatUI:
             self.left_panel,
             text="Rename",
             command=self.edit_chat_name,
-            bg=self.theme["button_bg"],
-            fg=self.theme["button_fg"],
             font=("Arial", 12),
         )
         self.rename_button.pack(padx=10, pady=5, fill=tk.X)
@@ -179,8 +175,6 @@ class AIChatUI:
             self.left_panel,
             text="Compress Chat",
             command=self.compress_active_chat,
-            bg=self.theme["button_bg"],
-            fg=self.theme["button_fg"],
             font=("Arial", 12),
         )
         self.compress_button.pack(padx=10, pady=5, fill=tk.X)
@@ -189,8 +183,6 @@ class AIChatUI:
             self.left_panel,
             text="Delete Chat",
             command=self.delete_active_chat,
-            bg="red",
-            fg=self.theme["button_fg"],
             font=("Arial", 12),
         )
         self.delete_button.pack(padx=10, pady=5, fill=tk.X)
@@ -204,42 +196,38 @@ class AIChatUI:
             self.rag_visible = True
 
         # Right panel for chat display
-        self.chat_display_frame = tk.Frame(
-            self.main_paned_window, bg=self.theme["chat_bg"]
-        )
+        self.chat_display_frame = tk.Frame(self.main_paned_window)
         self.main_paned_window.add(self.chat_display_frame)
 
         self.chat_display = ScrolledText(
             self.chat_display_frame,
             wrap=tk.WORD,
             state=tk.DISABLED,
-            bg=self.theme["chat_bg"],
-            fg=self.theme["chat_fg"],
             font=("Arial", 12),
         )
         self.chat_display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
         self.chat_display.tag_configure(
             RoleTags.USER,
-            foreground=self.theme["user"]["color_prefix"],
+            foreground=self.theme["user"]["color_prefix"] if self.theme else "blue",
             font=("Arial", 14, "bold"),
         )
         self.chat_display.tag_configure(
             RoleTags.ASSISTANT,
-            foreground=self.theme["assistant"]["color_prefix"],
+            foreground=(
+                self.theme["assistant"]["color_prefix"] if self.theme else "green"
+            ),
             font=("Arial", 14, "bold"),
         )
         self.chat_display.tag_configure(
             RoleTags.TOOL,
-            foreground=self.theme["tool"]["color_prefix"],
+            foreground=self.theme["tool"]["color_prefix"] if self.theme else "red",
             font=("Arial", 14, "bold"),
         )
         self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
 
         # Input area at the bottom (outside main content frame)
-        self.input_frame = tk.Frame(
-            self.chat_display_frame, bg=self.theme["bg"], height=50
-        )
+        self.input_frame = tk.Frame(self.chat_display_frame, height=50)
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.input_holder = ChatInput(self)
@@ -249,8 +237,6 @@ class AIChatUI:
             self.input_frame,
             text="🎙️ Record",
             command=self.record_voice,
-            bg=self.theme["button_bg"],
-            fg=self.theme["button_fg"],
             font=("Arial", 12),
         )
         self.record_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
@@ -260,21 +246,21 @@ class AIChatUI:
             self.input_frame,
             text="Send",
             command=self.handle_user_input,
-            bg=self.theme["button_bg"],
-            fg=self.theme["button_fg"],
             font=("Arial", 12),
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
         self.root.bind("<Escape>", self.cancel_ai_response)
 
-        setup_markdown_tags(self.chat_display)
+        self.apply_theme()
+        setup_markdown_tags(self.chat_display, self.theme)
         self.update_chat_list()
         self.create_default_chat()
         self.toggle_rag_panel()
 
     def apply_theme(self):
-        """Apply the current theme to the root window."""
-        self.root.configure(bg=self.theme["bg"])
+        """Apply the current theme to the chat and rag window."""
+        if self.theme:
+            apply_app_theme(self)
 
     def load_theme(self):
         """Load a custom theme from a JSON file."""
@@ -283,7 +269,7 @@ class AIChatUI:
             try:
                 with open(file_path, "r", encoding="utf-8") as file:
                     self.theme = json.load(file)
-                self.update_theme()
+                self.apply_theme()
                 messagebox.showinfo(
                     "Theme Loaded", "Custom theme applied successfully!"
                 )
@@ -303,27 +289,6 @@ class AIChatUI:
         self.send_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL if self.tts_model else tk.DISABLED)
         self.compress_button.config(state=tk.NORMAL)
-
-    def update_theme(self):
-        """Update the theme for all widgets."""
-        self.apply_theme()
-        self.left_panel.configure(bg=self.theme["bg"])
-        self.chat_list.configure(bg=self.theme["list_bg"], fg=self.theme["list_fg"])
-        self.chat_display.configure(bg=self.theme["chat_bg"], fg=self.theme["chat_fg"])
-        self.input_frame.configure(bg=self.theme["bg"])
-        self.user_input.configure(bg=self.theme["input_bg"], fg=self.theme["input_fg"])
-        self.send_button.configure(
-            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
-        )
-        self.delete_button.configure(
-            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
-        )
-        self.rename_button.configure(
-            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
-        )
-        self.new_chat_button.configure(
-            bg=self.theme["button_bg"], fg=self.theme["button_fg"]
-        )
 
     def create_default_chat(self):
         """Create the default chat on app startup."""
@@ -798,7 +763,7 @@ class AIChatUI:
             # Stop recording
             self.is_recording = False
             self.record_button.config(
-                text="🎙️ Record", bg=self.theme["button_bg"]
+                text="🎙️ Record",
             )  # Revert to default
             self.stop_recording()
 

@@ -1,8 +1,8 @@
 import tkinter as tk
 import os
 from tkinter import ttk, filedialog, messagebox
-from typing import Optional, Dict
-from ..models import RAG, DocumentReference
+from typing import Optional
+from ..models import RAG
 
 
 class RAGManagementUI:
@@ -14,44 +14,44 @@ class RAGManagementUI:
 
         self.current_collection: Optional[str] = None
 
-        self.frame = ttk.Frame(parent)
+        self.frame = tk.Frame(parent)
 
         # Collection Management Section
-        self.collection_frame = ttk.LabelFrame(self.frame, text="Collection Management")
+        self.collection_frame = tk.LabelFrame(self.frame, text="Collection Management")
         self.collection_frame.pack(fill=tk.X, padx=10, pady=5)
 
         # Collection management buttons
-        self.new_collection_button = ttk.Button(
+        self.new_collection_button = tk.Button(
             self.collection_frame,
             text="New",
             command=self.create_new_collection,
         )
         self.new_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        self.rename_collection_button = ttk.Button(
+        self.rename_collection_button = tk.Button(
             self.collection_frame,
             text="Rename",
             command=self.rename_collection,
         )
         self.rename_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        self.delete_button = ttk.Button(
+        self.delete_button = tk.Button(
             self.collection_frame, text="Delete Selected", command=self.delete_selected
         )
         self.delete_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
         # Data Store Section
-        self.data_store_frame = ttk.LabelFrame(self.frame, text="Data Store")
+        self.data_store_frame = tk.LabelFrame(self.frame, text="Data Store")
         self.data_store_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
 
         # Create a frame to hold the Treeview and scrollbars
-        self.tree_frame = ttk.Frame(self.data_store_frame)
+        self.tree_frame = tk.Frame(self.data_store_frame)
         self.tree_frame.pack(fill=tk.BOTH, padx=5, pady=5, expand=True)
 
         # Configure style for proper row height
         style = ttk.Style()
         style.configure(
-            "Treeview",
+            "RAG.Treeview",
             rowheight=36,
             font=("TkDefaultFont", 10),
         )
@@ -61,8 +61,8 @@ class RAGManagementUI:
             self.tree_frame,
             columns=("Name", "Type"),
             show="tree headings",
-            style="Treeview",
             selectmode="extended",
+            style="RAG.Treeview",
         )
         self.data_store_tree.heading("Name", text="File Name")
         self.data_store_tree.heading("Type", text="File Type")
@@ -72,7 +72,7 @@ class RAGManagementUI:
         self.data_store_tree.column("Type", width=100, minwidth=80)
 
         # Create vertical scrollbar
-        self.vsb = ttk.Scrollbar(
+        self.vsb = tk.Scrollbar(
             self.tree_frame, orient="vertical", command=self.data_store_tree.yview
         )
         self.data_store_tree.configure(yscrollcommand=self.vsb.set)
@@ -88,12 +88,12 @@ class RAGManagementUI:
         # Bind tree selection event
         self.data_store_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
-        self.upload_button = ttk.Button(
+        self.upload_button = tk.Button(
             self.data_store_frame, text="Upload File", command=self.upload_file
         )
         self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
 
-        self.context_button = ttk.Button(
+        self.context_button = tk.Button(
             self.data_store_frame, text="Set Query", command=self.set_query
         )
         self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
@@ -402,9 +402,12 @@ class RAGManagementUI:
 
         editor.on_save_callback = on_save_callback
 
+        if hasattr(self, "editor_style_callback"):
+            self.editor_style_callback(editor)
+
 
 class RAGQueryEditor:
-    def __init__(self, root, summarize_prompt, context_prompt):
+    def __init__(self, parent, summarize_prompt, context_prompt):
         """
         A window to edit summarize_prompt and context_prompt.
 
@@ -414,11 +417,11 @@ class RAGQueryEditor:
             context_prompt: Initial value of the context_prompt.
             on_save_callback: Function to call when the user saves the changes.
         """
-        self.root = tk.Toplevel(root)
+        self.root = tk.Toplevel(parent)
         self.root.title("Edit RAG Prompts and Query")
 
         # Create fields for summarize_prompt
-        self.summary_label = ttk.Label(self.root, text="Summarize Prompt:")
+        self.summary_label = tk.Label(self.root, text="Summarize Prompt:")
         self.summary_label.pack(anchor="w", padx=10, pady=(10, 0))
 
         self.summary_text = tk.Text(self.root, wrap=tk.WORD, height=10)
@@ -426,15 +429,15 @@ class RAGQueryEditor:
         self.summary_text.insert("1.0", summarize_prompt)
 
         # Create fields for context_prompt
-        self.contexgt_label = ttk.Label(self.root, text="Context Prompt:")
-        self.contexgt_label.pack(anchor="w", padx=10, pady=(10, 0))
+        self.context_label = tk.Label(self.root, text="Context Prompt:")
+        self.context_label.pack(anchor="w", padx=10, pady=(10, 0))
 
         self.context_text = tk.Text(self.root, wrap=tk.WORD, height=10)
         self.context_text.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
         self.context_text.insert("1.0", context_prompt)
 
         # Create fields for user query
-        self.query_label = ttk.Label(self.root, text="User Query:")
+        self.query_label = tk.Label(self.root, text="User Query:")
         self.query_label.pack(anchor="w", padx=10, pady=(10, 0))
 
         self.query_text = tk.Text(self.root, wrap=tk.WORD, height=4)
@@ -442,10 +445,10 @@ class RAGQueryEditor:
         self.query_text.focus_set()
 
         # Progress Bar
-        self.progress_frame = ttk.Frame(self.root)
+        self.progress_frame = tk.Frame(self.root)
         self.progress_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
 
-        self.progress_label = ttk.Label(
+        self.progress_label = tk.Label(
             self.progress_frame, text="Processing Progress: not started"
         )
         self.progress_label.pack(anchor="w")
@@ -455,15 +458,16 @@ class RAGQueryEditor:
         )
         self.progress_bar.pack(fill=tk.X, pady=5)
 
-        self.button_frame = ttk.Frame(self.root)
+        self.button_frame = tk.Frame(self.root)
         self.button_frame.pack(fill=tk.X, pady=10)
 
-        self.apply_button = ttk.Button(
+        self.apply_button = tk.Button(
             self.button_frame, text="Apply", command=self.save
         )
         self.apply_button.pack(anchor="center")
 
-        self.autoscale()
+        self.root.transient(parent)
+        self.root.grab_set()
 
     def save(self):
         """Handle saving the updated prompts and user query."""
@@ -480,14 +484,3 @@ class RAGQueryEditor:
         # Trigger the save callback with the updated values
         self.on_save_callback(user_query, updated_summary, updated_context)
         self.root.destroy()
-
-    def autoscale(self):
-        """Autoscale window size and center it"""
-        self.root.update_idletasks()  # Ensure geometry is calculated
-        width = self.root.winfo_reqwidth()
-        height = self.root.winfo_reqheight()
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        x = (screen_width - width) // 2
-        y = (screen_height - height) // 2
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
