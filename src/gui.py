@@ -205,7 +205,11 @@ class AIChatUI:
         self.input_frame = tk.Frame(self.chat_display_frame, height=50)
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.input_holder = ChatInput(self)
+        self.input_holder = ChatInput(
+            root=self,
+            input_frame=self.input_frame,
+            handle_user_input=self.handle_user_input,
+        )
         self.user_input = self.input_holder.user_input
 
         self.record_button = tk.Button(

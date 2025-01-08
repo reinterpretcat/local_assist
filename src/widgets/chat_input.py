@@ -1,14 +1,24 @@
 import tkinter as tk
+from typing import Callable, Optional
 
 
 class ChatInput:
     """A text input to provide better chat typing experience"""
 
-    def __init__(self, root):
+    def __init__(
+        self,
+        root,
+        input_frame: tk.Frame,
+        handle_user_input: Callable,
+        min_height: int = 1,
+        max_height: int = 5,
+    ):
 
         self.root = root
-        self.input_frame = root.input_frame
-        self.handle_user_input = root.handle_user_input
+        self.input_frame = input_frame
+        self.handle_user_input = handle_user_input
+        self.min_height = min_height
+        self.max_height = max_height
 
         self.undo_stack = []
         self.max_history_size = 64
@@ -33,7 +43,6 @@ class ChatInput:
         self.user_input.pack(side=tk.LEFT, padx=(10, 5), pady=5, fill=tk.X, expand=True)
 
         self.user_input.bind("<Control-a>", self.select_all)
-        #self.user_input.bind("<Control-z>", self.undo)
         self.user_input.bind("<Return>", self.handle_return_key)
         self.user_input.bind("<Shift-Return>", self.insert_newline)
         self.user_input.bind("<<Modified>>", self.handle_modify)
@@ -66,7 +75,10 @@ class ChatInput:
         )
 
         # Calculate the number of lines
-        num_lines = max(1, min(5, (required_height // single_line_height)))
+        num_lines = max(
+            self.min_height,
+            min(self.max_height, (required_height // single_line_height)),
+        )
 
         # Set height only if it has changed
         current_num_lines = int(self.user_input.cget("height"))
@@ -77,6 +89,8 @@ class ChatInput:
             self.scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         else:
             self.scrollbar.pack_forget()
+
+        self.scroll_to_cursor()
 
     def select_all(self, event=None):
         """Select all text in the input widget"""
@@ -99,3 +113,11 @@ class ChatInput:
         )  # Explicitly mark modified to trigger update
         self._adjust_height()  # Update height immediately after insertion
         return "break"
+
+    # Function to scroll to the cursor position
+    def scroll_to_cursor(self):
+        # Get the current index of the cursor
+        cursor_index = self.user_input.index(tk.INSERT)
+
+        # Scroll to the line containing the cursor
+        self.user_input.see(cursor_index)
