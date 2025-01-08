@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+import json
 
 
 def update_chat_history(self, history):
@@ -26,10 +27,11 @@ def handle_command(self, command):
             "Available commands:\n"
             "/clear    - Clear the chat history (optionally, role can be specified)\n"
             "/compress - Compresses history of currenlty selected chat\n"
+            "/config   - Show configuration"
             "/tts      - Manage text-to-speech\n"
             "/show     - A subcommand to display state info\n"
             "/stats    - A chat statistics\n"
-            "/markdown  - Manage markdown post processing\n"
+            "/markdown - Manage markdown post processing\n"
             "/restore  - A subcommand to restore original state\n"
             "/remove   - Removes messages from the selected chat\n"
             "\n/help   - Display this help message",
@@ -53,6 +55,29 @@ def handle_command(self, command):
                 "Syntax for clear command:\n"
                 "/clear        -  Clears all messages\n"
                 "/clear [role] -  Clears all messages for specific role\n"
+            )
+
+    elif command.startswith("/config"):
+        if len(args) != 2:
+            if self.markdown_enabled:
+                self.append_system_message(
+                    f"```json\n{json.dumps(self.config, indent=2)}\n```"
+                )
+            else:
+                self.append_system_message(f"\n{json.dumps(self.config, indent=2)}")
+        elif len(args) == 2:
+
+            def get_nested_value(data, path):
+                keys = path.split(".")
+                for key in keys:
+                    if isinstance(data, dict) and key in data:
+                        data = data[key]
+                    else:
+                        return None
+                return data
+
+            self.append_system_message(
+                f"\n{json.dumps(get_nested_value(self.config, args[1]), indent=2)}"
             )
 
     elif command.startswith("/tts"):
