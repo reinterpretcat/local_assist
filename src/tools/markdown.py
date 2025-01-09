@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
 import re
+from dataclasses import dataclass
+from typing import List
 
 
 def setup_markdown_tags(chat_display: ScrolledText, theme: dict = None):
@@ -15,9 +17,15 @@ def has_markdown_syntax(text):
     return MarkdownProcessor.has_markdown_syntax(text)
 
 
-class MarkdownProcessor:
+@dataclass
+class StyleSpan:
+    start: int
+    end: int
+    tag: str
+    text: str
 
-    # Precompiled regex as a static variable
+
+class MarkdownProcessor:
     MARKDOWN_PATTERNS = re.compile(
         r"(^#{1,6}\s.+$)|"  # Headers (e.g., # Header 1)
         r"(^[-*]\s.+$)|"  # Bullet lists (e.g., - Item)
@@ -44,7 +52,6 @@ class MarkdownProcessor:
 
     @staticmethod
     def has_markdown_syntax(text):
-        """Check if the given text contains Markdown syntax that can be processed."""
         return bool(MarkdownProcessor.MARKDOWN_PATTERNS.search(text))
 
     def setup_markdown_tags(self):
@@ -130,6 +137,13 @@ class MarkdownProcessor:
             background=self.theme["input_bg"],
         )
 
+    def process_block_with_styles(self, text: str, tag: str):
+        """Helper to apply a block tag and then process inline styles."""
+        start_idx = self.chat_display.index(tk.END)
+        self.process_inline_styles(text)
+        end_idx = self.chat_display.index(f"{start_idx} lineend")
+        self.chat_display.tag_add(tag, start_idx, end_idx)
+
     def render_markdown(self, text):
         if not MarkdownProcessor.has_markdown_syntax(text):
             self.chat_display.insert(tk.END, text + "\n")
@@ -172,64 +186,193 @@ class MarkdownProcessor:
                 i += 1
                 continue
 
+            # Headers
+            header_match = re.match(r"^(#{1,6})\s+(.+)$", line)
+            if header_match:
+                level = len(header_match.group(1))
+                content = header_match.group(2).strip()
+                self.chat_display.insert(tk.END, f"{content}\n", f"h{level}")
+                i += 1
+                continue
+
+            # Blockquotes
+            if line.startswith("> "):
+                content = line[2:].strip()
+                blockquote_lines = [content]
+                while i + 1 < len(lines) and lines[i + 1].startswith("> "):
+                    i += 1
+                    blockquote_lines.append(lines[i][2:].strip())
+                full_quote = " ".join(blockquote_lines)
+                self.chat_display.insert(tk.END, f"{full_quote}\n", "blockquote")
+                i += 1
+                continue
+
             # Task lists
             task_match = re.match(r"^- \[([ x])\] (.+)$", line)
             if task_match:
                 done = task_match.group(1) == "x"
                 tag = "task-done" if done else "task-pending"
-                checkbox = "☒ " if done else "☐ "
-                self.chat_display.insert(
-                    tk.END, checkbox + task_match.group(2) + "\n", tag
-                )
+                checkbox = "☑ " if done else "☐ "
+                self.chat_display.insert(tk.END, checkbox)
+                content = task_match.group(2).strip()
+                self.chat_display.insert(tk.END, f"{content}\n", tag)
                 i += 1
                 continue
 
-            # Horizontal rule
+            # Handle other existing patterns...
+            ordered_match = re.match(r"^(\d+\.\s)(.+)$", line)
+            if ordered_match:
+                self.chat_display.insert(tk.END, ordered_match.group(1))
+                self.process_inline_styles(ordered_match.group(2))
+                self.chat_display.insert(tk.END, "\n")
+                i += 1
+                continue
+
+
             if re.match(r"^([-*_])\1{2,}$", line):
                 self.chat_display.insert(tk.END, "─" * 40 + "\n", "hr")
                 i += 1
                 continue
 
-            # Previous markdown handling...
-            header_match = re.match(r"^(#{1,6})\s(.+)$", line)
-            if header_match:
-                level = len(header_match.group(1))
-                self.chat_display.insert(
-                    tk.END, header_match.group(2) + "\n", f"h{level}"
-                )
-                i += 1
-                continue
-
-            if line.startswith("> "):
-                self.chat_display.insert(tk.END, line[2:] + "\n", "blockquote")
-                i += 1
-                continue
-
             bullet_match = re.match(r"^[-*]\s(.+)$", line)
             if bullet_match:
-                self.chat_display.insert(
-                    tk.END, "• " + bullet_match.group(1) + "\n", "bullet"
-                )
+                self.chat_display.insert(tk.END, "• ")
+                self.process_inline_styles(bullet_match.group(1))
+                self.chat_display.insert(tk.END, "\n")
                 i += 1
                 continue
 
-            ordered_match = re.match(r"^\d+\.\s(.+)$", line)
-            if ordered_match:
-                num = int(re.match(r"^\d+", line).group())
-                self.chat_display.insert(
-                    tk.END, f"{num}. {ordered_match.group(1)}\n", "ordered"
-                )
-                i += 1
-                continue
-
-            line = self.process_inline_styles(line)
-            self.chat_display.insert(tk.END, line + "\n")
+            self.process_inline_styles(line)
+            self.chat_display.insert(tk.END, "\n")
             i += 1
 
         if in_table:
             self.render_table(table_data)
 
         self.chat_display.config(state=current_state)
+
+    def find_markdown_spans(self, text: str) -> List[StyleSpan]:
+        spans = []
+        markers = []
+
+        # Bold markers
+        for match in re.finditer(r"\*\*", text):
+            markers.append((match.start(), match.end(), "bold"))
+
+        # Italic markers
+        for match in re.finditer(r"(?<!\*)\*(?!\*)", text):
+            markers.append((match.start(), match.end(), "italic"))
+
+        # Code markers
+        for match in re.finditer(r"`", text):
+            markers.append((match.start(), match.end(), "code"))
+
+        # Strike markers
+        for match in re.finditer(r"~~", text):
+            markers.append((match.start(), match.end(), "strike"))
+
+        # Headers
+        for match in re.finditer(r"^(#{1,6})\s", text):
+            level = len(match.group(1))
+            markers.append((match.start(), match.end(), f"h{level}"))
+
+        # Blockquotes
+        for match in re.finditer(r"^>\s", text):
+            markers.append((match.start(), match.end(), "blockquote"))
+
+        # Task lists
+        for match in re.finditer(r"^- \[([ x])\]\s", text):
+            is_done = match.group(1) == "x"
+            tag = "task-done" if is_done else "task-pending"
+            markers.append((match.start(), match.end(), tag))
+
+        # Bullet lists
+        for match in re.finditer(r"^[-*]\s", text):
+            markers.append((match.start(), match.end(), "bullet"))
+
+        # Ordered lists
+        for match in re.finditer(r"^\d+\.\s", text):
+            markers.append((match.start(), match.end(), "ordered"))
+
+        # Sort all markers by position
+        markers.sort(key=lambda x: x[0])
+
+        # Match opening and closing markers for paired styles
+        stack = []
+        for marker in markers:
+            pos_start, pos_end, style = marker
+
+            # Paired styles (bold, italic, code, strike)
+            if style in ["bold", "italic", "code", "strike"]:
+                if not stack:
+                    stack.append(marker)
+                else:
+                    last_marker = stack[-1]
+                    if last_marker[2] == style:
+                        opening_end = last_marker[1]
+                        content = text[opening_end:pos_start]
+                        spans.append(
+                            StyleSpan(
+                                start=last_marker[0],
+                                end=pos_end,
+                                tag=style,
+                                text=content,
+                            )
+                        )
+                        stack.pop()
+                    else:
+                        stack.append(marker)
+            # Block-level styles (apply to whole line)
+            else:
+                end_pos = (
+                    len(text)
+                    if "\n" not in text[pos_end:]
+                    else text.index("\n", pos_end)
+                )
+                content = text[pos_end:end_pos].strip()
+                spans.append(
+                    StyleSpan(start=pos_start, end=end_pos, tag=style, text=content)
+                )
+
+        spans.sort(key=lambda x: x.start)
+        return spans
+
+    def process_inline_styles(self, text: str) -> str:
+        if not text:
+            return ""
+
+        spans = self.find_markdown_spans(text)
+        if not spans:
+            self.chat_display.insert(tk.END, text)
+            return ""
+
+        last_pos = 0
+        for span in spans:
+            if span.start > last_pos:
+                plain_text = text[last_pos : span.start]
+                self.chat_display.insert(tk.END, plain_text)
+
+            self.chat_display.insert(tk.END, span.text, span.tag)
+            last_pos = span.end
+
+        if last_pos < len(text):
+            remaining_text = text[last_pos:]
+            self.chat_display.insert(tk.END, remaining_text)
+
+        return ""
+
+    def handle_code_block(self, lines, start_idx):
+        code_content = []
+        i = start_idx + 1
+
+        while i < len(lines) and not lines[i].startswith("```"):
+            code_content.append(lines[i])
+            i += 1
+
+        code_text = "\n".join(code_content)
+        self.chat_display.insert(tk.END, code_text + "\n", "codeblock")
+
+        return i + 1 if i < len(lines) else i
 
     def render_table(self, table_data):
         if not table_data:
@@ -273,33 +416,3 @@ class MarkdownProcessor:
             self.chat_display.insert(tk.END, "\n")
 
         self.chat_display.insert(tk.END, "\n")
-
-    def handle_code_block(self, lines, start_idx):
-        code_content = []
-        i = start_idx + 1
-
-        while i < len(lines) and not lines[i].startswith("```"):
-            code_content.append(lines[i])
-            i += 1
-
-        code_text = "\n".join(code_content)
-        self.chat_display.insert(tk.END, code_text + "\n", "codeblock")
-
-        return i + 1 if i < len(lines) else i
-
-    def process_inline_styles(self, text):
-        # Inline code
-        text = re.sub(r"`([^`]+)`", lambda m: self.add_tag(m.group(1), "code"), text)
-        # Bold
-        text = re.sub(
-            r"\*\*(.+?)\*\*", lambda m: self.add_tag(m.group(1), "bold"), text
-        )
-        # Italic
-        text = re.sub(r"\*(.+?)\*", lambda m: self.add_tag(m.group(1), "italic"), text)
-        # Strikethrough
-        text = re.sub(r"~~(.+?)~~", lambda m: self.add_tag(m.group(1), "strike"), text)
-        return text
-
-    def add_tag(self, text, tag):
-        self.chat_display.insert(tk.END, text, tag)
-        return ""
