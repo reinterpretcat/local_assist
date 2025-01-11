@@ -11,6 +11,13 @@ class ChatHistory:
             "children": {},  # {name: {type: group/chat, children/messages}}
         }
         self.active_path = None  # List of names forming path to active chat
+        self.ensure_default_chat()
+
+    def ensure_default_chat(self):
+        """Ensure at least one default chat exists."""
+        if not self.root["children"]:
+            default_chat_path = self.create_chat("Default Chat")
+            self.set_active_chat(default_chat_path)
 
     def _get_node_by_path(self, path):
         """Get node at specified path"""
@@ -175,11 +182,12 @@ class ChatHistory:
             return []
         return self.get_chat_messages(self.active_path)
 
-    def load_chats(self, chat_data):
+    def load_chats(self, data):
         """Load chat data from external source"""
         self.root["children"] = {}
 
-        self.active_path = None  # Reset active chat/group
+        chat_data = data.get("chats", {})
+        self.active_path = data.get("active_path")
 
         for chat_name, chat_data in chat_data.items():
             # Split group path into components
@@ -202,6 +210,12 @@ class ChatHistory:
                 node["messages"] = chat_data["messages"]
             except ValueError:
                 continue  # Skip if chat already exists
+
+        # Restore active chat if valid
+        if self.active_path and self._get_node_by_path(self.active_path):
+            self.set_active_chat(self.active_path)
+        else:
+            self.ensure_default_chat()
 
     def save_chats(self, filepath):
         """Save chat history to a JSON file."""
@@ -240,9 +254,15 @@ class ChatHistory:
             # Convert tree structure to flat format
             chat_data = process_node(self.root, [])
 
+            # Include active path in saved data
+            save_data = {
+                "chats": chat_data,
+                "active_path": self.active_path,
+            }
+
             # Save to file with pretty printing
             with open(filepath, "w", encoding="utf-8") as f:
-                json.dump(chat_data, f, indent=2, ensure_ascii=False)
+                json.dump(save_data, f, indent=2, ensure_ascii=False)
 
         except IOError as e:
             raise IOError(f"Failed to save chat history: {str(e)}")

@@ -350,6 +350,7 @@ class AIChatUI:
 
                 self.chat_history.load_chats(loaded_chats)
                 self.chat_tree.load_tree()
+                self.chat_tree.expand_to_path(self.chat_history.active_path)
                 self.chat_display.clear()
 
                 messages = self.chat_history.get_active_chat_messages()

@@ -80,6 +80,9 @@ class ChatTree:
         self.tree.bind("<ButtonRelease-1>", self.on_drag_release)
         self._drag_data = {"item": None, "x": 0, "y": 0}
 
+        self.load_tree()
+        # self.expand_to_path()
+
     def get_item_path(self, item_id):
         """Get full path for a tree item"""
         path = []
@@ -378,21 +381,21 @@ class ChatTree:
             "<Double-1>", lambda e: "break" if not enabled else self.on_double_click(e)
         )
 
-    # def expand_to_path(self, path):
-    #     """Expand tree to show given path and select the last item"""
-    #     if not path:
-    #         return
+    def expand_to_path(self, path):
+        """Expand tree to show given path and select the last item"""
+        if not path:
+            return
 
-    #     # Find and expand each parent in path
-    #     current = ''
-    #     for name in path:
-    #         found = False
-    #         for child in self.tree.get_children(current):
-    #             if self.tree.item(child)['text'] == name:
-    #                 current = child
-    #                 self.tree.see(current)
-    #                 self.tree.selection_set(current)
-    #                 found = True
-    #                 break
-    #         if not found:
-    #             break
+        # Find and expand each parent in path
+        current = ""
+        for name in path:
+            found = False
+            for child in self.tree.get_children(current):
+                if self.tree.item(child)["text"] == name:
+                    current = child
+                    self.tree.see(current)
+                    self.tree.selection_set(current)
+                    found = True
+                    break
+            if not found:
+                break
