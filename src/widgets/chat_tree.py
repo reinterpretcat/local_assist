@@ -43,7 +43,7 @@ class ChatTree:
             command=self.new_chat,
             font=("Arial", 12),
         )
-        self.new_chat_button.pack(side=tk.LEFT, padx=2)
+        self.new_chat_button.pack(padx=10, pady=5, fill=tk.X)
 
         self.new_group_button = tk.Button(
             self.button_frame,
@@ -51,7 +51,7 @@ class ChatTree:
             command=self.new_group,
             font=("Arial", 12),
         )
-        self.new_group_button.pack(side=tk.LEFT, padx=2)
+        self.new_group_button.pack(padx=10, pady=5, fill=tk.X)
 
         self.rename_button = tk.Button(
             self.button_frame,
@@ -59,7 +59,7 @@ class ChatTree:
             command=self.rename_selected,
             font=("Arial", 12),
         )
-        self.rename_button.pack(side=tk.LEFT, padx=2)
+        self.rename_button.pack(padx=10, pady=5, fill=tk.X)
 
         self.delete_button = tk.Button(
             self.button_frame,
@@ -67,7 +67,7 @@ class ChatTree:
             command=self.delete_selected,
             font=("Arial", 12),
         )
-        self.delete_button.pack(side=tk.LEFT, padx=2)
+        self.delete_button.pack(padx=10, pady=5, fill=tk.X)
 
         # Bind events
         self.tree.bind("<Button-1>", self.on_click)
