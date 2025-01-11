@@ -81,7 +81,7 @@ class ChatTree:
         self._drag_data = {"item": None, "x": 0, "y": 0}
 
         self.load_tree()
-        # self.expand_to_path()
+        self.expand_to_path(self.chat_history.active_path)
 
     def get_item_path(self, item_id):
         """Get full path for a tree item"""
