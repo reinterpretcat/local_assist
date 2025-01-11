@@ -1,22 +1,5 @@
-import tkinter as tk
 from tkinter import messagebox
 import json
-
-
-def update_chat_history(self, history):
-    selection = self.chat_list.curselection()
-    if not selection:
-        messagebox.showerror("Clear command", "No chat selected.")
-        return
-
-    selected_index = selection[0]
-    chat_name = self.chat_list.get(selected_index)
-
-    self.chat_history = history
-    self.llm_model.load_history(self.chat_history)
-
-    self.chats[chat_name] = history
-    self.load_chat(chat_name)
 
 
 def handle_command(self, command):
@@ -26,7 +9,6 @@ def handle_command(self, command):
         self.append_system_message(
             "Available commands:\n"
             "/clear    - Clear the chat history (optionally, role can be specified)\n"
-            "/compress - Compresses history of currenlty selected chat\n"
             "/config   - Show configuration\n"
             "/echo     - Echoes message from `tool` role\n"
             "/tts      - Manage text-to-speech\n"
@@ -45,12 +27,13 @@ def handle_command(self, command):
             if role == "system":
                 messagebox.showerror("Clear command", "System role cannot be cleared.")
                 return
-            update_chat_history(
-                self, [msg for msg in self.chat_history if not (msg["role"] == role)]
-            )
+            self.chat_history.clear_messages_by_role(role)
+            self.handle_chat_select()
+
         elif len(args) == 1:
             # Clear all messages from the chat window
-            update_chat_history(self, [])
+            self.chat_history.clear_all_messages(role)
+            self.handle_chat_select()
         else:
             self.append_system_message(
                 "Syntax for clear command:\n"
@@ -127,15 +110,14 @@ def handle_command(self, command):
     elif command == "/stats":
         # Chat statistics
 
-        total_messages = len(self.chat_history)
-        total_words = sum(
-            len(message["content"].split()) for message in self.chat_history
-        )
+        messages = self.chat_history.get_active_chat_messages()
+        total_messages = len(messages)
+        total_words = sum(len(message["content"].split()) for message in messages)
 
         role_message_count = {}
         role_word_count = {}
 
-        for message in self.chat_history:
+        for message in messages:
             role = message["role"]
             words_in_message = len(message["content"].split())
             # Update message count per role
@@ -181,7 +163,7 @@ def handle_command(self, command):
                     f"Invalid argument '{args[1]}'. Use /markdown on, /markdown off",
                 )
                 return
-            update_chat_history(self, self.chat_history)
+            self.handle_chat_select()
         else:
             self.append_system_message(
                 "Too many arguments. Use /tts on, /tts off",
@@ -205,21 +187,6 @@ def handle_command(self, command):
                         f"Prompt set to: `{self.llm_model.system_prompt}`."
                     )
 
-    elif command.startswith("/compress"):
-        if len(args) == 1:
-            self.append_system_message(
-                "Syntax for compress command:\n"
-                "/compress keep_first keep_last max_words - Compresses history of currenlty selected chat\n"
-            )
-
-        elif len(args) == 4:
-            keep_first = int(args[1])
-            keep_last = int(args[2])
-            max_words = int(args[3])
-            self.compress_active_chat(
-                keep_first=keep_first, keep_last=keep_last, max_words=max_words
-            )
-
     elif command.startswith("/remove"):
         if len(args) != 2 and len(args) != 3:
             self.append_system_message(
@@ -230,21 +197,13 @@ def handle_command(self, command):
 
         elif len(args) == 2:
             last_n = int(args[1])
-            if last_n < 0 or last_n > len(self.chat_history):
-                pass
-            else:
-                update_chat_history(self, self.chat_history[:-last_n])
+            self.chat_history.clear_last_n_messages(last_n)
+            self.handle_chat_select()
 
         elif len(args) == 3:
             start = int(args[1])
             end = int(args[2])
-            if start < 0 or end >= len(self.chat_history) or start > end:
-                self.append_system_message(
-                    f"Invalid range: start must be >= 0, end must be < {len(self.chat_history)}, and start <= end."
-                )
-            else:
-                update_chat_history(
-                    self, self.chat_history[:start] + self.chat_history[end + 1 :]
-                )
+            self.chat_history.clear_messages_in_range(start, end)
+            self.handle_chat_select()
     else:
         self.append_system_message(f"Unknown command '{command}")

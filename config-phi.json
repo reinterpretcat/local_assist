@@ -1,0 +1,12 @@
+{
+    "llm": {
+        "model": "phi4:latest",
+        "system_prompt": "You are code assistant and should help software engineer on his requests.",
+        "options": {
+            "num_ctx": 4096
+        }
+    },
+    "rag": null,
+    "tts": null,
+    "stt": null
+}

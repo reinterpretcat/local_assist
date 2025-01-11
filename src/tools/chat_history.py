@@ -136,12 +136,7 @@ class ChatHistory:
 
     def append_message(self, role, content):
         """Append message to active chat"""
-        if not self.active_path:
-            raise ValueError("No active chat")
-
-        node = self._get_node_by_path(self.active_path)
-        if node["type"] != "chat":
-            raise ValueError("Active path is not a chat")
+        node = self._ensure_active_chat_node()
 
         node["messages"].append({"role": role, "content": content})
 
@@ -271,3 +266,50 @@ class ChatHistory:
         """Sets history of an active chat."""
         node = self._get_node_by_path(self.active_path)
         node["messages"] = messages
+
+    def clear_all_messages(self):
+        """Clear all messages for the active chat."""
+        node = self._ensure_active_chat_node()
+
+        node["messages"] = []
+
+    def clear_last_n_messages(self, n: int):
+        """Clear the last `n` messages for the active chat."""
+        node = self._ensure_active_chat_node()
+
+        total_messages = len(node["messages"])
+
+        # Clamp `n` to a valid range
+        n = max(0, min(n, total_messages))
+
+        if n > 0:
+            node["messages"] = node["messages"][:-n]
+
+    def clear_messages_in_range(self, start: int, end: int):
+        """Clear messages in the [start, end] range for the active chat."""
+        node = self._ensure_active_chat_node()
+
+        total_messages = len(node["messages"])
+
+        # Clamp start and end to valid indices
+        start = max(0, start)
+        end = min(total_messages - 1, end)
+
+        if start <= end:
+            node["messages"] = node["messages"][:start] + node["messages"][end + 1 :]
+
+    def clear_messages_by_role(self, role: str):
+        """Clear all messages for a given role in the active chat."""
+        node = self._ensure_active_chat_node()
+
+        node["messages"] = [msg for msg in node["messages"] if msg["role"] != role]
+
+    def _ensure_active_chat_node(self):
+        if not self.active_path:
+            raise ValueError("No active chat selected.")
+
+        node = self._get_node_by_path(self.active_path)
+        if node["type"] != "chat":
+            raise ValueError("Active path is not a chat.")
+
+        return node
