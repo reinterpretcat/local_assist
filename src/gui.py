@@ -131,29 +131,14 @@ class AIChatUI:
         self.input_frame = tk.Frame(self.chat_display_frame, height=50)
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
 
-        self.input_holder = ChatInput(
+        self.chat_input = ChatInput(
             root=self,
             input_frame=self.input_frame,
-            handle_user_input=self.handle_user_input,
+            on_user_input=self.handle_user_input,
+            on_record_voice=self.record_voice,
+            on_cancel_response=self.cancel_ai_response,
         )
-        self.user_input = self.input_holder.user_input
 
-        self.record_button = tk.Button(
-            self.input_frame,
-            text="🎙️ Record",
-            command=self.record_voice,
-            font=("Arial", 12),
-        )
-        self.record_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
-        self.record_button.config(state=tk.NORMAL if self.tts_model else tk.DISABLED)
-
-        self.send_button = tk.Button(
-            self.input_frame,
-            text="Send",
-            command=self.handle_user_input,
-            font=("Arial", 12),
-        )
-        self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
         self.root.bind("<Escape>", self.cancel_ai_response)
 
         self.apply_theme()
@@ -179,26 +164,16 @@ class AIChatUI:
 
     def disable_ui(self):
         """Disable user input."""
-        self.user_input.config(state=tk.DISABLED)
-        self.send_button.config(state=tk.DISABLED)
-        self.record_button.config(state=tk.DISABLED)
-
+        self.chat_input.disable()
         self.chat_tree.disable()
 
     def enable_ui(self):
         """Enable user input."""
-        self.user_input.config(state=tk.NORMAL)
-        self.send_button.config(state=tk.NORMAL)
-        self.record_button.config(state=tk.NORMAL if self.tts_model else tk.DISABLED)
-
+        self.chat_input.enable()
         self.chat_tree.enable()
 
-    def handle_user_input(self, event=None):
+    def handle_user_input(self, user_message):
         """Handle user input from input."""
-        user_message = self.user_input.get("1.0", "end-1c").strip()
-        if not user_message:
-            return
-        self.user_input.delete("1.0", tk.END)
 
         # Handle special commands
         if user_message.startswith("/"):
@@ -215,12 +190,7 @@ class AIChatUI:
 
         # Disable UI while AI response is generating
         self.disable_ui()
-
-        # Change Send button to Cancel button
-        self.cancel_response = False  # Reset cancel flag
-        self.send_button.config(
-            text="Cancel", command=self.cancel_ai_response, state=tk.NORMAL
-        )
+        self.cancel_response = False
 
         # Start token-by-token AI response
         response_generator = self.generate_ai_response(message)
@@ -278,14 +248,11 @@ class AIChatUI:
     def cancel_ai_response(self, event=None):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
-        self.send_button.config(text="Send", command=self.handle_user_input)
         self.enable_ui()  # Re-enable inputs
 
     def finish_ai_response(self):
         """Finalize the AI response display after generation and TTS complete."""
         self.enable_ui()
-
-        self.send_button.config(text="Send", command=self.handle_user_input)
 
         last_message = self.chat_history.get_last_message()
         self.chat_display.handle_response_readiness(last_message)

@@ -9,14 +9,18 @@ class ChatInput:
         self,
         root,
         input_frame: tk.Frame,
-        handle_user_input: Callable,
+        on_user_input: Callable,
+        on_record_voice: Optional[Callable],
+        on_cancel_response: Callable,
         min_height: int = 1,
         max_height: int = 8,
     ):
 
         self.root = root
         self.input_frame = input_frame
-        self.handle_user_input = handle_user_input
+        self.on_user_input = on_user_input
+        self.on_cancel_response = on_cancel_response
+
         self.min_height = min_height
         self.max_height = max_height
 
@@ -46,6 +50,25 @@ class ChatInput:
         self.user_input.bind("<Return>", self.handle_return_key)
         self.user_input.bind("<Shift-Return>", self.insert_newline)
         self.user_input.bind("<<Modified>>", self.handle_modify)
+
+        self.is_record_enabled = True if on_record_voice is not None else False
+
+        self.record_button = tk.Button(
+            self.input_frame,
+            text="🎙️ Record",
+            command=lambda: on_record_voice() if self.is_record_enabled else None,
+            font=("Arial", 12),
+        )
+        self.record_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
+        self.record_button.config(state=tk.NORMAL if on_record_voice else tk.DISABLED)
+
+        self.send_button = tk.Button(
+            self.input_frame,
+            text="Send",
+            command=lambda: self._consume_input(),
+            font=("Arial", 12),
+        )
+        self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
 
     def handle_modify(self, event=None):
         """Dynamically adjust text widget height after a small delay."""
@@ -101,9 +124,17 @@ class ChatInput:
     def handle_return_key(self, event):
         """Handle Return key press - submit if alone, newline if with Shift."""
         if not event.state & 0x1:  # No Shift key
-            self.handle_user_input()
+            self._consume_input()
+
             return "break"  # Prevent default newline
         return None  # Allow default newline behavior with Shift
+
+    def _consume_input(self):
+        user_message = self.user_input.get("1.0", "end-1c").strip()
+        self.user_input.delete("1.0", tk.END)
+
+        if user_message:
+            self.on_user_input(user_message)
 
     def insert_newline(self, event=None):
         """Insert newline on Shift+Return"""
@@ -121,3 +152,19 @@ class ChatInput:
 
         # Scroll to the line containing the cursor
         self.user_input.see(cursor_index)
+
+    def disable(self):
+        """Disable user input."""
+        self.user_input.config(state=tk.DISABLED)
+        self.record_button.config(state=tk.DISABLED)
+        self.send_button.config(
+            text="Cancel", command=lambda: self.on_cancel_response(), state=tk.NORMAL
+        )
+
+    def enable(self):
+        """Enable user input."""
+        self.user_input.config(state=tk.NORMAL)
+        self.record_button.config(
+            state=tk.NORMAL if self.is_record_enabled else tk.DISABLED
+        )
+        self.send_button.config(text="Send", command=lambda: self._consume_input())

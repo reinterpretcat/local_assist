@@ -134,8 +134,8 @@ def apply_chat_theme(self):
         self.chat_tree.new_group_button,
         self.chat_tree.rename_button,
         self.chat_tree.delete_button,
-        self.send_button,
-        self.record_button,
+        self.chat_input.send_button,
+        self.chat_input.record_button,
     ]:
         button.configure(**button_config)
 
@@ -165,7 +165,7 @@ def apply_chat_theme(self):
     )
 
     # Configure scrollbar
-    self.input_holder.scrollbar.configure(
+    self.chat_input.scrollbar.configure(
         bg=self.theme["scrollbar_bg"],
         activebackground=self.theme["scrollbar_hover"],
         troughcolor=self.theme["scrollbar_bg"],
@@ -175,7 +175,7 @@ def apply_chat_theme(self):
     # Configure input area
     self.input_frame.configure(bg=self.theme["bg"], relief="solid", borderwidth=1)
 
-    self.user_input.configure(
+    self.chat_input.user_input.configure(
         bg=self.theme["input_bg"],
         fg=self.theme["input_fg"],
         insertbackground=self.theme["input_fg"],
