@@ -12,7 +12,7 @@ class RAGManagementUI:
         self.rag_model = rag
         self.on_chat_start = on_chat_start
 
-        self.rag_visible = False
+        self.rag_visible = True
         self.current_collection: Optional[str] = None
 
         self.frame = tk.Frame(parent)

@@ -70,6 +70,7 @@ def get_list_style(theme: Dict) -> ttk.Style:
         selectbackground=theme["tree_select_bg"],
         selectforeground=theme["tree_select_fg"],
     )
+
     return style
 
 
@@ -107,8 +108,25 @@ def apply_chat_theme(self):
     # Configure left panel
     self.left_panel.configure(bg=self.theme["bg"], borderwidth=1, relief="solid")
 
+    # Chat tree
     style = get_list_style(theme=self.theme)
+    self.chat_tree.frame.configure(bg=self.theme["bg"], borderwidth=1, relief="solid")
+    self.chat_tree.tree_frame.configure(
+        bg=self.theme["bg"], borderwidth=1, relief="solid"
+    )
     self.chat_tree.tree.configure(style="Treeview")
+
+    # Configure scrollbar
+    self.chat_tree.scrollbar.configure(
+        bg=self.theme["scrollbar_bg"],
+        activebackground=self.theme["scrollbar_hover"],
+        troughcolor=self.theme["scrollbar_bg"],
+        width=12,
+    )
+
+    self.chat_tree.button_frame.configure(
+        bg=self.theme["bg"], borderwidth=1, relief="solid"
+    )
 
     button_config = get_button_config(self.theme)
     for button in [

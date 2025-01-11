@@ -2,33 +2,39 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from typing import Callable
 
+
 class ChatTree:
-    def __init__(self, 
-                 parent_frame, 
-                 chat_history,
-                 on_chat_select: Callable
-                 
-        ):
-        self.parent_frame = parent_frame
+    def __init__(self, parent_frame, chat_history, on_chat_select: Callable):
         self.chat_history = chat_history
         self.on_chat_select = on_chat_select
 
-        # Create Treeview with drag-and-drop support
-        self.tree = ttk.Treeview(parent_frame, selectmode="browse")
-        self.tree.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+        self.frame = tk.Frame(parent_frame)
+        self.frame.pack(fill=tk.BOTH, expand=True)
 
-        # Add scrollbar
-        scrollbar = ttk.Scrollbar(
-            parent_frame, orient="vertical", command=self.tree.yview
+        # Create middle frame for tree and scrollbar
+        self.tree_frame = tk.Frame(self.frame)
+        self.tree_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # Configure tree frame grid
+        self.tree_frame.grid_columnconfigure(0, weight=1)
+        self.tree_frame.grid_rowconfigure(0, weight=1)
+
+        # Create Treeview and scrollbar
+        self.tree = ttk.Treeview(self.tree_frame, selectmode="browse")
+        self.scrollbar = tk.Scrollbar(
+            self.tree_frame, orient="vertical", command=self.tree.yview
         )
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.tree.configure(yscrollcommand=scrollbar.set)
+        self.tree.configure(yscrollcommand=self.scrollbar.set)
+
+        # Position tree and scrollbar
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        self.scrollbar.grid(row=0, column=1, sticky="ns")
 
         # Configure columns
         self.tree.heading("#0", text="Chats", anchor=tk.W)
 
         # Add buttons
-        self.button_frame = tk.Frame(parent_frame)
+        self.button_frame = tk.Frame(self.frame)
         self.button_frame.pack(padx=10, pady=5, fill=tk.X)
 
         self.new_chat_button = tk.Button(
@@ -276,9 +282,7 @@ class ChatTree:
             if region == "nothing" or not target:
                 # Move to root level
                 try:
-                    self.chat_history.move_node(
-                        source_path, []
-                    )  # Empty path for root
+                    self.chat_history.move_node(source_path, [])  # Empty path for root
                     self.tree.move(
                         source_item, "", "end"
                     )  # Empty string for root in tree
@@ -338,7 +342,7 @@ class ChatTree:
 
         # Start recursive loading from root
         add_nodes()
-        
+
     def enable(self):
         """Enable chat tree input."""
         self.set_tree_state(enabled=True)
@@ -346,7 +350,7 @@ class ChatTree:
         self.new_group_button.config(state=tk.NORMAL)
         self.rename_button.config(state=tk.NORMAL)
         self.delete_button.config(state=tk.NORMAL)
-        
+
     def disable(self):
         """Disable chat tree input."""
         self.set_tree_state(enabled=False)
@@ -354,15 +358,25 @@ class ChatTree:
         self.new_group_button.config(state=tk.DISABLED)
         self.rename_button.config(state=tk.DISABLED)
         self.delete_button.config(state=tk.DISABLED)
-        
+
     def set_tree_state(self, enabled: bool):
         """Enable or disable the tree"""
         self.tree.configure(takefocus=enabled)
-        self.tree.bind('<Button-1>', lambda e: 'break' if not enabled else None)
-        self.tree.bind('<ButtonPress-1>', lambda e: 'break' if not enabled else self.on_drag_start(e))
-        self.tree.bind('<B1-Motion>', lambda e: 'break' if not enabled else self.on_drag_motion(e))
-        self.tree.bind('<ButtonRelease-1>', lambda e: 'break' if not enabled else self.on_drag_release(e))
-        self.tree.bind('<Double-1>', lambda e: 'break' if not enabled else self.on_double_click(e))
+        self.tree.bind("<Button-1>", lambda e: "break" if not enabled else None)
+        self.tree.bind(
+            "<ButtonPress-1>",
+            lambda e: "break" if not enabled else self.on_drag_start(e),
+        )
+        self.tree.bind(
+            "<B1-Motion>", lambda e: "break" if not enabled else self.on_drag_motion(e)
+        )
+        self.tree.bind(
+            "<ButtonRelease-1>",
+            lambda e: "break" if not enabled else self.on_drag_release(e),
+        )
+        self.tree.bind(
+            "<Double-1>", lambda e: "break" if not enabled else self.on_double_click(e)
+        )
 
     # def expand_to_path(self, path):
     #     """Expand tree to show given path and select the last item"""
