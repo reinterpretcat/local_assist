@@ -363,19 +363,13 @@ class AIChatUI:
     def record_voice(self):
         """Toggle recording state and handle recording."""
 
-        self.record_button.focus_set()
-
         if not self.is_recording:
             # Start recording
             self.is_recording = True
-            self.record_button.config(text="🛑 Stop", bg="red")  # Change text and color
             self.start_recording()
         else:
             # Stop recording
             self.is_recording = False
-            self.record_button.config(
-                text="🎙️ Record",
-            )  # Revert to default
             self.stop_recording()
 
     def start_recording(self):

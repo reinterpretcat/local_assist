@@ -21,6 +21,9 @@ class ChatInput:
         self.on_user_input = on_user_input
         self.on_cancel_response = on_cancel_response
 
+        self.on_record_voice = on_record_voice
+        self.is_recording = False
+
         self.min_height = min_height
         self.max_height = max_height
 
@@ -56,7 +59,9 @@ class ChatInput:
         self.record_button = tk.Button(
             self.input_frame,
             text="🎙️ Record",
-            command=lambda: on_record_voice() if self.is_record_enabled else None,
+            command=lambda: (
+                self.handle_record_voice() if self.is_record_enabled else None
+            ),
             font=("Arial", 12),
         )
         self.record_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
@@ -152,6 +157,19 @@ class ChatInput:
 
         # Scroll to the line containing the cursor
         self.user_input.see(cursor_index)
+
+    def handle_record_voice(self):
+        """Handle record button."""
+        self.record_button.focus_set()
+
+        if not self.is_recording:
+            self.is_recording = True
+            self.record_button.config(text="🛑 Stop")  # Change text and color
+        else:
+            self.is_recording = False
+            self.record_button.config(text="🎙️ Record")
+
+        self.on_record_voice()
 
     def disable(self):
         """Disable user input."""
