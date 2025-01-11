@@ -58,6 +58,21 @@ def get_button_config(theme: Dict) -> Dict:
     }
 
 
+def get_list_style(theme: Dict) -> ttk.Style:
+    style = ttk.Style()
+    style.configure(
+        "Treeview",
+        rowheight=36,
+        font=("TkDefaultFont", 10),
+        background=theme["tree_bg"],
+        foreground=theme["tree_fg"],
+        fieldbackground=theme["tree_bg"],
+        selectbackground=theme["tree_select_bg"],
+        selectforeground=theme["tree_select_fg"],
+    )
+    return style
+
+
 def apply_chat_theme(self):
     """Apply theme to main chat window components using provided theme dictionary"""
 
@@ -92,32 +107,8 @@ def apply_chat_theme(self):
     # Configure left panel
     self.left_panel.configure(bg=self.theme["bg"], borderwidth=1, relief="solid")
 
-    # Configure chat list
-    # self.chat_tree.tree.configure(
-    #     bg=self.theme["list_bg"],
-    #     fg=self.theme["list_fg"],
-    #     selectbackground=self.theme["list_select_bg"],
-    #     selectforeground=self.theme["list_select_fg"],
-    #     highlightbackground=self.theme["chat_border"],
-    #     font=("Arial", 12),
-    #     relief="solid",
-    #     borderwidth=1,
-    # )
-    
-    style = ttk.Style()
-    style.configure(
-        "Treeview",
-        rowheight=36,
-        font=("TkDefaultFont", 10),
-        background=self.theme["tree_bg"],
-        foreground=self.theme["tree_fg"],
-        fieldbackground=self.theme["tree_bg"],
-        selectbackground=self.theme["tree_select_bg"],
-        selectforeground=self.theme["tree_select_fg"],
-    )
+    style = get_list_style(theme=self.theme)
     self.chat_tree.tree.configure(style="Treeview")
-    
-    
 
     button_config = get_button_config(self.theme)
     for button in [
@@ -125,7 +116,6 @@ def apply_chat_theme(self):
         self.chat_tree.new_group_button,
         self.chat_tree.rename_button,
         self.chat_tree.delete_button,
-
         self.send_button,
         self.record_button,
     ]:
@@ -137,7 +127,7 @@ def apply_chat_theme(self):
     )
 
     # Configure chat display
-    self.chat_display.configure(
+    self.chat_display.display.configure(
         bg=self.theme["chat_bg"],
         fg=self.theme["chat_fg"],
         font=("Arial", 12),
@@ -148,7 +138,7 @@ def apply_chat_theme(self):
         relief="solid",
         borderwidth=1,
     )
-    self.chat_display.vbar.configure(
+    self.chat_display.display.vbar.configure(
         bg=self.theme["scrollbar_bg"],
         activebackground=self.theme["scrollbar_hover"],
         troughcolor=self.theme["scrollbar_bg"],
@@ -219,17 +209,7 @@ def apply_rag_theme(self):
     )
 
     # Apply custom styles
-    style = ttk.Style()
-    style.configure(
-        "Treeview",
-        rowheight=36,
-        font=("TkDefaultFont", 10),
-        background=self.theme["tree_bg"],
-        foreground=self.theme["tree_fg"],
-        fieldbackground=self.theme["tree_bg"],
-        selectbackground=self.theme["tree_select_bg"],
-        selectforeground=self.theme["tree_select_fg"],
-    )
+    style = get_list_style(theme=self.theme)
     style.configure(
         "Treeview.Heading",
         background=self.theme["header_bg"],

@@ -1,39 +1,16 @@
 from colorama import Fore
 import tkinter as tk
-from tkinter import filedialog, simpledialog, messagebox
-from tkinter.scrolledtext import ScrolledText
+from tkinter import filedialog, messagebox
 import json
 import threading
 import logging
 import time
 from typing import Optional
 
-from .models import LLM, STT, TTS, RAG
-from .utils import print_system_message
+from .models import *
 from .tools import *
 from .widgets import *
-
-
-class RoleTags:
-    TOOL = "tool_prefix"
-    USER = "user_prefix"
-    ASSISTANT = "ai_prefix"
-    CONTENT = "content_prefix"
-
-
-class RoleNames:
-    TOOL = "tool"
-    USER = "user"
-    ASSISTANT = "assistant"
-
-    @staticmethod
-    def to_tag(role) -> RoleTags:
-        if role == RoleNames.ASSISTANT:
-            return RoleTags.ASSISTANT
-        elif role == RoleNames.USER:
-            return RoleTags.USER
-
-        return RoleTags.TOOL
+from .utils import print_system_message
 
 
 class AIChatUI:
@@ -59,13 +36,12 @@ class AIChatUI:
         self.tts_lock = threading.Lock()
         self.active_tts_threads = 0  # Counter for active TTS chunks
 
-        self.chat_history = ChatHistory(on_history_changed=self.update_chat_display)
+        self.chat_history = ChatHistory()
 
         # A flag to track whether tts is enabled or not
         self.tts_enabled = True if self.tts_model else False
         self.is_recording = False  # Tracks the recording state
         self.cancel_response = False  # Flag to cancel AI response
-        self.markdown_enabled = False  # Flag for markdown post processing
 
         if self.tts_model:
             self.audio_io = AudioIO()
@@ -117,11 +93,18 @@ class AIChatUI:
         self.left_panel.pack_propagate(False)  # Prevent the panel from shrinking
         self.main_paned_window.add(self.left_panel)
 
+        # ChatTree UI
         self.chat_tree = ChatTree(
             self.left_panel,
             self.chat_history,
-            on_chat_select=self.update_chat_display,
+            on_chat_select=self.handle_chat_select,
         )
+
+        # RAG UI
+        if self.rag_model:
+            self.rag_panel = RAGManagementUI(
+                self.left_panel, self.rag_model, on_chat_start=self.on_rag_chat_start
+            )
 
         self.chat_menu = ChatMenu(
             self.root,
@@ -131,47 +114,18 @@ class AIChatUI:
                 self.root, self.theme, self.llm_model
             ),
             on_load_theme=self.load_theme,
-            on_toggle_rag_panel=self.toggle_rag_panel if self.rag_model else None,
+            on_toggle_rag_panel=self.rag_panel.toggle if self.rag_model else None,
         )
-
-        # RAG UI
-        if self.rag_model:
-            self.rag_panel = RAGManagementUI(
-                self.left_panel, self.rag_model, on_chat_start=self.on_rag_chat_start
-            )
-            self.rag_panel.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-            self.rag_visible = True
 
         # Right panel for chat display
         self.chat_display_frame = tk.Frame(self.main_paned_window)
         self.main_paned_window.add(self.chat_display_frame)
 
-        self.chat_display = ScrolledText(
-            self.chat_display_frame,
-            wrap=tk.WORD,
-            state=tk.DISABLED,
-            font=("Arial", 12),
+        self.chat_display = ChatDisplay(
+            parent=self.chat_display_frame,
+            theme=self.theme,
+            markdown_enabled=True,
         )
-        self.chat_display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-        self.chat_display.tag_configure(
-            RoleTags.USER,
-            foreground=self.theme["user"]["color_prefix"] if self.theme else "blue",
-            font=("Arial", 14, "bold"),
-        )
-        self.chat_display.tag_configure(
-            RoleTags.ASSISTANT,
-            foreground=(
-                self.theme["assistant"]["color_prefix"] if self.theme else "green"
-            ),
-            font=("Arial", 14, "bold"),
-        )
-        self.chat_display.tag_configure(
-            RoleTags.TOOL,
-            foreground=self.theme["tool"]["color_prefix"] if self.theme else "red",
-            font=("Arial", 14, "bold"),
-        )
-        self.chat_display.tag_configure(RoleTags.CONTENT, foreground="black")
 
         # Input area at the bottom (outside main content frame)
         self.input_frame = tk.Frame(self.chat_display_frame, height=50)
@@ -203,10 +157,6 @@ class AIChatUI:
         self.root.bind("<Escape>", self.cancel_ai_response)
 
         self.apply_theme()
-        setup_markdown_tags(self.chat_display, self.theme)
-        # self.update_chat_list()
-        # self.create_default_chat()
-        self.toggle_rag_panel()
 
     def apply_theme(self):
         """Apply the current theme to the chat and rag window."""
@@ -257,10 +207,11 @@ class AIChatUI:
 
         self.handle_user_message(user_message)
 
-    def handle_user_message(self, user_message):
+    def handle_user_message(self, message):
         """Handle user message and initiate AI reply."""
 
-        self.append_to_chat(RoleNames.USER, user_message)
+        self.chat_display.append_message(RoleNames.USER, message)
+        self.chat_history.append_message(RoleNames.USER, message)
 
         # Disable UI while AI response is generating
         self.disable_ui()
@@ -272,7 +223,7 @@ class AIChatUI:
         )
 
         # Start token-by-token AI response
-        response_generator = self.generate_ai_response(user_message)
+        response_generator = self.generate_ai_response(message)
         self.root.after(100, self.display_ai_response, response_generator)
 
     def display_ai_response(self, generator):
@@ -288,9 +239,7 @@ class AIChatUI:
         try:
             token = next(generator)
             self.append_to_chat_partial(RoleNames.ASSISTANT, token)
-            self.root.after(
-                100, self.display_ai_response, generator
-            )  # Schedule next token
+            self.root.after(100, self.display_ai_response, generator)
         except StopIteration:
             self.check_tts_completion()
 
@@ -329,37 +278,17 @@ class AIChatUI:
     def cancel_ai_response(self, event=None):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
-        self.send_button.config(
-            text="Send", command=self.handle_user_input
-        )  # Revert button to Send
+        self.send_button.config(text="Send", command=self.handle_user_input)
         self.enable_ui()  # Re-enable inputs
 
     def finish_ai_response(self):
         """Finalize the AI response display after generation and TTS complete."""
         self.enable_ui()
+
         self.send_button.config(text="Send", command=self.handle_user_input)
 
         last_message = self.chat_history.get_last_message()
-
-        if last_message["role"] == RoleNames.ASSISTANT:
-            last_message = last_message["content"]
-
-            # Rerender the message in case of markdown syntax
-            if self.markdown_enabled and has_markdown_syntax(last_message):
-                self.chat_display.config(state=tk.NORMAL)
-
-                tag_indices = self.chat_display.tag_ranges(RoleTags.ASSISTANT)
-                if tag_indices:
-                    start_index = tag_indices[-2]
-                    self.chat_display.delete(start_index, tk.END)
-                    if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
-                        self.chat_display.insert(tk.END, "\n")
-                    self.chat_display.insert(
-                        tk.END, f"{RoleNames.ASSISTANT}: ", RoleTags.ASSISTANT
-                    )
-                    render_markdown(self.chat_display, last_message)
-
-                self.chat_display.config(state=tk.DISABLED)
+        self.chat_display.handle_response_readiness(last_message)
 
     def speak_text(self, text):
         """Speak the given text using TTS."""
@@ -407,92 +336,27 @@ class AIChatUI:
         else:
             self.root.after(100, self.check_tts_completion)
 
-    def append_to_chat(self, role, content):
-        """Append a message to the chat display."""
-        self.chat_display.config(state=tk.NORMAL)
-
-        if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
-            self.chat_display.insert(tk.END, "\n")
-
-        self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-        self.append_markdown(content)
-        self.chat_display.config(state=tk.DISABLED)
-        self.chat_display.see(tk.END)
-
-        self.chat_history.append_message(role, content)
-
     def append_to_chat_partial(self, role, token):
         """Append a token to the chat display for partial updates."""
         messages = self.chat_history.get_active_chat_messages()
 
-        self.chat_display.config(state=tk.NORMAL)
-
-        # If it's the first token for assistant, add the role label
-        if role == RoleNames.ASSISTANT and (
+        # If it's the first token for assistant
+        is_first_token = RoleNames.ASSISTANT and (
             not messages or messages[-1]["role"] != RoleNames.ASSISTANT
-        ):
-            if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
-                self.chat_display.insert(tk.END, "\n")
-            self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-            # Add new message to history
-            self.chat_history.append_message(role, "")
+        )
 
-        # Append the token to the display
-        self.chat_display.insert(tk.END, f"{token}")
-        self.chat_display.config(state=tk.DISABLED)
-        self.chat_display.see(tk.END)  # Auto-scroll
+        self.chat_display.append_partial(role, token, is_first_token)
+        self.chat_history.append_message_partial(role, token, is_first_token)
 
-        # Update the content of the last message
-        messages = self.chat_history.get_active_chat_messages()
-        if messages and messages[-1]["role"] == role:
-            current_content = messages[-1]["content"]
-            messages[-1]["content"] = current_content + token
-
-    def update_chat_display(self):
+    def handle_chat_select(self):
         """Update chat display from history manager"""
-        self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.delete(1.0, tk.END)
-
         messages = self.chat_history.get_active_chat_messages()
-        for idx, message in enumerate(messages):
-            if message["role"] == RoleNames.USER:
-                self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
-            elif message["role"] == RoleNames.ASSISTANT:
-                self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
-            elif message["role"] == RoleNames.TOOL:
-                self.chat_display.insert(tk.END, "Tool: ", RoleTags.TOOL)
-
-            elif idx == 0 and message["role"] == "system":
-                print_system_message(
-                    f"skip initial system message: {message}", color=Fore.LIGHTBLUE_EX
-                )
-                continue
-
-            self.append_markdown(message["content"])
-
-        self.chat_display.config(state=tk.DISABLED)
-        self.chat_display.yview_moveto(1.0)
-
-        # Update LLM model history if needed
+        self.chat_display.update(messages)
         self.llm_model.load_history(messages)
 
-        # Scroll to the end
-        self.chat_display.yview_moveto(1.0)
-
-    def append_markdown(self, text):
-        if self.markdown_enabled:
-            render_markdown(self.chat_display, text)
-        else:
-            self.chat_display.insert(tk.END, text + "\n")
-
     def append_system_message(self, message):
-        self.append_to_chat(RoleNames.TOOL, message)
-
-    def clear_messages(self):
-        """Clear chat display."""
-        self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.delete(1.0, tk.END)
-        self.chat_display.config(state=tk.DISABLED)
+        self.chat_display.append_message(RoleNames.TOOL, message)
+        self.chat_history.append_message(RoleNames.TOOL, message)
 
     def save_chats_to_file(self):
         """Save all chats to a file"""
@@ -518,7 +382,10 @@ class AIChatUI:
 
                 self.chat_history.load_chats(loaded_chats)
                 self.chat_tree.load_tree()
-                self.clear_messages()
+                self.chat_display.clear()
+
+                messages = self.chat_history.get_active_chat_messages()
+                self.llm_model.load_history(messages)
 
                 messagebox.showinfo(
                     "Load Chats", "Chats have been loaded successfully."
@@ -585,10 +452,9 @@ class AIChatUI:
         # Get currently selected chat, if any
         if self.chat_history.active_path:
             # Reset active chat with initial system message
-            self.chat_history.set_active_chat_history(messages=[messages[0]])
-
-            # Update display
-            self.update_chat_display()
+            messages = [messages[0]]
+            self.chat_history.set_active_chat_history(messages)
+            self.chat_display.update(messages)
 
             # Process user's message
             self.handle_user_message(messages[1]["content"])
@@ -597,14 +463,3 @@ class AIChatUI:
                 "RAG Chat",
                 "No selected chat. Please select a chat before starting RAG.",
             )
-
-    def toggle_rag_panel(self):
-        """Toggle the visibility of the RAG panel."""
-        if not self.rag_model:
-            return
-
-        if self.rag_visible:
-            self.rag_panel.frame.pack_forget()
-        else:
-            self.rag_panel.frame.pack(fill=tk.BOTH, expand=True)
-        self.rag_visible = not self.rag_visible

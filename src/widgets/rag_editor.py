@@ -12,9 +12,11 @@ class RAGManagementUI:
         self.rag_model = rag
         self.on_chat_start = on_chat_start
 
+        self.rag_visible = False
         self.current_collection: Optional[str] = None
 
         self.frame = tk.Frame(parent)
+        self.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
         # Collection Management Section
         self.collection_frame = tk.LabelFrame(self.frame, text="Collection Management")
@@ -404,6 +406,17 @@ class RAGManagementUI:
 
         if hasattr(self, "editor_style_callback"):
             self.editor_style_callback(editor)
+
+    def toggle(self):
+        """Toggle the visibility of the RAG panel."""
+        if not self.rag_model:
+            return
+
+        if self.rag_visible:
+            self.frame.pack_forget()
+        else:
+            self.frame.pack(fill=tk.BOTH, expand=True)
+        self.rag_visible = not self.rag_visible
 
 
 class RAGQueryEditor:

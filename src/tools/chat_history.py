@@ -4,14 +4,13 @@ from typing import Callable
 class ChatHistory:
     """Manages chat history."""
 
-    def __init__(self, on_history_changed: Callable):
+    def __init__(self):
         self.root = {
             "type": "group",
             "name": "/",
             "children": {},  # {name: {type: group/chat, children/messages}}
         }
         self.active_path = None  # List of names forming path to active chat
-        self.on_history_changed = on_history_changed
 
     def _get_node_by_path(self, path):
         """Get node at specified path"""
@@ -139,20 +138,27 @@ class ChatHistory:
 
         node["messages"].append({"role": role, "content": content})
 
-        if self.on_history_changed:
-            self.on_history_changed()
+    def append_message_partial(self, role, token, is_first_token):
+        """Append message token to active chat"""
+        if is_first_token:
+            self.append_message(role, "")
+
+        # Update the content of the last message
+        messages = self.get_active_chat_messages()
+        if messages and messages[-1]["role"] == role:
+            current_content = messages[-1]["content"]
+            messages[-1]["content"] = current_content + token
 
     def get_last_message(self):
-        """Returns last message in the active chat. """    
+        """Returns last message in the active chat."""
         return self.get_chat_messages(self.active_path)[-1]
-        
 
     def update_last_message(self, role, token):
         """Update last message in active chat"""
         if not self.active_path:
             raise ValueError("No active chat")
         node = self._get_node_by_path(self.active_path)
-        
+
         if node and node["messages"][-1]["role"] == role:
             node["messages"][-1]["content"] += token
 
@@ -172,8 +178,8 @@ class ChatHistory:
     def load_chats(self, chat_data):
         """Load chat data from external source"""
         self.root["children"] = {}
-        
-        self.active_path = None # Reset active chat/group
+
+        self.active_path = None  # Reset active chat/group
 
         for chat_name, chat_data in chat_data.items():
             # Split group path into components
@@ -240,9 +246,8 @@ class ChatHistory:
 
         except IOError as e:
             raise IOError(f"Failed to save chat history: {str(e)}")
-        
+
     def set_active_chat_history(self, messages):
-        """Sets history of an active chat. """
+        """Sets history of an active chat."""
         node = self._get_node_by_path(self.active_path)
-        node['messages'] = messages
-        
+        node["messages"] = messages
