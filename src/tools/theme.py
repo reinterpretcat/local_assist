@@ -70,7 +70,13 @@ def get_list_style(theme: Dict) -> ttk.Style:
         selectbackground=theme["tree_select_bg"],
         selectforeground=theme["tree_select_fg"],
     )
-
+    style.configure(
+        "Treeview.Heading",
+        background=theme["header_bg"],
+        foreground=theme["fg"],
+        relief="flat",
+    )
+    style.map("Treeview.Heading", background=[("active", theme["button_bg_hover"])])
     return style
 
 
@@ -228,15 +234,7 @@ def apply_rag_theme(self):
 
     # Apply custom styles
     style = get_list_style(theme=self.theme)
-    style.configure(
-        "Treeview.Heading",
-        background=self.theme["header_bg"],
-        foreground=self.theme["fg"],
-        relief="flat",
-    )
-    style.map(
-        "Treeview.Heading", background=[("active", self.theme["button_bg_hover"])]
-    )
+
     # Apply styles to Treeview
     self.data_store_tree.configure(style="Treeview")
 
