@@ -87,7 +87,13 @@ class ChatTree:
         """Get full path for a tree item"""
         path = []
         while item_id:
-            path.insert(0, self.tree.item(item_id)["text"])
+            # Need to cleanup icon
+            display_name = self.tree.item(item_id)["text"]
+            text = (
+                display_name.split(" ", 1)[-1] if " " in display_name else display_name
+            )
+
+            path.insert(0, text)
             item_id = self.tree.parent(item_id)
         return path
 
@@ -330,11 +336,14 @@ class ChatTree:
                 name = node["name"]
                 is_group = node["type"] == "group"
 
+                # Choose icon based on node type
+                display_name = f"{'📁 ' if is_group else '💬 '}{name}"
+
                 # Insert node into tree
                 item_id = self.tree.insert(
                     tree_parent,
                     "end",
-                    text=name,
+                    text=display_name,
                     tags=("group" if is_group else "chat",),
                 )
 
