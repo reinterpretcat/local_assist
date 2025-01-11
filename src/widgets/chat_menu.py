@@ -1,5 +1,5 @@
 import tkinter as tk
-from .llm_settings import open_llm_settings_dialog
+from typing import Callable, Optional
 
 
 def pad_label(label, width=30):
@@ -13,36 +13,44 @@ def pad_label(label, width=30):
     return " " * left_padding + label + " " * right_padding
 
 
-def add_chat_menu(self):
-    """Adds chat menu"""
+class ChatMenu:
+    def __init__(
+        self,
+        root,
+        on_save_chats_to_file: Callable,
+        on_load_chats_from_file: Callable,
+        on_llm_settings: Callable,
+        on_load_theme: Callable,
+        on_toggle_rag_panel: Optional[Callable],
+    ):
+        """Adds chat menu"""
 
-    self.menu_bar = tk.Menu(self.root)
-    self.root.config(menu=self.menu_bar)
+        self.root = root
+        self.menu_bar = tk.Menu(self.root)
+        self.root.config(menu=self.menu_bar)
 
-    self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
-    self.file_menu.add_command(
-        label=pad_label("Save Chats"), command=self.save_chats_to_file
-    )
-    self.file_menu.add_command(
-        label=pad_label("Load Chats"), command=self.load_chats_from_file
-    )
-    self.menu_bar.add_cascade(label="File", menu=self.file_menu)
-
-    self.settings_menu = tk.Menu(self.menu_bar, tearoff=0)
-    self.settings_menu.add_command(
-        label=pad_label("LLM Settings"),
-        command=lambda: open_llm_settings_dialog(self.root, self.theme, self.llm_model),
-    )
-    self.settings_menu.add_command(
-        label=pad_label("Change Theme"), command=self.load_theme
-    )
-    self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
-
-    if self.rag_model:
-        self.rag_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.rag_menu.add_command(
-            label=pad_label("Toggle RAG Editor"), command=self.toggle_rag_panel
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.file_menu.add_command(
+            label=pad_label("Save Chats"), command=on_save_chats_to_file
         )
-        self.menu_bar.add_cascade(label="RAG", menu=self.rag_menu)
-    else:
-        self.rag_menu = None
+        self.file_menu.add_command(
+            label=pad_label("Load Chats"), command=on_load_chats_from_file
+        )
+        self.menu_bar.add_cascade(label="File", menu=self.file_menu)
+
+        self.settings_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.settings_menu.add_command(
+            label=pad_label("LLM Settings"),
+            command=on_llm_settings,
+        )
+        self.settings_menu.add_command(
+            label=pad_label("Change Theme"), command=on_load_theme
+        )
+        self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
+
+        if on_toggle_rag_panel:
+            self.rag_menu = tk.Menu(self.menu_bar, tearoff=0)
+            self.rag_menu.add_command(
+                label=pad_label("Toggle RAG Editor"), command=on_toggle_rag_panel
+            )
+            self.menu_bar.add_cascade(label="RAG", menu=self.rag_menu)

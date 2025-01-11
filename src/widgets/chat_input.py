@@ -11,7 +11,7 @@ class ChatInput:
         input_frame: tk.Frame,
         handle_user_input: Callable,
         min_height: int = 1,
-        max_height: int = 5,
+        max_height: int = 8,
     ):
 
         self.root = root

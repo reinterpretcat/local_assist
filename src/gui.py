@@ -9,7 +9,7 @@ import time
 from typing import Optional
 
 from .models import LLM, STT, TTS, RAG
-from .utils import compress_messages, print_system_message
+from .utils import print_system_message
 from .tools import *
 from .widgets import *
 
@@ -59,8 +59,7 @@ class AIChatUI:
         self.tts_lock = threading.Lock()
         self.active_tts_threads = 0  # Counter for active TTS chunks
 
-        self.chats = {}
-        self.chat_history = []  # To store the conversation history
+        self.chat_history = ChatHistory(on_history_changed=self.update_chat_display)
 
         # A flag to track whether tts is enabled or not
         self.tts_enabled = True if self.tts_model else False
@@ -92,8 +91,6 @@ class AIChatUI:
         min_height = int(screen_height * 0.3)  # 30% of screen height
         self.root.minsize(min_width, min_height)
 
-        add_chat_menu(self)
-
         # Main PanedWindow
         self.main_paned_window = tk.PanedWindow(root, orient=tk.HORIZONTAL)
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
@@ -120,47 +117,22 @@ class AIChatUI:
         self.left_panel.pack_propagate(False)  # Prevent the panel from shrinking
         self.main_paned_window.add(self.left_panel)
 
-        # Chat list
-        self.chat_list = tk.Listbox(
+        self.chat_tree = ChatTree(
             self.left_panel,
-            font=("Arial", 12),
-            selectmode=tk.SINGLE,
-            width=0,  # Let it expand to frame width
+            self.chat_history,
+            on_chat_select=self.update_chat_display,
         )
-        self.chat_list.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-        self.chat_list.bind("<<ListboxSelect>>", self.load_selected_chat)
 
-        self.new_chat_button = tk.Button(
-            self.left_panel,
-            text="New Chat",
-            command=self.new_chat,
-            font=("Arial", 12),
+        self.chat_menu = ChatMenu(
+            self.root,
+            on_save_chats_to_file=self.save_chats_to_file,
+            on_load_chats_from_file=self.load_chats_from_file,
+            on_llm_settings=lambda: open_llm_settings_dialog(
+                self.root, self.theme, self.llm_model
+            ),
+            on_load_theme=self.load_theme,
+            on_toggle_rag_panel=self.toggle_rag_panel if self.rag_model else None,
         )
-        self.new_chat_button.pack(padx=10, pady=5, fill=tk.X)
-
-        self.rename_button = tk.Button(
-            self.left_panel,
-            text="Rename",
-            command=self.edit_chat_name,
-            font=("Arial", 12),
-        )
-        self.rename_button.pack(padx=10, pady=5, fill=tk.X)
-
-        self.compress_button = tk.Button(
-            self.left_panel,
-            text="Compress Chat",
-            command=self.compress_active_chat,
-            font=("Arial", 12),
-        )
-        self.compress_button.pack(padx=10, pady=5, fill=tk.X)
-
-        self.delete_button = tk.Button(
-            self.left_panel,
-            text="Delete Chat",
-            command=self.delete_active_chat,
-            font=("Arial", 12),
-        )
-        self.delete_button.pack(padx=10, pady=5, fill=tk.X)
 
         # RAG UI
         if self.rag_model:
@@ -232,8 +204,8 @@ class AIChatUI:
 
         self.apply_theme()
         setup_markdown_tags(self.chat_display, self.theme)
-        self.update_chat_list()
-        self.create_default_chat()
+        # self.update_chat_list()
+        # self.create_default_chat()
         self.toggle_rag_panel()
 
     def apply_theme(self):
@@ -255,190 +227,21 @@ class AIChatUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
 
-    def disable_input(self):
-        """Disable user input and send button."""
+    def disable_ui(self):
+        """Disable user input."""
         self.user_input.config(state=tk.DISABLED)
         self.send_button.config(state=tk.DISABLED)
         self.record_button.config(state=tk.DISABLED)
-        self.compress_button.config(state=tk.DISABLED)
 
-    def enable_input(self):
-        """Enable user input and send button."""
+        self.chat_tree.disable()
+
+    def enable_ui(self):
+        """Enable user input."""
         self.user_input.config(state=tk.NORMAL)
         self.send_button.config(state=tk.NORMAL)
         self.record_button.config(state=tk.NORMAL if self.tts_model else tk.DISABLED)
-        self.compress_button.config(state=tk.NORMAL)
 
-    def create_default_chat(self):
-        """Create the default chat on app startup."""
-        # Use new_chat logic to ensure consistency
-        chat_name = "Default Chat"
-        if chat_name not in self.chats:
-            self.chats[chat_name] = [
-                {
-                    "role": RoleNames.TOOL,
-                    "content": "Welcome to the chat with AI assistant! Use /help to list available meta commands.",
-                }
-            ]
-            self.chat_history = self.chats[chat_name]
-            self.update_chat_list()
-            self.load_chat(chat_name)
-
-    def load_chat(self, chat_name):
-        """Load a specific chat into the main chat display."""
-        # Switch to the selected chat's history
-        self.chat_history = self.chats.get(chat_name, [])
-
-        # Update the chat display
-        self.chat_display.config(state=tk.NORMAL)
-        self.chat_display.delete(1.0, tk.END)  # Clear the current display
-
-        self.focus_on_chat(chat_name)
-        self.user_input.focus_set()
-
-        self.reinsert_messages_from_history()
-
-    def save_chats_to_file(self):
-        """Save all chats to a file."""
-        file_path = filedialog.asksaveasfilename(
-            defaultextension=".json", filetypes=[("JSON Files", "*.json")]
-        )
-        if file_path:
-            try:
-                with open(file_path, "w", encoding="utf-8") as file:
-                    json.dump(self.chats, file, ensure_ascii=False, indent=4)
-                messagebox.showinfo(
-                    "Save Chats", "All chats have been saved successfully."
-                )
-            except Exception as e:
-                messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
-
-    def load_chats_from_file(self):
-        """Load chats from a file."""
-        file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
-        if file_path:
-            try:
-                with open(file_path, "r", encoding="utf-8") as file:
-                    loaded_chats = json.load(file)
-
-                # Replace existing chats with the loaded ones
-                self.chats = loaded_chats
-
-                # Refresh chat list
-                self.update_chat_list()
-
-                # Load the first chat automatically
-                if self.chats:
-                    first_chat = next(iter(self.chats))
-                    self.load_chat(first_chat)
-
-                messagebox.showinfo(
-                    "Load Chats", "Chats have been loaded successfully."
-                )
-            except Exception as e:
-                messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
-
-    def update_chat_list(self):
-        """Update the chat list display."""
-        self.chat_list.delete(0, tk.END)
-        for chat_name in sorted(
-            self.chats.keys(), reverse=True
-        ):  # Sort by latest first
-            self.chat_list.insert(tk.END, chat_name)
-
-    def edit_chat_name(self):
-        """Edit the selected chat's name."""
-        selection = self.chat_list.curselection()
-        if not selection:
-            messagebox.showwarning("Edit Name", "Please select a chat to rename.")
-            return
-
-        # Get the currently selected chat name
-        selected_index = selection[0]
-        old_name = self.chat_list.get(selected_index)
-
-        # Prompt for a new name
-        new_name = simpledialog.askstring(
-            "Edit Chat Name", f"Rename '{old_name}' to:", initialvalue=old_name
-        )
-        if not new_name:
-            return  # User canceled or entered nothing
-
-        # Validate new name
-        if new_name in self.chat_list.get(0, tk.END):
-            messagebox.showerror("Edit Name", "A chat with this name already exists.")
-            return
-
-        # Update the chat name in the list
-        self.chat_list.delete(selected_index)
-        self.chat_list.insert(selected_index, new_name)
-        self.chat_list.selection_set(
-            selected_index
-        )  # Keep the selection on the renamed chat
-
-        # Update the underlying chat data
-        self.chats[new_name] = self.chats.pop(old_name)
-
-    def delete_active_chat(self):
-        """Delete the currently selected chat after confirmation."""
-        selection = self.chat_list.curselection()
-        if not selection:
-            messagebox.showwarning("Delete Chat", "Please select a chat to delete.")
-            return
-
-        # Get the selected chat name
-        selected_index = selection[0]
-        chat_name = self.chat_list.get(selected_index)
-
-        # Confirmation dialog
-        confirm = messagebox.askyesno(
-            "Delete Chat", f"Are you sure you want to delete '{chat_name}'?"
-        )
-        if confirm:
-            # Delete the chat from the dictionary
-            del self.chats[chat_name]
-
-            # Check if any chats remain
-            if not self.chats:
-                # Automatically create a new default chat
-                default_chat_name = "Default Chat"
-                self.chats[default_chat_name] = []
-                self.chat_history = []
-                self.update_chat_list()
-                self.load_chat(default_chat_name)
-            else:
-                # Refresh chat list and load the first available chat
-                self.update_chat_list()
-                first_chat = next(iter(self.chats))
-                self.load_chat(first_chat)
-
-    def focus_on_chat(self, chat_name):
-        """Set focus on the given chat in the chat list."""
-        try:
-            chat_index = list(self.chats.keys()).index(chat_name)
-            self.chat_list.selection_clear(0, tk.END)  # Clear any existing selection
-            self.chat_list.selection_set(chat_index)  # Select the desired chat
-            self.chat_list.see(chat_index)  # Ensure the chat is visible
-        except ValueError:
-            print_system_message(
-                "cannot find chat: {chat_name}",
-                log_level=logging.WARN,
-                color=Fore.YELLOW,
-            )
-
-    def disable_chat_list(self):
-        """Disable the chat list to prevent switching."""
-        self.chat_list.config(state=tk.DISABLED)
-        self.new_chat_button.config(state=tk.DISABLED)
-        self.rename_button.config(state=tk.DISABLED)
-        self.delete_button.config(state=tk.DISABLED)
-
-    def enable_chat_list(self):
-        """Enable the chat list after response generation."""
-        self.chat_list.config(state=tk.NORMAL)
-        self.new_chat_button.config(state=tk.NORMAL)
-        self.rename_button.config(state=tk.NORMAL)
-        self.delete_button.config(state=tk.NORMAL)
+        self.chat_tree.enable()
 
     def handle_user_input(self, event=None):
         """Handle user input from input."""
@@ -459,9 +262,8 @@ class AIChatUI:
 
         self.append_to_chat(RoleNames.USER, user_message)
 
-        # Disable input and chat list while AI response is generating
-        self.disable_input()
-        self.disable_chat_list()
+        # Disable UI while AI response is generating
+        self.disable_ui()
 
         # Change Send button to Cancel button
         self.cancel_response = False  # Reset cancel flag
@@ -530,15 +332,14 @@ class AIChatUI:
         self.send_button.config(
             text="Send", command=self.handle_user_input
         )  # Revert button to Send
-        self.enable_input()  # Re-enable inputs
+        self.enable_ui()  # Re-enable inputs
 
     def finish_ai_response(self):
         """Finalize the AI response display after generation and TTS complete."""
-        self.enable_input()
-        self.enable_chat_list()
+        self.enable_ui()
         self.send_button.config(text="Send", command=self.handle_user_input)
 
-        last_message = self.chat_history[-1]
+        last_message = self.chat_history.get_last_message()
 
         if last_message["role"] == RoleNames.ASSISTANT:
             last_message = last_message["content"]
@@ -610,7 +411,6 @@ class AIChatUI:
         """Append a message to the chat display."""
         self.chat_display.config(state=tk.NORMAL)
 
-        # Add a newline if the last character is not already a newline
         if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
             self.chat_display.insert(tk.END, "\n")
 
@@ -619,30 +419,65 @@ class AIChatUI:
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)
 
-        self.chat_history.append({"role": role, "content": content})
+        self.chat_history.append_message(role, content)
 
     def append_to_chat_partial(self, role, token):
         """Append a token to the chat display for partial updates."""
+        messages = self.chat_history.get_active_chat_messages()
+
         self.chat_display.config(state=tk.NORMAL)
 
         # If it's the first token for assistant, add the role label
         if role == RoleNames.ASSISTANT and (
-            not self.chat_history
-            or self.chat_history[-1]["role"] != RoleNames.ASSISTANT
+            not messages or messages[-1]["role"] != RoleNames.ASSISTANT
         ):
             if not self.chat_display.get("end-2c", "end-1c").endswith("\n"):
                 self.chat_display.insert(tk.END, "\n")
             self.chat_display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-            self.chat_history.append({"role": role, "content": ""})
+            # Add new message to history
+            self.chat_history.append_message(role, "")
 
         # Append the token to the display
         self.chat_display.insert(tk.END, f"{token}")
         self.chat_display.config(state=tk.DISABLED)
         self.chat_display.see(tk.END)  # Auto-scroll
 
-        # Update chat history
-        if self.chat_history and self.chat_history[-1]["role"] == role:
-            self.chat_history[-1]["content"] += f"{token}"
+        # Update the content of the last message
+        messages = self.chat_history.get_active_chat_messages()
+        if messages and messages[-1]["role"] == role:
+            current_content = messages[-1]["content"]
+            messages[-1]["content"] = current_content + token
+
+    def update_chat_display(self):
+        """Update chat display from history manager"""
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.delete(1.0, tk.END)
+
+        messages = self.chat_history.get_active_chat_messages()
+        for idx, message in enumerate(messages):
+            if message["role"] == RoleNames.USER:
+                self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
+            elif message["role"] == RoleNames.ASSISTANT:
+                self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
+            elif message["role"] == RoleNames.TOOL:
+                self.chat_display.insert(tk.END, "Tool: ", RoleTags.TOOL)
+
+            elif idx == 0 and message["role"] == "system":
+                print_system_message(
+                    f"skip initial system message: {message}", color=Fore.LIGHTBLUE_EX
+                )
+                continue
+
+            self.append_markdown(message["content"])
+
+        self.chat_display.config(state=tk.DISABLED)
+        self.chat_display.yview_moveto(1.0)
+
+        # Update LLM model history if needed
+        self.llm_model.load_history(messages)
+
+        # Scroll to the end
+        self.chat_display.yview_moveto(1.0)
 
     def append_markdown(self, text):
         if self.markdown_enabled:
@@ -653,80 +488,43 @@ class AIChatUI:
     def append_system_message(self, message):
         self.append_to_chat(RoleNames.TOOL, message)
 
-    def new_chat(self):
-        """Start a new chat."""
-        chat_name = simpledialog.askstring("New Chat", "Enter a name for this chat:")
-        if chat_name and chat_name not in self.chats:
-            self.chats[chat_name] = [
-                {"role": RoleNames.TOOL, "content": "Welcome to your new chat!"}
-            ]
-            self.chat_history = self.chats[chat_name]
-
-            # Update chat list and focus on the new chat
-            self.update_chat_list()
-            self.load_chat(chat_name)
-        elif chat_name in self.chats:
-            messagebox.showerror("New Chat", "A chat with this name already exists.")
-
-    def load_selected_chat(self, event=None):
-        """Load the selected chat into the chat display."""
-        selection = self.chat_list.curselection()
-        if selection:
-            selected_chat = self.chat_list.get(selection)
-            self.chat_history = self.chats.get(selected_chat, [])
-            self.chat_display.config(state=tk.NORMAL)
-            self.chat_display.delete(1.0, tk.END)
-
-            self.reinsert_messages_from_history()
-
-    def update_chat_list(self):
-        """Update the chat list display."""
-        self.chat_list.delete(0, tk.END)
-        for chat_name in sorted(self.chats.keys(), reverse=True):  # Sort by latest
-            self.chat_list.insert(tk.END, chat_name)
-
-    def reinsert_messages_from_history(self):
-        """Reinsert messages with appropriate tags."""
-        for idx, message in enumerate(self.chat_history):
-            if message["role"] == RoleNames.USER:
-                self.chat_display.insert(tk.END, "You: ", RoleTags.USER)
-            elif message["role"] == RoleNames.ASSISTANT:
-                self.chat_display.insert(tk.END, "Assistant: ", RoleTags.ASSISTANT)
-            elif message["role"] == RoleNames.TOOL:
-                self.chat_display.insert(tk.END, "Tool: ", RoleTags.TOOL)
-            elif idx == 0 and message["role"] == "system":
-                print_system_message(
-                    f"skip initial system message: {message}", color=Fore.LIGHTBLUE_EX
-                )
-                continue
-
-            self.append_markdown(message["content"])
-
+    def clear_messages(self):
+        """Clear chat display."""
+        self.chat_display.config(state=tk.NORMAL)
+        self.chat_display.delete(1.0, tk.END)
         self.chat_display.config(state=tk.DISABLED)
-        self.llm_model.load_history(self.chat_history)
-        self.chat_display.yview_moveto(1.0)  # Scroll to the end
 
-    def compress_active_chat(self, keep_first=1, keep_last=4, max_words=32):
-        """Compress chat history for the selected chat or all chats."""
-        selection = self.chat_list.curselection()
-        if selection:
-            # Compress the selected chat's history
-            selected_chat = self.chat_list.get(selection)
-            if selected_chat in self.chats:
-                self.chats[selected_chat] = compress_messages(
-                    self.chats[selected_chat],
-                    keep_first=keep_first,
-                    keep_last=keep_last,
-                    max_words=max_words,
-                )
-                self.llm_model.load_history(self.chats[selected_chat])  # Sync with LLM
-                self.load_chat(selected_chat)  # Refresh the chat display
+    def save_chats_to_file(self):
+        """Save all chats to a file"""
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".json", filetypes=[("JSON Files", "*.json")]
+        )
+        if file_path:
+            try:
+                self.chat_history.save_chats(file_path)
                 messagebox.showinfo(
-                    "Compress Chat",
-                    f"Chat history for '{selected_chat}' compressed successfully with {keep_first=}, {keep_last=}, {max_words=}.",
+                    "Save Chats", "All chats have been saved successfully."
                 )
-            else:
-                messagebox.showerror("Compress Chat", "Selected chat not found.")
+            except Exception as e:
+                messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
+
+    def load_chats_from_file(self):
+        """Load chats from a file"""
+        file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
+        if file_path:
+            try:
+                with open(file_path, "r", encoding="utf-8") as file:
+                    loaded_chats = json.load(file)
+
+                self.chat_history.load_chats(loaded_chats)
+                self.chat_tree.load_tree()
+                self.clear_messages()
+
+                messagebox.showinfo(
+                    "Load Chats", "Chats have been loaded successfully."
+                )
+            except Exception as e:
+                messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
 
     def record_voice(self):
         """Toggle recording state and handle recording."""
@@ -779,20 +577,26 @@ class AIChatUI:
             print_system_message("No audio captured. Press record to try again.")
 
     def on_rag_chat_start(self, messages):
-        selection = self.chat_list.curselection()
+        """Handle the start of a RAG chat with initial messages"""
         if len(messages) != 2:
             messagebox.showerror("RAG Chat", f"Unexpected messages: {messages}.")
             return
 
-        if selection:
-            selected_chat = self.chat_list.get(selection)
-            self.chats[selected_chat] = [messages[0]]
-            self.chat_history = self.chats[selected_chat]
+        # Get currently selected chat, if any
+        if self.chat_history.active_path:
+            # Reset active chat with initial system message
+            self.chat_history.set_active_chat_history(messages=[messages[0]])
 
-            self.load_selected_chat()
+            # Update display
+            self.update_chat_display()
+
+            # Process user's message
             self.handle_user_message(messages[1]["content"])
         else:
-            messagebox.showerror("RAG Chat", "No selected chats.")
+            messagebox.showerror(
+                "RAG Chat",
+                "No selected chat. Please select a chat before starting RAG.",
+            )
 
     def toggle_rag_panel(self):
         """Toggle the visibility of the RAG panel."""

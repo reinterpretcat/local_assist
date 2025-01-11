@@ -120,58 +120,58 @@ def print_system_message(
     )
 
 
-def compress_messages(messages, keep_first: int, keep_last: int, max_words: int):
-    import re
+# def compress_messages(messages, keep_first: int, keep_last: int, max_words: int):
+#     import re
 
-    def summarize_message(role: Optional[str], message: str, max_words) -> str:
-        """Summarize a message by truncating it heuristically, keeping as much context as possible."""
+#     def summarize_message(role: Optional[str], message: str, max_words) -> str:
+#         """Summarize a message by truncating it heuristically, keeping as much context as possible."""
 
-        # Skip summarization for system messages
-        if role == "system":
-            return message
+#         # Skip summarization for system messages
+#         if role == "system":
+#             return message
 
-        words = message.split()
-        if len(words) <= max_words:
-            return message  # No summarization needed
+#         words = message.split()
+#         if len(words) <= max_words:
+#             return message  # No summarization needed
 
-        # Heuristic: Look for punctuation to avoid cutting mid-sentence
-        truncated = " ".join(words[:max_words])
-        if not truncated.endswith((".", "!", "?")):
-            # Attempt to find a natural endpoint within the truncated segment
-            match = re.search(r"(.*?[.!?])\s", truncated)
-            if match:
-                return match.group(1) + "..."  # Use the matched sentence
-            else:
-                # Default fallback: Add ellipsis if no natural endpoint found
-                return truncated + "..."
-        return truncated
+#         # Heuristic: Look for punctuation to avoid cutting mid-sentence
+#         truncated = " ".join(words[:max_words])
+#         if not truncated.endswith((".", "!", "?")):
+#             # Attempt to find a natural endpoint within the truncated segment
+#             match = re.search(r"(.*?[.!?])\s", truncated)
+#             if match:
+#                 return match.group(1) + "..."  # Use the matched sentence
+#             else:
+#                 # Default fallback: Add ellipsis if no natural endpoint found
+#                 return truncated + "..."
+#         return truncated
 
-    def compress_old_messages(messages, keep_first, keep_last, max_words):
-        """
-        Compress all but the first `keep_first` and last `keep_last` messages.
+#     def compress_old_messages(messages, keep_first, keep_last, max_words):
+#         """
+#         Compress all but the first `keep_first` and last `keep_last` messages.
 
-        Args:
-            messages: List of messages to compress.
-            keep_first: Number of messages to keep unchanged from the start.
-            keep_last: Number of messages to keep unchanged from the end.
-            max_words: Maximum number of words to keep in each compressed message.
+#         Args:
+#             messages: List of messages to compress.
+#             keep_first: Number of messages to keep unchanged from the start.
+#             keep_last: Number of messages to keep unchanged from the end.
+#             max_words: Maximum number of words to keep in each compressed message.
 
-        Returns:
-            List of messages with middle messages compressed.
-        """
-        if len(messages) > (keep_first + keep_last):
-            # Compress only the middle messages
-            for i in range(keep_first, len(messages) - keep_last):
-                messages[i]["content"] = summarize_message(
-                    messages[i]["role"], messages[i]["content"], max_words
-                )
-        return messages
+#         Returns:
+#             List of messages with middle messages compressed.
+#         """
+#         if len(messages) > (keep_first + keep_last):
+#             # Compress only the middle messages
+#             for i in range(keep_first, len(messages) - keep_last):
+#                 messages[i]["content"] = summarize_message(
+#                     messages[i]["role"], messages[i]["content"], max_words
+#                 )
+#         return messages
 
-    def filter_non_critical_messages(messages):
-        """Remove redundant messages from the history."""
-        return [msg for msg in messages if not (msg["role"] == "tool")]
+#     def filter_non_critical_messages(messages):
+#         """Remove redundant messages from the history."""
+#         return [msg for msg in messages if not (msg["role"] == "tool")]
 
-    messages = compress_old_messages(messages, keep_first, keep_last, max_words)
-    messages = filter_non_critical_messages(messages)
+#     messages = compress_old_messages(messages, keep_first, keep_last, max_words)
+#     messages = filter_non_critical_messages(messages)
 
-    return messages
+#     return messages

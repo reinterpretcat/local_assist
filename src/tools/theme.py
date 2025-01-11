@@ -72,7 +72,7 @@ def apply_chat_theme(self):
     )
 
     # Configure menu
-    self.menu_bar.configure(
+    self.chat_menu.menu_bar.configure(
         bg=self.theme["menu_bg"],
         fg=self.theme["fg"],
         activebackground=self.theme["button_bg"],
@@ -80,7 +80,7 @@ def apply_chat_theme(self):
         borderwidth=0,
     )
 
-    for menu in self.menu_bar.winfo_children():
+    for menu in self.chat_menu.menu_bar.winfo_children():
         menu.configure(
             bg=self.theme["menu_bg"],
             fg=self.theme["fg"],
@@ -93,25 +93,41 @@ def apply_chat_theme(self):
     self.left_panel.configure(bg=self.theme["bg"], borderwidth=1, relief="solid")
 
     # Configure chat list
-    self.chat_list.configure(
-        bg=self.theme["list_bg"],
-        fg=self.theme["list_fg"],
-        selectbackground=self.theme["list_select_bg"],
-        selectforeground=self.theme["list_select_fg"],
-        highlightbackground=self.theme["chat_border"],
-        font=("Arial", 12),
-        relief="solid",
-        borderwidth=1,
+    # self.chat_tree.tree.configure(
+    #     bg=self.theme["list_bg"],
+    #     fg=self.theme["list_fg"],
+    #     selectbackground=self.theme["list_select_bg"],
+    #     selectforeground=self.theme["list_select_fg"],
+    #     highlightbackground=self.theme["chat_border"],
+    #     font=("Arial", 12),
+    #     relief="solid",
+    #     borderwidth=1,
+    # )
+    
+    style = ttk.Style()
+    style.configure(
+        "Treeview",
+        rowheight=36,
+        font=("TkDefaultFont", 10),
+        background=self.theme["tree_bg"],
+        foreground=self.theme["tree_fg"],
+        fieldbackground=self.theme["tree_bg"],
+        selectbackground=self.theme["tree_select_bg"],
+        selectforeground=self.theme["tree_select_fg"],
     )
+    self.chat_tree.tree.configure(style="Treeview")
+    
+    
 
     button_config = get_button_config(self.theme)
     for button in [
-        self.new_chat_button,
-        self.rename_button,
-        self.compress_button,
+        self.chat_tree.new_chat_button,
+        self.chat_tree.new_group_button,
+        self.chat_tree.rename_button,
+        self.chat_tree.delete_button,
+
         self.send_button,
         self.record_button,
-        self.delete_button,
     ]:
         button.configure(**button_config)
 
