@@ -32,7 +32,7 @@ def handle_command(self, command):
 
         elif len(args) == 1:
             # Clear all messages from the chat window
-            self.chat_history.clear_all_messages(role)
+            self.chat_history.clear_all_messages()
             self.handle_chat_select()
         else:
             self.append_system_message(

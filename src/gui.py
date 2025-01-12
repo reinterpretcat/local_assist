@@ -448,4 +448,5 @@ class AIChatUI:
         self.chat_input.apply_theme(theme)
         self.chat_menu.apply_theme(theme)
         self.chat_tree.apply_theme(theme)
-        self.rag_panel.apply_theme(theme)
+        if self.rag_model:
+            self.rag_panel.apply_theme(theme)
