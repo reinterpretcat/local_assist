@@ -109,6 +109,14 @@ class AIChatUI:
             markdown_enabled=True,
         )
 
+        # Add toolbar after chat display but before input frame
+        self.chat_toolbar = ChatToolBar(
+            parent=self.chat_display_frame,
+            chat_display=self.chat_display,
+            chat_history=self.chat_history,
+            on_chat_change=self.handle_chat_select,
+        )
+
         # Input area at the bottom (outside main content frame)
         self.input_frame = tk.Frame(self.chat_display_frame, height=50)
         self.input_frame.pack(side=tk.BOTTOM, fill=tk.X)
@@ -454,5 +462,6 @@ class AIChatUI:
         self.chat_input.apply_theme(theme)
         self.chat_menu.apply_theme(theme)
         self.chat_tree.apply_theme(theme)
+        self.chat_toolbar.apply_theme(theme)
         if self.rag_model:
             self.rag_panel.apply_theme(theme)
