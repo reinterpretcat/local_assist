@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
 from typing import Dict
 from ..models import RoleNames, RoleTags
-from ..tools import render_markdown, has_markdown_syntax
+from ..tools import render_markdown, has_markdown_syntax, setup_markdown_tags
 
 
 class ChatDisplay:
@@ -34,6 +34,9 @@ class ChatDisplay:
             font=("Arial", 14, "bold"),
         )
         self.display.tag_configure(RoleTags.CONTENT, foreground="black")
+
+        setup_markdown_tags(chat_display=self.display, theme=theme)
+        
 
     def append_message(self, role, content):
         self.display.config(state=tk.NORMAL)
