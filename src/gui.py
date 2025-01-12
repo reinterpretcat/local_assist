@@ -106,7 +106,7 @@ class AIChatUI:
 
         self.chat_display = ChatDisplay(
             parent=self.chat_display_frame,
-            markdown_enabled=True,
+            markdown_enabled=False,
         )
 
         # Add toolbar after chat display but before input frame
@@ -125,7 +125,7 @@ class AIChatUI:
             root=self,
             input_frame=self.input_frame,
             on_user_input=self.handle_user_input,
-            on_record_voice=self.record_voice,
+            on_record_voice=self.record_voice if self.tts_enabled else None,
             on_cancel_response=self.cancel_ai_response,
         )
 

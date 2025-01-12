@@ -43,7 +43,7 @@ def handle_command(self, command):
 
     elif command.startswith("/config"):
         if len(args) != 2:
-            if self.markdown_enabled:
+            if self.chat_display.markdown_enabled:
                 self.append_system_message(
                     f"```json\n{json.dumps(self.config, indent=2)}\n```"
                 )
@@ -153,10 +153,10 @@ def handle_command(self, command):
             )
         elif len(args) == 2:
             if args[1] == "on":
-                self.markdown_enabled = True
+                self.chat_display.markdown_enabled = True
                 self.append_system_message("Markdown enabled.")
             elif args[1] == "off":
-                self.markdown_enabled = False
+                self.chat_display.markdown_enabled = False
                 self.append_system_message("Markdown disabled.")
             else:
                 self.append_system_message(
