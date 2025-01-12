@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from typing import Callable
+from ..tools import ensure_icon
 
 
 class ChatTree:
@@ -87,13 +88,8 @@ class ChatTree:
         """Get full path for a tree item"""
         path = []
         while item_id:
-            # Need to cleanup icon
-            display_name = self.tree.item(item_id)["text"]
-            text = (
-                display_name.split(" ", 1)[-1] if " " in display_name else display_name
-            )
-
-            path.insert(0, text)
+            name = self.tree.item(item_id)["text"]
+            path.insert(0, name)
             item_id = self.tree.parent(item_id)
         return path
 
@@ -115,6 +111,8 @@ class ChatTree:
         group_name = simpledialog.askstring("New Group", "Enter group name:")
         if not group_name:
             return None
+
+        group_name = ensure_icon(name=group_name, default_icon="📁")
 
         try:
             path = self.chat_history.create_group(group_name, parent_path)
@@ -144,6 +142,8 @@ class ChatTree:
         chat_name = simpledialog.askstring("New Chat", "Enter chat name:")
         if not chat_name:
             return
+
+        chat_name = ensure_icon(name=chat_name, default_icon="💬")
 
         try:
             path = self.chat_history.create_chat(chat_name, parent_path)
@@ -336,14 +336,11 @@ class ChatTree:
                 name = node["name"]
                 is_group = node["type"] == "group"
 
-                # Choose icon based on node type
-                display_name = f"{'📁 ' if is_group else '💬 '}{name}"
-
                 # Insert node into tree
                 item_id = self.tree.insert(
                     tree_parent,
                     "end",
-                    text=display_name,
+                    text=name,
                     tags=("group" if is_group else "chat",),
                 )
 

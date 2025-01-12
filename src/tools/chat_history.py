@@ -1,6 +1,5 @@
 from typing import Callable
 
-
 class ChatHistory:
     """Manages chat history."""
 
@@ -16,7 +15,7 @@ class ChatHistory:
     def ensure_default_chat(self):
         """Ensure at least one default chat exists."""
         if not self.root["children"]:
-            default_chat_path = self.create_chat("Default Chat")
+            default_chat_path = self.create_chat("💬 Default Chat")
             self.set_active_chat(default_chat_path)
 
     def _get_node_by_path(self, path):
