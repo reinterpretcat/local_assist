@@ -3,6 +3,7 @@ import os
 from tkinter import ttk, filedialog, messagebox
 from typing import Optional
 from ..models import RAG
+from ..tools import get_button_config, get_list_style
 
 
 class RAGManagementUI:
@@ -376,9 +377,12 @@ class RAGManagementUI:
 
         editor = RAGQueryEditor(
             self.parent,
+            theme=self.theme,
             summarize_prompt=self.rag_model.summarize_prompt,
             context_prompt=self.rag_model.context_prompt,
         )
+        if hasattr(self, "theme"):
+            editor.apply_theme(theme=self.theme)
 
         def progress_callback(current, total):
             """Update the progress bar based on the progress_callback."""
@@ -404,9 +408,6 @@ class RAGManagementUI:
 
         editor.on_save_callback = on_save_callback
 
-        if hasattr(self, "editor_style_callback"):
-            self.editor_style_callback(editor)
-
     def toggle(self):
         """Toggle the visibility of the RAG panel."""
         if not self.rag_model:
@@ -418,9 +419,56 @@ class RAGManagementUI:
             self.frame.pack(fill=tk.BOTH, expand=True)
         self.rag_visible = not self.rag_visible
 
+    def apply_theme(self, theme):
+        self.theme = theme
+
+        self.frame.configure(bg=theme["bg"], borderwidth=1, relief="solid")
+        self.collection_frame.configure(
+            bg=theme["bg"], fg=theme["fg"], borderwidth=1, relief="solid"
+        )
+        self.data_store_frame.configure(
+            bg=theme["bg"], fg=theme["fg"], borderwidth=1, relief="solid"
+        )
+        self.tree_frame.configure(bg=theme["bg"])
+
+        # Configure buttons with common style
+        button_config = {
+            "bg": theme["button_bg"],
+            "fg": theme["button_fg"],
+            "activebackground": theme["button_bg_hover"],
+            "activeforeground": theme["button_fg"],
+            "font": ("Arial", 12),
+            "relief": "solid",
+            "borderwidth": 1,
+        }
+
+        button_config = get_button_config(theme)
+        for button in [
+            self.new_collection_button,
+            self.rename_collection_button,
+            self.upload_button,
+            self.context_button,
+            self.delete_button,
+        ]:
+            button.configure(**button_config)
+
+        # Configure scrollbar
+        self.vsb.configure(
+            bg=theme["scrollbar_bg"],
+            activebackground=theme["scrollbar_hover"],
+            troughcolor=theme["scrollbar_bg"],
+            width=12,
+        )
+
+        # Apply custom styles
+        style = get_list_style(theme=theme)
+
+        # Apply styles to Treeview
+        self.data_store_tree.configure(style="Treeview")
+
 
 class RAGQueryEditor:
-    def __init__(self, parent, summarize_prompt, context_prompt):
+    def __init__(self, parent, theme, summarize_prompt, context_prompt):
         """
         A window to edit summarize_prompt and context_prompt.
 
@@ -497,3 +545,41 @@ class RAGQueryEditor:
         # Trigger the save callback with the updated values
         self.on_save_callback(user_query, updated_summary, updated_context)
         self.root.destroy()
+
+    def apply_theme(self, theme):
+        self.root.configure(bg=theme["bg"])
+
+        self.summary_label.configure(bg=theme["bg"], fg=theme["fg"])
+        self.summary_text.configure(
+            bg=theme["input_bg"],
+            fg=theme["input_fg"],
+            insertbackground=theme["input_fg"],
+        )
+
+        self.context_label.configure(bg=theme["bg"], fg=theme["fg"])
+        self.context_text.configure(
+            bg=theme["input_bg"],
+            fg=theme["input_fg"],
+            insertbackground=theme["input_fg"],
+        )
+
+        self.query_label.configure(bg=theme["bg"], fg=theme["fg"])
+        self.query_text.configure(
+            bg=theme["input_bg"],
+            fg=theme["input_fg"],
+            insertbackground=theme["input_fg"],
+        )
+
+        self.progress_frame.configure(bg=theme["bg"])
+        self.progress_label.configure(bg=theme["bg"], fg=theme["fg"])
+        self.progress_bar.configure(style="Horizontal.TProgressbar")
+
+        self.button_frame.configure(bg=theme["bg"])
+        self.apply_button.configure(
+            bg=theme["button_bg"],
+            fg=theme["button_fg"],
+            activebackground=theme["button_bg_hover"],
+            activeforeground=theme["button_fg"],
+            relief="solid",
+            borderwidth=1,
+        )

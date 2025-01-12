@@ -1,5 +1,6 @@
 import tkinter as tk
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
+from ..tools import get_button_config, get_list_style
 
 
 class ChatInput:
@@ -186,3 +187,28 @@ class ChatInput:
             state=tk.NORMAL if self.is_record_enabled else tk.DISABLED
         )
         self.send_button.config(text="Send", command=lambda: self._consume_input())
+
+    def apply_theme(self, theme):
+        button_config = get_button_config(theme)
+        for button in [
+            self.send_button,
+            self.record_button,
+        ]:
+            button.configure(**button_config)
+
+        self.user_input.configure(
+            bg=theme["input_bg"],
+            fg=theme["input_fg"],
+            insertbackground=theme["input_fg"],
+            font=("Arial", 12),
+            relief="solid",
+            borderwidth=1,
+        )
+
+        # Configure scrollbar
+        self.scrollbar.configure(
+            bg=theme["scrollbar_bg"],
+            activebackground=theme["scrollbar_hover"],
+            troughcolor=theme["scrollbar_bg"],
+            width=12,
+        )

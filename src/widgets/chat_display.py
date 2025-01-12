@@ -1,11 +1,12 @@
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
+from typing import Dict
 from ..models import RoleNames, RoleTags
 from ..tools import render_markdown, has_markdown_syntax
 
 
 class ChatDisplay:
-    def __init__(self, parent, theme=None, markdown_enabled=True):
+    def __init__(self, parent, markdown_enabled=True):
         self.display = ScrolledText(
             parent,
             wrap=tk.WORD,
@@ -15,7 +16,6 @@ class ChatDisplay:
         self.display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
         self.markdown_enabled = markdown_enabled
-        self._configure_tags(theme)
 
     def _configure_tags(self, theme):
         self.display.tag_configure(
@@ -92,3 +92,26 @@ class ChatDisplay:
         for message in messages:
             if message["role"] != "system":
                 self.append_message(message["role"], message["content"])
+
+    def apply_theme(self, theme: Dict):
+        self._configure_tags(theme)
+
+        # Configure chat display
+        self.display.configure(
+            bg=theme["chat_bg"],
+            fg=theme["chat_fg"],
+            font=("Arial", 12),
+            insertbackground=theme["chat_fg"],
+            selectbackground=theme["list_select_bg"],
+            selectforeground=theme["list_select_fg"],
+            highlightbackground=theme["chat_border"],
+            relief="solid",
+            borderwidth=1,
+        )
+        self.display.vbar.configure(
+            bg=theme["scrollbar_bg"],
+            activebackground=theme["scrollbar_hover"],
+            troughcolor=theme["scrollbar_bg"],
+            width=12,
+            elementborderwidth=0,
+        )

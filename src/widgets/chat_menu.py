@@ -1,5 +1,5 @@
 import tkinter as tk
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 
 
 def pad_label(label, width=30):
@@ -54,3 +54,22 @@ class ChatMenu:
                 label=pad_label("Toggle RAG Editor"), command=on_toggle_rag_panel
             )
             self.menu_bar.add_cascade(label="RAG", menu=self.rag_menu)
+
+    def apply_theme(self, theme: Dict):
+        # Configure menu
+        self.menu_bar.configure(
+            bg=theme["menu_bg"],
+            fg=theme["fg"],
+            activebackground=theme["button_bg"],
+            activeforeground=theme["button_fg"],
+            borderwidth=0,
+        )
+
+        for menu in self.menu_bar.winfo_children():
+            menu.configure(
+                bg=theme["menu_bg"],
+                fg=theme["fg"],
+                activebackground=theme["button_bg"],
+                activeforeground=theme["button_fg"],
+                selectcolor=theme["button_fg"],
+            )

@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
-from typing import Callable
-from ..tools import ensure_icon
+from typing import Callable, Dict
+from ..tools import ensure_icon, get_button_config, get_list_style
 
 
 class ChatTree:
@@ -405,3 +405,29 @@ class ChatTree:
                     break
             if not found:
                 break
+
+    def apply_theme(self, theme):
+
+        style = get_list_style(theme=theme)
+        self.frame.configure(bg=theme["bg"], borderwidth=1, relief="solid")
+        self.tree_frame.configure(bg=theme["bg"], borderwidth=1, relief="solid")
+        self.tree.configure(style="Treeview")
+
+        # Configure scrollbar
+        self.scrollbar.configure(
+            bg=theme["scrollbar_bg"],
+            activebackground=theme["scrollbar_hover"],
+            troughcolor=theme["scrollbar_bg"],
+            width=12,
+        )
+
+        self.button_frame.configure(bg=theme["bg"], borderwidth=1, relief="solid")
+
+        button_config = get_button_config(theme)
+        for button in [
+            self.new_chat_button,
+            self.new_group_button,
+            self.rename_button,
+            self.delete_button,
+        ]:
+            button.configure(**button_config)

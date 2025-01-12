@@ -27,6 +27,7 @@ class AIChatUI:
         self.root.title("AI Assistance Chat")
 
         self.config = config
+        self.theme = default_theme
 
         self.llm_model = llm_model
         self.stt_model = stt_model
@@ -45,8 +46,6 @@ class AIChatUI:
 
         if self.tts_model:
             self.audio_io = AudioIO()
-
-        self.theme = default_theme
 
         # Calculate window size based on screen dimensions
         screen_width = self.root.winfo_screenwidth()
@@ -124,7 +123,6 @@ class AIChatUI:
 
         self.chat_display = ChatDisplay(
             parent=self.chat_display_frame,
-            theme=self.theme,
             markdown_enabled=True,
         )
 
@@ -142,12 +140,7 @@ class AIChatUI:
 
         self.root.bind("<Escape>", self.cancel_ai_response)
 
-        self.apply_theme()
-
-    def apply_theme(self):
-        """Apply the current theme to the chat and rag window."""
-        if self.theme:
-            apply_app_theme(self)
+        self.apply_theme(self.theme)
 
     def load_theme(self):
         """Load a custom theme from a JSON file."""
@@ -156,7 +149,9 @@ class AIChatUI:
             try:
                 with open(file_path, "r", encoding="utf-8") as file:
                     self.theme = json.load(file)
-                self.apply_theme()
+
+                self.apply_theme(theme=self.theme)
+
                 messagebox.showinfo(
                     "Theme Loaded", "Custom theme applied successfully!"
                 )
@@ -426,3 +421,31 @@ class AIChatUI:
                 "RAG Chat",
                 "No selected chat. Please select a chat before starting RAG.",
             )
+
+    def apply_theme(self, theme):
+        # Configure root and main frames
+        self.root.configure(bg=theme["bg"])
+        self.main_paned_window.configure(
+            bg=theme["bg"],
+            sashwidth=4,
+            sashpad=1,
+            borderwidth=1,
+            relief="solid",
+        )
+
+        # Configure chat display frame
+        self.chat_display_frame.configure(
+            bg=theme["chat_bg"], borderwidth=1, relief="solid"
+        )
+
+        # Configure left panel
+        self.left_panel.configure(bg=theme["bg"], borderwidth=1, relief="solid")
+
+        # Configure input area
+        self.input_frame.configure(bg=theme["bg"], relief="solid", borderwidth=1)
+
+        self.chat_display.apply_theme(theme)
+        self.chat_input.apply_theme(theme)
+        self.chat_menu.apply_theme(theme)
+        self.chat_tree.apply_theme(theme)
+        self.rag_panel.apply_theme(theme)
