@@ -47,24 +47,7 @@ class AIChatUI:
         if self.tts_model:
             self.audio_io = AudioIO()
 
-        # Calculate window size based on screen dimensions
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-
-        # Set window size to 70% of screen size
-        window_width = int(screen_width * 0.7)
-        window_height = int(screen_height * 0.7)
-
-        # Calculate position for center of screen
-        x_position = (screen_width - window_width) // 2
-        y_position = (screen_height - window_height) // 2
-
-        # Set geometry with format: 'widthxheight+x+y'
-        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
-
-        min_width = int(screen_width * 0.3)  # 30% of screen width
-        min_height = int(screen_height * 0.3)  # 30% of screen height
-        self.root.minsize(min_width, min_height)
+        window_width, _ = self.set_geometry()
 
         # Main PanedWindow
         self.main_paned_window = tk.PanedWindow(root, orient=tk.HORIZONTAL)
@@ -167,6 +150,29 @@ class AIChatUI:
         """Enable user input."""
         self.chat_input.enable()
         self.chat_tree.enable()
+
+    def set_geometry(self):
+        """Sets geometry and other properties."""
+        # Calculate window size based on screen dimensions
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Set window size to 70% of screen size
+        window_width = int(screen_width * 0.7)
+        window_height = int(screen_height * 0.7)
+
+        # Calculate position for center of screen
+        x_position = (screen_width - window_width) // 2
+        y_position = (screen_height - window_height) // 2
+
+        # Set geometry with format: 'widthxheight+x+y'
+        self.root.geometry(f"{window_width}x{window_height}+{x_position}+{y_position}")
+
+        min_width = int(screen_width * 0.3)  # 30% of screen width
+        min_height = int(screen_height * 0.3)  # 30% of screen height
+        self.root.minsize(min_width, min_height)
+
+        return window_width, window_height
 
     def handle_user_input(self, user_message):
         """Handle user input from input."""
