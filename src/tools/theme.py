@@ -5,7 +5,7 @@ dark_theme = {
     "bg": "#2f343f",  # Arc-Dark background
     "fg": "#d3dae3",  # Arc-Dark foreground
     "border_color": "#3b4048",
-    "header_bg": "#3b4048",
+    "header_bg": "#353a45",
     "input_bg": "#3b4048",
     "input_fg": "#d3dae3",
     "input_border": "#3b4048",
