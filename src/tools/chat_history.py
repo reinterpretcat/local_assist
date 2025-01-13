@@ -1,16 +1,21 @@
+import json
 from typing import Callable
+
 
 class ChatHistory:
     """Manages chat history."""
 
-    def __init__(self):
+    def __init__(self, history_path=None):
         self.root = {
             "type": "group",
             "name": "/",
             "children": {},  # {name: {type: group/chat, children/messages}}
         }
         self.active_path = None  # List of names forming path to active chat
-        self.ensure_default_chat()
+        if history_path:
+            self.load_chats(history_path)
+        else:
+            self.ensure_default_chat()
 
     def ensure_default_chat(self):
         """Ensure at least one default chat exists."""
@@ -176,8 +181,12 @@ class ChatHistory:
             return []
         return self.get_chat_messages(self.active_path)
 
-    def load_chats(self, data):
+    def load_chats(self, file_path):
         """Load chat data from external source"""
+
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
         self.root["children"] = {}
 
         chat_data = data.get("chats", {})

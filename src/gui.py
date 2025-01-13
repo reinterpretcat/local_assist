@@ -37,7 +37,8 @@ class AIChatUI:
         self.tts_lock = threading.Lock()
         self.active_tts_threads = 0  # Counter for active TTS chunks
 
-        self.chat_history = ChatHistory()
+        self.history_path = self.config.get("chat", {}).get("history_path", {})
+        self.chat_history = ChatHistory(history_path=self.history_path)
 
         # A flag to track whether tts is enabled or not
         self.tts_enabled = True if self.tts_model else False
@@ -68,6 +69,15 @@ class AIChatUI:
 
         # Bind the configuration to when the window is fully loaded
         self.root.bind("<Map>", configure_sash)
+
+        def save_chat_history(event=None):
+            # silently save to self.config.chat.history_path if defined, otherwise show save dialog
+            if self.history_path:
+                self.chat_history.save_chats(self.history_path)
+            else:
+                self.save_chats_to_file()
+
+        self.root.bind("<Control-s>", save_chat_history)
 
         # Left panel for chat list and RAG
         self.left_panel = tk.Frame(self.main_paned_window)
@@ -343,6 +353,7 @@ class AIChatUI:
         if file_path:
             try:
                 self.chat_history.save_chats(file_path)
+                self.history_path = file_path
                 messagebox.showinfo(
                     "Save Chats", "All chats have been saved successfully."
                 )
@@ -354,10 +365,7 @@ class AIChatUI:
         file_path = filedialog.askopenfilename(filetypes=[("JSON Files", "*.json")])
         if file_path:
             try:
-                with open(file_path, "r", encoding="utf-8") as file:
-                    loaded_chats = json.load(file)
-
-                self.chat_history.load_chats(loaded_chats)
+                self.chat_history.load_chats(file_path)
                 self.chat_tree.load_tree()
                 self.chat_tree.expand_to_path(self.chat_history.active_path)
                 self.chat_display.clear()
@@ -365,6 +373,7 @@ class AIChatUI:
                 messages = self.chat_history.get_active_chat_messages()
                 self.llm_model.load_history(messages)
 
+                self.history_path = file_path
                 messagebox.showinfo(
                     "Load Chats", "Chats have been loaded successfully."
                 )

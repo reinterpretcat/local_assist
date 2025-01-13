@@ -33,6 +33,10 @@ default_theme = dark_theme
 
 
 default_config = {
+    "chat": {
+      "history_path": "history.json"
+    },
+    
     # LLM config
     "llm": {
         "disable_chat_history": False,
