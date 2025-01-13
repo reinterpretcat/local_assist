@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from torch import cuda
 from .theme import dark_theme
 
+
 class Settings(BaseSettings):
     """
     Application settings class.
@@ -33,10 +34,11 @@ default_theme = dark_theme
 
 
 default_config = {
+    # Chat config
     "chat": {
-      "history_path": "history.json"
+        "history_path": "history.json",
+        "history_sort": False,
     },
-    
     # LLM config
     "llm": {
         "disable_chat_history": False,

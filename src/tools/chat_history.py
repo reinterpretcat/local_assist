@@ -5,13 +5,15 @@ from typing import Callable
 class ChatHistory:
     """Manages chat history."""
 
-    def __init__(self, history_path=None):
+    def __init__(self, history_path=None, history_sort=False):
         self.root = {
             "type": "group",
             "name": "/",
             "children": {},  # {name: {type: group/chat, children/messages}}
         }
         self.active_path = None  # List of names forming path to active chat
+
+        self.history_sort = history_sort
         if history_path:
             self.load_chats(history_path)
         else:
@@ -136,7 +138,12 @@ class ChatHistory:
             nodes.append({"name": name, "type": node["type"]})
 
         # Sort nodes: groups first, then alphabetically
-        return sorted(nodes, key=lambda x: (x["type"] != "group", x["name"].lower()))
+        if self.history_sort:
+            return sorted(
+                nodes, key=lambda x: (x["type"] != "group", x["name"].lower())
+            )
+
+        return nodes
 
     def append_message(self, role, content):
         """Append message to active chat"""

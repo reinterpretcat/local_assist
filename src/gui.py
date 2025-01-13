@@ -38,7 +38,10 @@ class AIChatUI:
         self.active_tts_threads = 0  # Counter for active TTS chunks
 
         self.history_path = self.config.get("chat", {}).get("history_path", {})
-        self.chat_history = ChatHistory(history_path=self.history_path)
+        self.chat_history = ChatHistory(
+            history_path=self.history_path,
+            history_sort=self.config.get("chat", {}).get("history_sort", False),
+        )
 
         # A flag to track whether tts is enabled or not
         self.tts_enabled = True if self.tts_model else False
