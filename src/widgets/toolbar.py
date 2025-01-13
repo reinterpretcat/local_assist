@@ -1,9 +1,17 @@
 import tkinter as tk
+from ..models import RoleNames
 from typing import Callable
+from tkinter import simpledialog
 
 
 class ChatToolBar:
-    def __init__(self, parent, chat_display, chat_history, on_chat_change: Callable):
+    def __init__(
+        self,
+        parent,
+        chat_display,
+        chat_history,
+        on_chat_change: Callable,
+    ):
         self.chat_history = chat_history
         self.on_chat_change = on_chat_change
 
@@ -23,6 +31,13 @@ class ChatToolBar:
         )
         self.remove_last_btn.pack(side=tk.RIGHT, padx=2)
         self._create_tooltip(self.remove_last_btn, "Remove Last Message")
+
+        # Edit last message button
+        self.edit_last_btn = tk.Button(
+            self.frame, text="📝", command=self.edit_last_message, **button_style
+        )
+        self.edit_last_btn.pack(side=tk.RIGHT, padx=2)
+        self._create_tooltip(self.edit_last_btn, "Edit Last Message")
 
         # Copy all messages button
         self.copy_all_btn = tk.Button(
@@ -78,6 +93,35 @@ class ChatToolBar:
             self.frame.clipboard_clear()
             self.frame.clipboard_append(all_messages)
 
+    def edit_last_message(self):
+        """Edit the last message for the specified role or remove a message for another role."""
+        # Get messages for the active chat
+        messages = self.chat_history.get_active_chat_messages()
+
+        # Step 1: Find and edit the last message for role_to_edit
+        last_user_message_index = None
+        for i in range(len(messages) - 1, -1, -1):
+            if messages[i]["role"] == RoleNames.USER:
+                last_user_message_index = i
+                old_content = messages[i]["content"]
+                new_content = simpledialog.askstring(
+                    "Edit Message", "Edit your last message:", initialvalue=old_content
+                )
+                if new_content is not None and new_content.strip() != old_content:
+                    messages[i]["content"] = new_content.strip()
+                else:
+                    return  # No changes made, exit without removing the assistant message
+                break
+
+        # Step 2: Remove last message for role_to_remove if user message was modified
+        if last_user_message_index is not None:
+            for i in range(len(messages) - 1, last_user_message_index, -1):
+                if messages[i]["role"] == RoleNames.ASSISTANT:
+                    messages.pop(i)
+                    break
+        # TODO need to trigger AI response
+        self.on_chat_change()
+
     def remove_last_message(self):
         """Remove the last message from the active chat."""
         messages = self.chat_history.get_active_chat_messages()
@@ -111,4 +155,5 @@ class ChatToolBar:
 
         self.copy_last_btn.configure(**button_style)
         self.copy_all_btn.configure(**button_style)
+        self.edit_last_btn.configure(**button_style)
         self.remove_last_btn.configure(**button_style)

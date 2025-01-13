@@ -1,6 +1,4 @@
 import json
-from typing import Callable
-
 
 class ChatHistory:
     """Manages chat history."""
