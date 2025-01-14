@@ -49,7 +49,7 @@ class ChatStatusBar(tk.Frame):
 
     def update_chat_info(self, chat_name):
         """Update chat name display"""
-        self.chat_info.config(text=f"{chat_name}")
+        self.chat_info.config(text=f"  {chat_name}")
 
     def update_model_info(self, model_name):
         """Updates model info"""

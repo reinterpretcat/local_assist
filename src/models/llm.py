@@ -84,7 +84,7 @@ class LLM(BaseModel):
         self.set_system_prompt(self.system_prompt)
 
         print_system_message(
-            f"Set LLM messages to {self.messages}", log_level=logging.INFO
+            f"Set LLM messages from history ({len(self.messages)})", log_level=logging.INFO
         )
 
     def exists(self) -> bool:
