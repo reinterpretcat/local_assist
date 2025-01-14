@@ -51,19 +51,20 @@ class AIChatUI:
         if self.tts_model:
             self.audio_io = AudioIO()
 
-        
         # Main container for all elements
         self.main_container = tk.Frame(root)
         self.main_container.pack(fill=tk.BOTH, expand=True)
-        
+
         window_width, _ = self.set_geometry()
-        
+
         # Container for PanedWindow
         self.paned_container = tk.Frame(self.main_container)
         self.paned_container.pack(fill=tk.BOTH, expand=True)
 
         # PanedWindow inside its container
-        self.main_paned_window = tk.PanedWindow(self.paned_container, orient=tk.HORIZONTAL)
+        self.main_paned_window = tk.PanedWindow(
+            self.paned_container, orient=tk.HORIZONTAL
+        )
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
         left_panel_width = int(window_width * 0.25)  # 25% of window width
@@ -149,7 +150,7 @@ class AIChatUI:
             on_record_voice=self.record_voice if self.tts_enabled else None,
             on_cancel_response=self.cancel_ai_response,
         )
-        
+
         # Status bar at bottom of main container
         self.chat_statusbar = ChatStatusBar(self.main_container)
         self.chat_statusbar.pack(side=tk.BOTTOM, fill=tk.X)
@@ -223,6 +224,7 @@ class AIChatUI:
 
         self.chat_display.append_message(RoleNames.USER, message)
         self.chat_history.append_message(RoleNames.USER, message)
+        self.update_statistics()
 
         # Disable UI while AI response is generating
         self.disable_ui()
@@ -292,6 +294,7 @@ class AIChatUI:
 
         last_message = self.chat_history.get_last_message()
         self.chat_display.handle_response_readiness(last_message)
+        self.update_statistics()
 
     def speak_text(self, text):
         """Speak the given text using TTS."""
@@ -355,12 +358,18 @@ class AIChatUI:
         """Update chat display from history manager"""
         messages = self.chat_history.get_active_chat_messages()
         self.chat_statusbar.update_chat_info(self.chat_history.active_path[-1])
+        self.update_statistics()
         self.chat_display.update(messages)
         self.llm_model.load_history(messages)
 
     def append_system_message(self, message):
         self.chat_display.append_message(RoleNames.TOOL, message)
         self.chat_history.append_message(RoleNames.TOOL, message)
+
+    def update_statistics(self):
+        """Updates statistics on status bar."""
+        messages = self.chat_history.get_active_chat_messages()
+        self.chat_statusbar.update_stats(messages)
 
     def save_chats_to_file(self):
         """Save all chats to a file"""
