@@ -5,7 +5,7 @@ import json
 import threading
 import logging
 import time
-from typing import Optional
+from typing import Callable, Optional
 
 from .models import *
 from .tools import *
@@ -143,6 +143,7 @@ class AIChatUI:
             chat_display=self.chat_display,
             chat_history=self.chat_history,
             on_chat_change=self.handle_chat_select,
+            on_chat_edit=self.handle_chat_edit,
         )
 
         # Input area at the bottom (outside main content frame)
@@ -156,6 +157,7 @@ class AIChatUI:
             on_record_voice=self.record_voice if self.tts_enabled else None,
             on_cancel_response=self.cancel_ai_response,
         )
+        self.on_input_edit = None
 
         # Status bar at bottom of main container
         self.chat_statusbar = ChatStatusBar(self.main_container)
@@ -215,6 +217,11 @@ class AIChatUI:
     def handle_user_input(self, user_message):
         """Handle user input from input."""
 
+        if self.on_input_edit is not None:
+            self.on_input_edit(user_message)
+            self.on_input_edit = None
+            return
+
         # Handle special commands
         if user_message.startswith("/"):
             handle_command(self, user_message)
@@ -227,7 +234,13 @@ class AIChatUI:
 
         self.chat_display.append_message(RoleNames.USER, message)
         self.chat_history.append_message(RoleNames.USER, message)
+
         self.update_statistics()
+
+        self.trigger_ai_response(message)
+
+    def trigger_ai_response(self, message):
+        """Handle user message and initiate AI reply without changing chat display and history."""
 
         # Disable UI while AI response is generating
         self.disable_ui()
@@ -356,6 +369,16 @@ class AIChatUI:
 
         self.chat_display.append_partial(role, token, is_first_token)
         self.chat_history.append_message_partial(role, token, is_first_token)
+
+    def handle_chat_edit(self, old_content, on_toolbar_edit: Callable):
+        self.chat_input.set_text(old_content)
+
+        def on_input_edit(new_content):
+            if on_toolbar_edit(new_content):
+                self.handle_chat_select()
+                self.trigger_ai_response(new_content)
+
+        self.on_input_edit = on_input_edit
 
     def handle_chat_select(self):
         """Update chat display from history manager"""

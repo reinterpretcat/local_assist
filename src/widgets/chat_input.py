@@ -127,6 +127,11 @@ class ChatInput:
         self.user_input.mark_set(tk.INSERT, tk.END)
         return "break"  # Prevents default behavior
 
+    def set_text(self, new_text):
+        """Sets text to user input."""
+        self.user_input.delete("1.0", tk.END)
+        self.user_input.insert(tk.END, new_text)
+
     def handle_return_key(self, event):
         """Handle Return key press - submit if alone, newline if with Shift."""
         if not event.state & 0x1:  # No Shift key

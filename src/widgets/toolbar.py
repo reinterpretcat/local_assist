@@ -11,9 +11,11 @@ class ChatToolBar:
         chat_display,
         chat_history,
         on_chat_change: Callable,
+        on_chat_edit: Callable,
     ):
         self.chat_history = chat_history
         self.on_chat_change = on_chat_change
+        self.on_chat_edit = on_chat_edit
 
         self.frame = tk.Frame(parent, bg="lightgray", bd=1, relief=tk.SOLID)
         self.frame.place(x=0, y=0)  # Initial placement
@@ -95,32 +97,37 @@ class ChatToolBar:
 
     def edit_last_message(self):
         """Edit the last message for the specified role or remove a message for another role."""
-        # Get messages for the active chat
         messages = self.chat_history.get_active_chat_messages()
 
+        # TODO refactor this as is very fragile
         # Step 1: Find and edit the last message for role_to_edit
         last_user_message_index = None
         for i in range(len(messages) - 1, -1, -1):
             if messages[i]["role"] == RoleNames.USER:
                 last_user_message_index = i
-                old_content = messages[i]["content"]
-                new_content = simpledialog.askstring(
-                    "Edit Message", "Edit your last message:", initialvalue=old_content
-                )
-                if new_content is not None and new_content.strip() != old_content:
-                    messages[i]["content"] = new_content.strip()
-                else:
-                    return  # No changes made, exit without removing the assistant message
-                break
+                # old_content = messages[i]["content"]
+                old_message = messages[i]
 
-        # Step 2: Remove last message for role_to_remove if user message was modified
-        if last_user_message_index is not None:
-            for i in range(len(messages) - 1, last_user_message_index, -1):
-                if messages[i]["role"] == RoleNames.ASSISTANT:
-                    messages.pop(i)
-                    break
-        # TODO need to trigger AI response
-        self.on_chat_change()
+                def on_edit(new_content):
+                    if (
+                        new_content is not None
+                        and new_content.strip() != old_message["content"]
+                    ):
+                        old_message["content"] = new_content.strip()
+                    else:
+                        # No changes made, exit without removing the assistant message
+                        return False
+                    messages = self.chat_history.get_active_chat_messages()
+                    # Step 2: Remove last message for role_to_remove if user message was modified
+                    if last_user_message_index is not None:
+                        for i in range(len(messages) - 1, last_user_message_index, -1):
+                            if messages[i]["role"] == RoleNames.ASSISTANT:
+                                messages.pop(i)
+                                break
+                    return True
+
+                self.on_chat_edit(old_message["content"], on_edit)
+                return
 
     def remove_last_message(self):
         """Remove the last message from the active chat."""
