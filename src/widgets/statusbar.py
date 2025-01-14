@@ -66,7 +66,7 @@ class ChatStatusBar(tk.Frame):
 
         self.stats.config(text=f"Messages: {total_msgs} | Words: {total_words}")
 
-    def update_system_msg(self, message, message_type="info", duration=5000):
+    def update_system_msg(self, message, message_type="info", duration=3000):
         """Update system msg display"""
         # self.extras.config(text=extras_text)
         if self.system_msg_timer:

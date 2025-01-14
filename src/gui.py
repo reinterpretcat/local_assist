@@ -87,6 +87,7 @@ class AIChatUI:
             # silently save to self.config.chat.history_path if defined, otherwise show save dialog
             if self.history_path:
                 self.chat_history.save_chats(self.history_path)
+                self.update_status_message(message="Chats are saved.")
             else:
                 self.save_chats_to_file()
 
@@ -448,8 +449,9 @@ class AIChatUI:
         except AttributeError:
             print_system_message("No audio captured. Press record to try again.")
 
-    def update_status_message(self, message):
-        self.chat_statusbar.update_system_msg(message=message)
+    def update_status_message(self, message, duration=3000):
+        """ Shows message in chat status bar for duration specified. """
+        self.chat_statusbar.update_system_msg(message=message, duration = duration)
 
     def on_rag_chat_start(self, messages):
         """Handle the start of a RAG chat with initial messages"""
