@@ -1,10 +1,10 @@
 import tkinter as tk
-from typing import Dict
+from typing import Callable, Dict
 from ..models import LLM
 from ..tools import get_button_config
 
 
-def open_llm_settings_dialog(root, theme: Dict, llm_model: LLM):
+def open_llm_settings_dialog(root, theme: Dict, llm_model: LLM, on_complete: Callable):
     """Open a dialog to set LLM settings."""
 
     current_prompt = llm_model.system_prompt
@@ -32,6 +32,7 @@ def open_llm_settings_dialog(root, theme: Dict, llm_model: LLM):
     # Save Button
     def save_settings():
         llm_model.set_system_prompt(prompt_text.get(1.0, tk.END).strip())
+        on_complete()
         settings_window.destroy()
 
     save_button = tk.Button(

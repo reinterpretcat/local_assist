@@ -116,7 +116,12 @@ class AIChatUI:
             on_save_chats_to_file=self.save_chats_to_file,
             on_load_chats_from_file=self.load_chats_from_file,
             on_llm_settings=lambda: open_llm_settings_dialog(
-                self.root, self.theme, self.llm_model
+                self.root,
+                self.theme,
+                self.llm_model,
+                on_complete=lambda: self.update_status_message(
+                    message="LLM settings changed"
+                ),
             ),
             on_load_theme=self.load_theme,
             on_toggle_rag_panel=self.rag_panel.toggle if self.rag_model else None,
@@ -169,7 +174,7 @@ class AIChatUI:
                     self.theme = json.load(file)
 
                 self.apply_theme(theme=self.theme)
-                self.chat_statusbar.update_system_msg(message="Theme loaded")
+                self.update_status_message(message="Theme loaded")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
 
@@ -377,7 +382,7 @@ class AIChatUI:
             try:
                 self.chat_history.save_chats(file_path)
                 self.history_path = file_path
-                self.chat_statusbar.update_system_msg(message="Chats saved")
+                self.update_status_message(message="Chats saved")
             except Exception as e:
                 messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
 
@@ -395,7 +400,7 @@ class AIChatUI:
                 self.llm_model.load_history(messages)
 
                 self.history_path = file_path
-                self.chat_statusbar.update_system_msg(message="Chats loaded")
+                self.update_status_message(message="Chats loaded")
             except Exception as e:
                 messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
 
@@ -442,6 +447,9 @@ class AIChatUI:
 
         except AttributeError:
             print_system_message("No audio captured. Press record to try again.")
+
+    def update_status_message(self, message):
+        self.chat_statusbar.update_system_msg(message=message)
 
     def on_rag_chat_start(self, messages):
         """Handle the start of a RAG chat with initial messages"""
