@@ -47,6 +47,8 @@ class LLM(BaseModel):
 
         self.model = Client()
 
+        self.response_statistic = None
+
     def set_system_prompt(self, prompt: str):
         """Update the system prompt and ensure it is reflected in messages."""
         self.system_prompt = prompt
@@ -100,6 +102,43 @@ class LLM(BaseModel):
         except ResponseError:
             return False
 
+    def _update_statistics(self, response):
+        """Generate a compact status string for a chat response."""
+
+        def format_duration(ns):
+            """Convert nanoseconds to human-readable format."""
+            ns = int(ns)
+            if ns >= 1e9:
+                return f"{ns / 1e9:.2f}s"
+            elif ns >= 1e6:
+                return f"{ns / 1e6:.2f}ms"
+            return None  # Ignore durations less than milliseconds
+
+        total_duration = format_duration(response["total_duration"])
+        load_duration = format_duration(response["load_duration"])
+        prompt_eval_duration = format_duration(response["prompt_eval_duration"])
+        eval_duration = format_duration(response["eval_duration"])
+
+        # Optional: timestamp conversion for logging/debugging
+        eval_count = response["eval_count"]
+        prompt_eval_count = response["prompt_eval_count"]
+
+        # Build status message
+        status_parts = []
+        if total_duration:
+            status_parts.append(f"Total:{total_duration}")
+        if load_duration:
+            status_parts.append(f"Load:{load_duration}")
+        if prompt_eval_duration:
+            status_parts.append(f"Prompt:{prompt_eval_duration}")
+        if eval_duration:
+            status_parts.append(f"Eval:{eval_duration}")
+        status_parts.append(f"Tokens:{prompt_eval_count}")
+        status_parts.append(f"Evals:{eval_count}")
+
+        # Join and return status string
+        self.response_statistic = "|".join(status_parts)
+
     def forward(self, message: str) -> Iterator[str]:
         """
         Generate text from user input using the specified LLM.
@@ -123,13 +162,16 @@ class LLM(BaseModel):
         )
 
         for chunk in stream:
-            # NOTE: `chunk["done"] == True` when ends
             token = chunk["message"]["content"]
 
             if assistant_role is None:
                 assistant_role = chunk["message"]["role"]
 
             generated_content += token
+
+            # we have reached end of message
+            if chunk["done"] == True:
+                self._update_statistics(response=chunk)
 
             yield token
 

@@ -9,7 +9,7 @@ class ChatStatusBar(tk.Frame):
         self.config(relief=tk.SUNKEN, borderwidth=1)
 
         # Set label width to prevent shifting
-        label_widths = {"chat_info": 15, "model_info": 5, "stats": 20, "sys_msg": 40}
+        label_widths = {"chat_info": 10, "model_info": 5, "stats": 15, "sys_msg": 60}
 
         # Create labels with fixed widths
         self.chat_info = tk.Label(
@@ -68,7 +68,6 @@ class ChatStatusBar(tk.Frame):
 
     def update_system_msg(self, message, message_type="info", duration=3000):
         """Update system msg display"""
-        # self.extras.config(text=extras_text)
         if self.system_msg_timer:
             self.after_cancel(self.system_msg_timer)
 

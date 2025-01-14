@@ -373,6 +373,13 @@ class AIChatUI:
         """Updates statistics on status bar."""
         messages = self.chat_history.get_active_chat_messages()
         self.chat_statusbar.update_stats(messages)
+        if self.llm_model.response_statistic is not None:
+            self.chat_statusbar.update_system_msg(
+                message=self.llm_model.response_statistic, duration=12000
+            )
+            print_system_message(self.llm_model.response_statistic)
+            # A bit hacky to reset statistic directly in LLM
+            self.llm_model.response_statistic = None
 
     def save_chats_to_file(self):
         """Save all chats to a file"""
@@ -450,8 +457,8 @@ class AIChatUI:
             print_system_message("No audio captured. Press record to try again.")
 
     def update_status_message(self, message, duration=3000):
-        """ Shows message in chat status bar for duration specified. """
-        self.chat_statusbar.update_system_msg(message=message, duration = duration)
+        """Shows message in chat status bar for duration specified."""
+        self.chat_statusbar.update_system_msg(message=message, duration=duration)
 
     def on_rag_chat_start(self, messages):
         """Handle the start of a RAG chat with initial messages"""
