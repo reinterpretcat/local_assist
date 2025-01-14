@@ -9,7 +9,7 @@ class ChatStatusBar(tk.Frame):
         self.config(relief=tk.SUNKEN, borderwidth=1)
 
         # Set label width to prevent shifting
-        label_widths = {"chat_info": 15, "model_info": 5, "stats": 20, "extras": 40}
+        label_widths = {"chat_info": 15, "model_info": 5, "stats": 20, "sys_msg": 40}
 
         # Create labels with fixed widths
         self.chat_info = tk.Label(
@@ -25,11 +25,11 @@ class ChatStatusBar(tk.Frame):
         )
         self.separator2 = tk.Label(self, text="│", padx=2)
         self.stats = tk.Label(
-            self, text="Stats", width=label_widths["stats"], anchor=tk.W, padx=5
+            self, text="", width=label_widths["stats"], anchor=tk.W, padx=5
         )
         self.separator3 = tk.Label(self, text="│", padx=2)
-        self.extras = tk.Label(
-            self, text="Extras", width=label_widths["extras"], anchor=tk.E, padx=5
+        self.system_msg = tk.Label(
+            self, text="", width=label_widths["sys_msg"], anchor=tk.E, padx=5
         )
 
         # Grid layout
@@ -39,11 +39,13 @@ class ChatStatusBar(tk.Frame):
         self.separator2.grid(row=0, column=3, sticky=tk.NS)
         self.stats.grid(row=0, column=4, sticky=tk.NSEW)
         self.separator3.grid(row=0, column=5, sticky=tk.NS)
-        self.extras.grid(row=0, column=6, sticky=tk.NSEW)
+        self.system_msg.grid(row=0, column=6, sticky=tk.NSEW)
 
         # Configure column weights
         for col in range(7):
             self.columnconfigure(col, weight=1)
+
+        self.system_msg_timer = None
 
     def update_chat_info(self, chat_name):
         """Update chat name display"""
@@ -64,14 +66,25 @@ class ChatStatusBar(tk.Frame):
 
         self.stats.config(text=f"Messages: {total_msgs} | Words: {total_words}")
 
-    def update_extras(self, extras_text):
-        """Update settings display"""
-        self.extras.config(text=extras_text)
+    def update_system_msg(self, message, message_type="info", duration=5000):
+        """Update system msg display"""
+        # self.extras.config(text=extras_text)
+        if self.system_msg_timer:
+            self.after_cancel(self.system_msg_timer)
+
+        color = self.system_msg.cget("fg")  # Use theme color by default
+        if message_type == "error":
+            color = "#bf616a"  # Use error color from theme
+
+        self.system_msg.config(text=message, fg=color)
+        self.system_msg_timer = self.after(
+            duration, lambda: self.system_msg.config(text="")
+        )
 
     def apply_theme(self, theme):
         self.config(bg=theme["bg"], borderwidth=1, relief=tk.SUNKEN)
 
-        for widget in (self.chat_info, self.model_info, self.stats, self.extras):
+        for widget in (self.chat_info, self.model_info, self.stats, self.system_msg):
             widget.config(bg=theme["bg"], fg=theme["fg"])
 
         for sep in (self.separator1, self.separator2, self.separator3):

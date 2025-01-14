@@ -169,10 +169,7 @@ class AIChatUI:
                     self.theme = json.load(file)
 
                 self.apply_theme(theme=self.theme)
-
-                messagebox.showinfo(
-                    "Theme Loaded", "Custom theme applied successfully!"
-                )
+                self.chat_statusbar.update_system_msg(message="Theme loaded")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
 
@@ -380,9 +377,7 @@ class AIChatUI:
             try:
                 self.chat_history.save_chats(file_path)
                 self.history_path = file_path
-                messagebox.showinfo(
-                    "Save Chats", "All chats have been saved successfully."
-                )
+                self.chat_statusbar.update_system_msg(message="Chats saved")
             except Exception as e:
                 messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
 
@@ -400,9 +395,7 @@ class AIChatUI:
                 self.llm_model.load_history(messages)
 
                 self.history_path = file_path
-                messagebox.showinfo(
-                    "Load Chats", "Chats have been loaded successfully."
-                )
+                self.chat_statusbar.update_system_msg(message="Chats loaded")
             except Exception as e:
                 messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
 
