@@ -120,7 +120,7 @@ class AIChatUI:
                 self.theme,
                 self.llm_model,
                 on_complete=lambda: self.update_status_message(
-                    message="LLM settings changed"
+                    message="LLM settings changed."
                 ),
             ),
             on_load_theme=self.load_theme,
@@ -174,7 +174,7 @@ class AIChatUI:
                     self.theme = json.load(file)
 
                 self.apply_theme(theme=self.theme)
-                self.update_status_message(message="Theme loaded")
+                self.update_status_message(message="Theme loaded.")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load theme: {e}")
 
@@ -382,7 +382,7 @@ class AIChatUI:
             try:
                 self.chat_history.save_chats(file_path)
                 self.history_path = file_path
-                self.update_status_message(message="Chats saved")
+                self.update_status_message(message="Chats saved.")
             except Exception as e:
                 messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
 
@@ -400,7 +400,7 @@ class AIChatUI:
                 self.llm_model.load_history(messages)
 
                 self.history_path = file_path
-                self.update_status_message(message="Chats loaded")
+                self.update_status_message(message="Chats loaded.")
             except Exception as e:
                 messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
 

@@ -83,10 +83,10 @@ def handle_command(self, command):
                     )
                     return
                 self.tts_enabled = True
-                self.append_system_message("Text-to-speech enabled.")
+                self.update_status_message("Text-to-speech enabled.")
             elif args[1] == "off":
                 self.tts_enabled = False
-                self.append_system_message("Text-to-speech disabled.")
+                self.update_status_message("Text-to-speech disabled.")
             else:
                 self.append_system_message(
                     f"Invalid argument '{args[1]}'. Use /tts on, /tts off",
@@ -154,10 +154,10 @@ def handle_command(self, command):
         elif len(args) == 2:
             if args[1] == "on":
                 self.chat_display.markdown_enabled = True
-                self.append_system_message("Markdown enabled.")
+                self.update_status_message("Markdown enabled.")
             elif args[1] == "off":
                 self.chat_display.markdown_enabled = False
-                self.append_system_message("Markdown disabled.")
+                self.update_status_message("Markdown disabled.")
             else:
                 self.append_system_message(
                     f"Invalid argument '{args[1]}'. Use /markdown on, /markdown off",
