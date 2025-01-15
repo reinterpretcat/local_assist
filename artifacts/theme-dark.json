@@ -29,6 +29,7 @@
     "tree_select_bg": "#4d4d4d",
     "tree_select_fg": "#dcdcdc",
     "menu_bg": "#2b2b2b",
+    "popup_bg": "#2b2b2b",
     "user": {"color_prefix": "#4d4d4d", "bg": "#313335", "border": "#3c3f41"},
     "assistant": {"color_prefix": "#6a8759", "bg": "#2b2b2b", "border": "#3c3f41"},
     "tool": {"color_prefix": "#d4d4d4", "bg": "#313335", "border": "#3c3f41"}

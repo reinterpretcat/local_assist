@@ -2,11 +2,18 @@ import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
 from typing import Dict
 from ..models import RoleNames, RoleTags
-from ..tools import render_markdown, has_markdown_syntax, setup_markdown_tags
+from ..tools import (
+    ChatHistory,
+    render_markdown,
+    has_markdown_syntax,
+    setup_markdown_tags,
+)
 
 
 class ChatDisplay:
-    def __init__(self, parent, markdown_enabled=True):
+    def __init__(self, parent, chat_history: ChatHistory):
+        self.chat_history = chat_history
+
         self.display = ScrolledText(
             parent,
             wrap=tk.WORD,
@@ -14,8 +21,6 @@ class ChatDisplay:
             font=("Arial", 12),
         )
         self.display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-        self.markdown_enabled = markdown_enabled
 
     def _configure_tags(self, theme):
         self.display.tag_configure(
@@ -36,7 +41,6 @@ class ChatDisplay:
         self.display.tag_configure(RoleTags.CONTENT, foreground="black")
 
         setup_markdown_tags(chat_display=self.display, theme=theme)
-        
 
     def append_message(self, role, content):
         self.display.config(state=tk.NORMAL)
@@ -63,7 +67,10 @@ class ChatDisplay:
             last_message = last_message["content"]
 
             # Rerender the message in case of markdown syntax
-            if self.markdown_enabled and has_markdown_syntax(last_message):
+            if (
+                self.chat_history.get_chat_settings().markdown_enabled
+                and has_markdown_syntax(last_message)
+            ):
                 self.display.config(state=tk.NORMAL)
 
                 tag_indices = self.display.tag_ranges(RoleTags.ASSISTANT)
@@ -80,7 +87,7 @@ class ChatDisplay:
                 self.display.config(state=tk.DISABLED)
 
     def _append_markdown(self, text):
-        if self.markdown_enabled:
+        if self.chat_history.get_chat_settings().markdown_enabled:
             render_markdown(self.display, text)
         else:
             self.display.insert(tk.END, text + "\n")

@@ -1,4 +1,5 @@
 from tkinter import messagebox
+from .chat_history import LLMSettings
 import json
 
 
@@ -15,7 +16,7 @@ def handle_command(self, command):
             "/show     - A subcommand to display state info\n"
             "/stats    - A chat statistics\n"
             "/markdown - Manage markdown post processing\n"
-            "/restore  - A subcommand to restore original state\n"
+            "/reply    - Allows to enable/disable AI replies\n"
             "/remove   - Removes messages from the selected chat\n"
             "\n/help   - Display this help message",
         )
@@ -146,46 +147,64 @@ def handle_command(self, command):
     elif command.startswith("/markdown"):
         if len(args) == 1:
             self.append_system_message(
-                "Syntax for markdown command:\n"
+                "Syntax for markdown command (applies for active chat only):\n"
                 "/markdown on  - Enable markdown post processing\n"
                 "/markdown off - Disable tmarkdown post procesing\n"
                 "/markdown     - Show this help message",
             )
         elif len(args) == 2:
             if args[1] == "on":
-                self.chat_display.markdown_enabled = True
-                self.update_status_message("Markdown enabled.")
+                enabled = True
             elif args[1] == "off":
-                self.chat_display.markdown_enabled = False
-                self.update_status_message("Markdown disabled.")
+                enabled = False
             else:
                 self.append_system_message(
                     f"Invalid argument '{args[1]}'. Use /markdown on, /markdown off",
                 )
                 return
+
+            self.chat_history.set_chat_settings(
+                self.chat_history.get_chat_settings().replace(markdown_enabled=enabled)
+            )
+
+            self.update_status_message(
+                f"Markdown {'enabled' if enabled else 'disabled'}."
+            )
             self.handle_chat_select()
         else:
             self.append_system_message(
                 "Too many arguments. Use /tts on, /tts off",
             )
 
-    elif command.startswith("/restore"):
+    elif command.startswith("/reply"):
         if len(args) == 1:
             self.append_system_message(
-                "Syntax for retore command:\n"
-                "/restore prompt - Restores system llm prompt from the config\n"
+                "Syntax for reply command:\n"
+                "/reply on  - Enable AI reply\n"
+                "/reply off - Disable AI reply\n"
+                "/reply     - Show this help message",
+            )
+        elif len(args) == 2:
+            if args[1] == "on":
+                enabled = True
+                self.update_status_message("Replies enabled.")
+            elif args[1] == "off":
+                enabled = False
+                self.update_status_message("Replies disabled.")
+            else:
+                self.append_system_message(
+                    f"Invalid argument '{args[1]}'. Use /reply on, /reply off",
+                )
+                return
+
+            self.chat_history.set_chat_settings(
+                self.chat_history.get_chat_settings().replace(replies_allowed=enabled)
             )
 
-        elif len(args) == 2:
-            if args[1] == "prompt":
-                system_prompt = self.config.get("llm", {}).get("system_prompt")
-                if not system_prompt:
-                    self.append_system_message(f"No prompt specified in the config.")
-                else:
-                    self.llm_model.set_system_prompt(system_prompt)
-                    self.append_system_message(
-                        f"Prompt set to: `{self.llm_model.system_prompt}`."
-                    )
+        else:
+            self.append_system_message(
+                "Too many arguments. Use /reply on, /reply off",
+            )
 
     elif command.startswith("/remove"):
         if len(args) != 2 and len(args) != 3:

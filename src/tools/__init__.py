@@ -1,5 +1,5 @@
 from .audio import AudioIO
-from .chat_history import ChatHistory
+from .chat_history import ChatHistory, LLMSettings, ChatSettings
 from .commands import handle_command
 from .icons import ensure_icon
 from .markdown import has_markdown_syntax, setup_markdown_tags, render_markdown

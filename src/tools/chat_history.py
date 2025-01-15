@@ -1,4 +1,92 @@
 import json
+from typing import Any, Dict, Optional
+from dataclasses import dataclass, asdict
+
+
+@dataclass
+class LLMSettings:
+    """Settings specific to language model configuration."""
+
+    system_prompt: Optional[str] = None
+    model_id: Optional[str] = None
+    temperature: Optional[float] = None
+    num_ctx: Optional[int] = None
+    num_predict: Optional[int] = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "LLMSettings":
+        """Create LLM settings from dictionary, handling missing fields."""
+        if not data:
+            return cls()
+        return cls(
+            system_prompt=data.get("system_prompt"),
+            model_id=data.get("model_id"),
+            temperature=data.get("temperature"),
+            num_ctx=data.get("num_ctx"),
+            num_predict=data.get("num_predict"),
+        )
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary, excluding None values and returning None if all default."""
+        non_default = {k: v for k, v in asdict(self).items() if v is not None}
+        return non_default if non_default else None
+
+
+class ChatSettings:
+    """Manages chat-specific settings."""
+
+    def __init__(self, markdown_enabled=False, replies_allowed=True, llm=LLMSettings()):
+        self.markdown_enabled = markdown_enabled
+        self.replies_allowed = replies_allowed
+        self.llm: LLMSettings = llm
+        # self._custom_settings: Dict[str, Any] = {}
+
+    def to_dict(self) -> dict:
+        """Convert settings to dictionary for serialization, excluding default values."""
+        result = {}
+
+        # Only include non-default values
+        if self.markdown_enabled:
+            result["markdown_enabled"] = True
+        if not self.replies_allowed:
+            result["replies_allowed"] = False
+
+        # Include LLM settings only if they differ from defaults
+        llm_dict = self.llm.to_dict()
+        if llm_dict:
+            result["llm"] = llm_dict
+
+        # Include custom settings only if not empty
+        # if self._custom_settings:
+        #   result["custom_settings"] = self._custom_settings
+
+        return result
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ChatSettings":
+        """Create settings from dictionary."""
+        settings = cls()
+        settings.markdown_enabled = data.get("markdown_enabled", False)
+        settings.replies_allowed = data.get("replies_allowed", True)
+        settings.llm = LLMSettings.from_dict(data.get("llm"))
+        # settings._custom_settings = data.get("custom_settings", {})
+        return settings
+
+    # def set_custom_setting(self, key: str, value: Any) -> None:
+    #     """Set a custom setting value."""
+    #     if value is None:
+    #         self._custom_settings.pop(key, None)
+    #     else:
+    #         self._custom_settings[key] = value
+
+    # def get_custom_setting(self, key: str, default: Any = None) -> Any:
+    #     """Get a custom setting value."""
+    #     return self._custom_settings.get(key, default)
+
+    def replace(self, **kwargs):
+        # Create a new object with the specified updated attributes
+        return ChatSettings(**{**self.__dict__, **kwargs})
+
 
 class ChatHistory:
     """Manages chat history."""
@@ -14,8 +102,8 @@ class ChatHistory:
         self.history_sort = history_sort
         if history_path:
             self.load_chats(history_path)
-        else:
-            self.ensure_default_chat()
+
+        self.ensure_default_chat()
 
     def ensure_default_chat(self):
         """Ensure at least one default chat exists."""
@@ -64,6 +152,7 @@ class ChatHistory:
         parent["children"][name] = {
             "type": "chat",
             "name": name,
+            "settings": ChatSettings().to_dict(),
             "messages": [{"role": "tool", "content": "Welcome to your new chat!"}],
         }
 
@@ -99,16 +188,41 @@ class ChatHistory:
 
         del parent["children"][name]
 
-    def move_node(self, source_path, target_path):
-        """Move a node to a new location"""
+    def move_node(self, source_path, target_path, position=None):
+        """Move a node to a new location with optional position.
+
+        Args:
+            source_path: Path of node to move
+            target_path: Destination path
+            position: Optional index position within target group
+        """
         source_parent_path, source_name = self._get_parent_path(source_path)
         source_parent = self._get_node_by_path(source_parent_path)
         target_parent = self._get_node_by_path(target_path)
 
+        # Moving within same parent - reorder children
+        if source_parent is target_parent:
+            if position is not None:
+                # Get ordered list of children
+                children = list(source_parent["children"].items())
+
+                # Find source item
+                source_idx = next(
+                    i for i, (name, _) in enumerate(children) if name == source_name
+                )
+
+                # Remove and reinsert at new position
+                item = children.pop(source_idx)
+                children.insert(position, item)
+
+                # Update parent's children dict with new order
+                source_parent["children"] = dict(children)
+                return
+
+        # Regular move between different parents
         if source_name in target_parent["children"]:
             raise ValueError(f"Item {source_name} already exists in target location")
 
-        # Move the node
         node = source_parent["children"].pop(source_name)
         target_parent["children"][source_name] = node
 
@@ -118,8 +232,37 @@ class ChatHistory:
                 target_path + [source_name] + self.active_path[len(source_path) :]
             )
 
-    def get_chat_messages(self, path):
+    def get_chat_settings(self, path=None) -> ChatSettings:
+        """Get settings for specified chat."""
+        if path is None:
+            path = self.active_path
+
+        node = self._get_node_by_path(path)
+        if node["type"] != "chat":
+            raise ValueError("Not a chat node")
+
+        # Create settings if they don't exist (backward compatibility)
+        if "settings" not in node:
+            node["settings"] = ChatSettings().to_dict()
+
+        return ChatSettings.from_dict(node["settings"])
+
+    def set_chat_settings(self, settings: ChatSettings, path=None) -> None:
+        """Set settings for specified chat."""
+        if path is None:
+            path = self.active_path
+
+        node = self._get_node_by_path(path)
+        if node["type"] != "chat":
+            raise ValueError("Not a chat node")
+
+        node["settings"] = settings.to_dict()
+
+    def get_chat_messages(self, path=None):
         """Get messages for chat at specified path"""
+        if path is None:
+            path = self.active_path
+
         node = self._get_node_by_path(path)
         if node["type"] != "chat":
             raise ValueError("Not a chat node")
@@ -215,6 +358,8 @@ class ChatHistory:
             try:
                 chat_path = self.create_chat(chat_name, current_path)
                 node = self._get_node_by_path(chat_path)
+                if "settings" in chat_data:
+                    node["settings"] = chat_data["settings"]
                 node["messages"] = chat_data["messages"]
             except ValueError:
                 continue  # Skip if chat already exists
@@ -237,6 +382,7 @@ class ChatHistory:
             if node["type"] == "chat":
                 # For chat nodes, store messages and group path
                 result[node["name"]] = {
+                    "settings": node["settings"],
                     "messages": node["messages"],
                     "group": "/" + "/".join(current_path) if current_path else "/",
                 }

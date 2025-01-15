@@ -47,6 +47,7 @@ class LLM(BaseModel):
 
         self.model = Client()
 
+        self.model_id_dyn = None
         self.response_statistic = None
 
     def set_system_prompt(self, prompt: str):
@@ -70,6 +71,41 @@ class LLM(BaseModel):
             # Add a new system message if none exists
             self.messages.insert(0, {"role": "system", "content": prompt})
 
+    def set_options(
+        self,
+        model_id=None,
+        temperature=None,
+        num_ctx=None,
+        num_predict=None,
+        system_prompt=None,
+    ):
+        """Set model options, manage self.options lifecycle, and update system prompt."""
+        self.model_id_dyn = model_id
+
+        # Create a dictionary for parameters to evaluate their necessity
+        options_dict = {
+            "temperature": temperature,
+            "num_ctx": num_ctx,
+            "num_predict": num_predict,
+        }
+
+        # Determine if we need to set options
+        has_non_none_options = any(value is not None for value in options_dict.values())
+        if has_non_none_options:
+            self.options = Options(
+                temperature=temperature,
+                num_ctx=num_ctx,
+                num_predict=num_predict,
+            )
+        else:
+            self.options = None
+
+        # Update the system prompt if different from the current one
+        if system_prompt is not None and system_prompt != self.system_prompt:
+            self.set_system_prompt(system_prompt)
+
+        print_system_message(f"LLM Options are set to: {self.options}")
+
     def load_history(self, history: List[Dict[str, str]]):
         """Load conversation history into the LLM class."""
         # Ensure the system prompt is preserved if present
@@ -84,7 +120,8 @@ class LLM(BaseModel):
         self.set_system_prompt(self.system_prompt)
 
         print_system_message(
-            f"Set LLM messages from history ({len(self.messages)})", log_level=logging.INFO
+            f"Set LLM messages from history ({len(self.messages)})",
+            log_level=logging.INFO,
         )
 
     def exists(self) -> bool:
@@ -155,7 +192,7 @@ class LLM(BaseModel):
         generated_content = ""
 
         stream = self.model.chat(
-            model=self.model_id,
+            model=self.model_id_dyn if self.model_id_dyn is not None else self.model_id,
             messages=self.messages,
             stream=True,
             options=self.options,

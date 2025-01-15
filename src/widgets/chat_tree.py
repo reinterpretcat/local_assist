@@ -271,55 +271,63 @@ class ChatTree:
 
     def on_drag_release(self, event):
         """End drag operation"""
-        if self._drag_data["item"]:
-            region = self.tree.identify_region(event.x, event.y)
-            target = self.tree.identify_row(event.y)
+        if not self._drag_data["item"]:
+            return
 
-            source_item = self._drag_data["item"]
-            source_path = self.get_item_path(source_item)
+        region = self.tree.identify_region(event.x, event.y)
+        target = self.tree.identify_row(event.y)
 
-            # Don't allow drop if target is source or its descendant
-            if target:
-                current = target
-                while current:
-                    if current == source_item:
-                        self._drag_data["item"] = None
-                        return
-                    current = self.tree.parent(current)
+        source_item = self._drag_data["item"]
+        source_path = self.get_item_path(source_item)
 
-            # Handle drop on empty area or between items
+        # Don't allow drop on self or descendants
+        if target:
+            current = target
+            while current:
+                if current == source_item:
+                    self._drag_data["item"] = None
+                    return
+                current = self.tree.parent(current)
+
+        try:
             if region == "nothing" or not target:
-                # Move to root level
-                try:
-                    self.chat_history.move_node(source_path, [])  # Empty path for root
-                    self.tree.move(
-                        source_item, "", "end"
-                    )  # Empty string for root in tree
-                    self.tree.selection_set(source_item)
-                except ValueError as e:
-                    messagebox.showerror("Error", str(e))
+                # Move to root
+                self.chat_history.move_node(source_path, [])
+                self.tree.move(source_item, "", "end")
+
             else:
-                # Handle drop on or between items
                 target_path = self.get_item_path(target)
                 target_tags = self.tree.item(target)["tags"]
 
-                # If target is not a group, use its parent as target
+                # Get target parent and position
                 if "group" not in target_tags:
-                    target = self.tree.parent(target)
-                    target_path = self.get_item_path(target) if target else []
+                    target_parent = self.tree.parent(target)
+                    target_parent_path = (
+                        self.get_item_path(target_parent) if target_parent else []
+                    )
 
-                try:
-                    # Move the item in the history manager
-                    self.chat_history.move_node(source_path, target_path)
+                    # Calculate position within parent
+                    siblings = self.tree.get_children(target_parent)
+                    position = siblings.index(target)
 
-                    # Move the item in the tree
-                    target_id = target if target else ""
-                    self.tree.move(source_item, target_id, "end")
-                    self.tree.selection_set(source_item)
-                except ValueError as e:
-                    messagebox.showerror("Error", str(e))
+                else:
+                    target_parent = target
+                    target_parent_path = target_path
+                    position = 0  # Insert at beginning of group
 
-            # Reset drag data
+                # Move in history
+                self.chat_history.move_node(source_path, target_parent_path, position)
+
+                # Move in tree
+                target_parent_id = target_parent if target_parent else ""
+                self.tree.move(source_item, target_parent_id, position)
+
+            self.tree.selection_set(source_item)
+
+        except ValueError as e:
+            messagebox.showerror("Error", str(e))
+
+        finally:
             self._drag_data["item"] = None
             self._drag_data["x"] = 0
             self._drag_data["y"] = 0

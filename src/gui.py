@@ -117,12 +117,11 @@ class AIChatUI:
             on_save_chats_to_file=self.save_chats_to_file,
             on_load_chats_from_file=self.load_chats_from_file,
             on_llm_settings=lambda: open_llm_settings_dialog(
-                self.root,
-                self.theme,
-                self.llm_model,
-                on_complete=lambda: self.update_status_message(
-                    message="LLM settings changed."
-                ),
+                root=self.root,
+                theme=self.theme,
+                llm_model=self.llm_model,
+                llm_settings=self.chat_history.get_chat_settings().llm,
+                on_complete=self.handle_llm_settings,
             ),
             on_load_theme=self.load_theme,
             on_toggle_rag_panel=self.rag_panel.toggle if self.rag_model else None,
@@ -133,8 +132,7 @@ class AIChatUI:
         self.main_paned_window.add(self.chat_display_frame)
 
         self.chat_display = ChatDisplay(
-            parent=self.chat_display_frame,
-            markdown_enabled=False,
+            parent=self.chat_display_frame, chat_history=self.chat_history
         )
 
         # Add toolbar after chat display but before input frame
@@ -162,7 +160,6 @@ class AIChatUI:
         # Status bar at bottom of main container
         self.chat_statusbar = ChatStatusBar(self.main_container)
         self.chat_statusbar.pack(side=tk.BOTTOM, fill=tk.X)
-        self.chat_statusbar.update_model_info(self.llm_model.model_id)
 
         self.root.bind("<Escape>", self.cancel_ai_response)
 
@@ -241,6 +238,9 @@ class AIChatUI:
 
     def trigger_ai_response(self, message):
         """Handle user message and initiate AI reply without changing chat display and history."""
+        if not self.chat_history.get_chat_settings().replies_allowed:
+            self.update_status_message(message="AI reply is disabled.")
+            return
 
         # Disable UI while AI response is generating
         self.disable_ui()
@@ -302,6 +302,7 @@ class AIChatUI:
     def cancel_ai_response(self, event=None):
         """Cancel the ongoing AI response generation."""
         self.cancel_response = True  # Set the flag to stop token generation
+        self.chat_input.clear_input()
         self.enable_ui()  # Re-enable inputs
 
     def finish_ai_response(self):
@@ -371,7 +372,7 @@ class AIChatUI:
         self.chat_history.append_message_partial(role, token, is_first_token)
 
     def handle_chat_edit(self, old_content, on_toolbar_edit: Callable):
-        self.chat_input.set_text(old_content)
+        self.chat_input.set_edit_text(old_content)
 
         def on_input_edit(new_content):
             if on_toolbar_edit(new_content):
@@ -383,10 +384,30 @@ class AIChatUI:
     def handle_chat_select(self):
         """Update chat display from history manager"""
         messages = self.chat_history.get_active_chat_messages()
-        self.chat_statusbar.update_chat_info(self.chat_history.active_path[-1])
-        self.update_statistics()
+        self.refresh_llm_settings()
         self.chat_display.update(messages)
         self.llm_model.load_history(messages)
+
+    def handle_llm_settings(self, llm_settings):
+        """Handles LLM settings change for selected chat."""
+        self.chat_history.set_chat_settings(
+            self.chat_history.get_chat_settings().replace(llm=llm_settings)
+        )
+        self.update_status_message(message="LLM settings for the chat are changed.")
+        self.refresh_llm_settings()
+
+    def refresh_llm_settings(self):
+        """Resets LLM options for active chat."""
+        self.update_status_bar()
+
+        llm_settings = self.chat_history.get_chat_settings().llm
+        self.llm_model.set_options(
+            model_id=llm_settings.model_id,
+            temperature=llm_settings.temperature,
+            num_ctx=llm_settings.num_ctx,
+            num_predict=llm_settings.num_predict,
+            system_prompt=llm_settings.system_prompt,
+        )
 
     def append_system_message(self, message):
         self.chat_display.append_message(RoleNames.TOOL, message)
@@ -482,6 +503,21 @@ class AIChatUI:
     def update_status_message(self, message, duration=3000):
         """Shows message in chat status bar for duration specified."""
         self.chat_statusbar.update_system_msg(message=message, duration=duration)
+
+    def update_status_bar(self):
+        """Updates information on status bar."""
+        self.chat_statusbar.update_chat_info(self.chat_history.active_path[-1])
+
+        chat_settings = self.chat_history.get_chat_settings()
+        # update model info
+        if chat_settings.llm.model_id:
+            self.chat_statusbar.update_model_info(chat_settings.llm.model_id)
+        else:
+            self.chat_statusbar.update_model_info(self.llm_model.model_id)
+
+        self.chat_statusbar.update_state_info(self.chat_history.get_chat_settings())
+
+        self.update_statistics()
 
     def on_rag_chat_start(self, messages):
         """Handle the start of a RAG chat with initial messages"""

@@ -32,6 +32,7 @@ dark_theme = {
     "tree_select_bg": "#4c566a",
     "tree_select_fg": "#ffffff",
     "menu_bg": "#353a45",
+    "popup_bg": "#353a45",
     "user": {"color_prefix": "#a3be8c", "bg": "#2f343f", "border": "#3b4048"},
     "assistant": {"color_prefix": "#81a1c1", "bg": "#2f343f", "border": "#3b4048"},
     "tool": {"color_prefix": "#e06c75", "bg": "#2f343f", "border": "#3b4048"},

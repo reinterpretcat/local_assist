@@ -127,10 +127,11 @@ class ChatInput:
         self.user_input.mark_set(tk.INSERT, tk.END)
         return "break"  # Prevents default behavior
 
-    def set_text(self, new_text):
+    def set_edit_text(self, new_text):
         """Sets text to user input."""
         self.user_input.delete("1.0", tk.END)
         self.user_input.insert(tk.END, new_text)
+        self.send_button.config(text="Edit")
 
     def handle_return_key(self, event):
         """Handle Return key press - submit if alone, newline if with Shift."""
@@ -192,6 +193,10 @@ class ChatInput:
             state=tk.NORMAL if self.is_record_enabled else tk.DISABLED
         )
         self.send_button.config(text="Send", command=lambda: self._consume_input())
+
+    def clear_input(self):
+        """Clears input field."""
+        self.user_input.delete("1.0", tk.END)
 
     def apply_theme(self, theme):
         button_config = get_button_config(theme)
