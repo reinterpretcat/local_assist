@@ -13,7 +13,7 @@ class ChatInput:
         on_user_input: Callable,
         on_record_voice: Optional[Callable],
         on_cancel_response: Callable,
-        min_height: int = 1,
+        min_height: int = 2,
         max_height: int = 8,
     ):
 
@@ -37,7 +37,7 @@ class ChatInput:
             relief=tk.FLAT,
             undo=True,
             bd=5,
-            height=1,  # Start with single line
+            height=self.min_height,  # Start with single line
             wrap=tk.WORD,  # Enable word wrapping
             width=40,  # Set initial width in characters
         )
