@@ -2,7 +2,8 @@
 
 An experimental AI Chat client built with Python/Tkinter for experimentation with local hosted LLMs (ollama). This project represents a "learn by doing" approach where various LLMs (including the ones consumed through the chat client itself) helped in the development process.
 
-![image](https://github.com/user-attachments/assets/3cfd0db5-2e57-4fdc-a691-577589996b49)
+![image](https://github.com/user-attachments/assets/2cd6c5ea-80a1-42c1-a624-9ca05df81910)
+
 
 ## Project Philosophy
 
@@ -12,16 +13,19 @@ This is an experimental project focusing on functionality over code architecture
 - Code was generated with help of various LLMs
 - The application was partially used to improve itself - it generated some of its own code!
 - Prioritizes rapid experimentation over architectural patterns (no strict MVC/MVVM)
-- Primary use case: Language learning through AI conversation (with German TTS/STT configs)
+- My primary use cases:
+  - Language learning through AI conversation (e.g. with German TTS/STT configs)
+  - Code assistant
+  - learning better AI Engineering: experimental playground for understanding capabilities of local hosted LLM on consumer hardware
 
 ## Key Features
 
 - Integration with Ollama for local LLM hosting
-- Chat history saving and loading
+- Chat history: saving and loading
 - Text-to-Speech (TTS) for AI responses
 - Speech-to-Text (STT) for voice input
 - A very naive RAG (Retrieval-Augmented Generation) support for chatting about your documents
-- Customizable system prompts
+- Customizable system prompts and LLM settings (per chat)
 - Custom themes support
 - Basic markdown support
 
