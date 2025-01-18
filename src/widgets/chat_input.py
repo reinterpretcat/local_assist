@@ -1,5 +1,6 @@
 import tkinter as tk
-from typing import Callable, Optional, Dict
+from tkinter import filedialog
+from typing import Callable, Optional
 from ..tools import get_button_config, get_list_style
 
 
@@ -76,6 +77,16 @@ class ChatInput:
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
 
+        self.image_button = tk.Button(
+            self.input_frame,
+            text="📷 Image",
+            command=self.handle_image_selection,
+            font=("Arial", 12),
+        )
+        self.image_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
+
+        self.selected_image: Optional[str] = None
+
     def handle_modify(self, event=None):
         """Dynamically adjust text widget height after a small delay."""
         if self.user_input.edit_modified():
@@ -141,13 +152,6 @@ class ChatInput:
             return "break"  # Prevent default newline
         return None  # Allow default newline behavior with Shift
 
-    def _consume_input(self):
-        user_message = self.user_input.get("1.0", "end-1c").strip()
-        self.user_input.delete("1.0", tk.END)
-
-        if user_message:
-            self.on_user_input(user_message)
-
     def insert_newline(self, event=None):
         """Insert newline on Shift+Return"""
         self.user_input.insert("insert", "\n")
@@ -177,6 +181,25 @@ class ChatInput:
             self.record_button.config(text="🎙️ Record")
 
         self.on_record_voice()
+
+    def handle_image_selection(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp")]
+        )
+        if file_path:
+            self.selected_image = file_path
+            self._consume_input(with_image=True)
+
+    def _consume_input(self, with_image=False):
+        user_message = self.user_input.get("1.0", "end-1c").strip()
+        self.user_input.delete("1.0", tk.END)
+
+        if user_message or with_image:
+            if with_image:
+                self.on_user_input(user_message, image_path=self.selected_image)
+                self.selected_image = None
+            else:
+                self.on_user_input(user_message)
 
     def disable(self):
         """Disable user input."""

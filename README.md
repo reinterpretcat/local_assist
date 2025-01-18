@@ -44,6 +44,9 @@ ollama pull qwen2.5-coder:7b
 
 # Language learning models (German)
 ollama pull cyberwald/llama-3.1-sauerkrautlm-8b-instruct:q8_0
+
+# Multi-modal (to work with images)
+ollama run llava-phi3
 ```
 
 3. Install Python dependencies:

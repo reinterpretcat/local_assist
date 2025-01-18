@@ -211,7 +211,7 @@ class AIChatUI:
 
         return window_width, window_height
 
-    def handle_user_input(self, user_message):
+    def handle_user_input(self, user_message, image_path=None):
         """Handle user input from input."""
 
         if self.on_input_edit is not None:
@@ -224,19 +224,19 @@ class AIChatUI:
             handle_command(self, user_message)
             return
 
-        self.handle_user_message(user_message)
+        self.handle_user_message(user_message, image_path)
 
-    def handle_user_message(self, message):
+    def handle_user_message(self, message, image_path=None):
         """Handle user message and initiate AI reply."""
 
-        self.chat_display.append_message(RoleNames.USER, message)
-        self.chat_history.append_message(RoleNames.USER, message)
+        self.chat_display.append_message(RoleNames.USER, message, image_path)
+        self.chat_history.append_message(RoleNames.USER, message, image_path)
 
         self.update_statistics()
 
-        self.trigger_ai_response(message)
+        self.trigger_ai_response(message, image_path)
 
-    def trigger_ai_response(self, message):
+    def trigger_ai_response(self, message, image_path: None):
         """Handle user message and initiate AI reply without changing chat display and history."""
         if not self.chat_history.get_chat_settings().replies_allowed:
             self.update_status_message(message="AI reply is disabled.")
@@ -247,7 +247,7 @@ class AIChatUI:
         self.cancel_response = False
 
         # Start token-by-token AI response
-        response_generator = self.generate_ai_response(message)
+        response_generator = self.generate_ai_response(message, image_path)
         self.root.after(100, self.display_ai_response, response_generator)
 
     def display_ai_response(self, generator):
@@ -267,14 +267,14 @@ class AIChatUI:
         except StopIteration:
             self.check_tts_completion()
 
-    def generate_ai_response(self, user_message):
+    def generate_ai_response(self, user_message, image_path: None):
         """Generate token-by-token AI response."""
 
         buffer = []
         min_chunk_size = 10
         splitters = [".", ",", "?", ":", ";"]
 
-        for token in self.llm_model.forward(user_message):
+        for token in self.llm_model.forward(user_message, image_path):
             buffer.append(token)
             if token == "\n" or (len(buffer) >= min_chunk_size and token in splitters):
                 chunk = "".join(buffer).strip()

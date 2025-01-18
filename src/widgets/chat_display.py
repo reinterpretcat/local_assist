@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
 from typing import Dict
+from PIL import Image, ImageTk
 from ..models import RoleNames, RoleTags
 from ..tools import (
     ChatHistory,
@@ -13,6 +14,7 @@ from ..tools import (
 class ChatDisplay:
     def __init__(self, parent, chat_history: ChatHistory):
         self.chat_history = chat_history
+        self.images = []  # Keep references to prevent garbage collection
 
         self.display = ScrolledText(
             parent,
@@ -42,12 +44,19 @@ class ChatDisplay:
 
         setup_markdown_tags(chat_display=self.display, theme=theme)
 
-    def append_message(self, role, content):
+    def append_message(self, role, content, image_path=None):
         self.display.config(state=tk.NORMAL)
         if not self.display.get("end-2c", "end-1c").endswith("\n"):
             self.display.insert(tk.END, "\n")
         self.display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
-        self._append_markdown(content)
+
+        if image_path:
+            self.display.insert(tk.END, "\n")
+            self._append_image(image_path)
+
+        if content:
+            self._append_markdown(content)
+
         self.display.config(state=tk.DISABLED)
         self.display.see(tk.END)
 
@@ -86,6 +95,26 @@ class ChatDisplay:
 
                 self.display.config(state=tk.DISABLED)
 
+    def _append_image(self, image_path):
+        try:
+            image = Image.open(image_path)
+            # Scale image if too large
+            max_width = 400
+            if image.width > max_width:
+                ratio = max_width / image.width
+                new_size = (max_width, int(image.height * ratio))
+                image = image.resize(new_size, Image.Resampling.LANCZOS)
+
+            photo = ImageTk.PhotoImage(image)
+            self.images.append(photo)  # Prevent garbage collection
+
+            self.display.image_create(tk.END, image=photo)
+            self.display.insert(tk.END, "\n")
+        except Exception as e:
+            role = RoleNames.TOOL
+            self.display.insert(tk.END, f"{role}: ", RoleNames.to_tag(role))
+            self.display.insert(tk.END, f"Error loading image: {str(e)}\n")
+
     def _append_markdown(self, text):
         if self.chat_history.get_chat_settings().markdown_enabled:
             render_markdown(self.display, text)
@@ -96,12 +125,14 @@ class ChatDisplay:
         self.display.config(state=tk.NORMAL)
         self.display.delete(1.0, tk.END)
         self.display.config(state=tk.DISABLED)
+        self.images.clear()
 
-    def update(self, messages):
+    def update(self, messages: Dict):
         self.clear()
         for message in messages:
             if message["role"] != "system":
-                self.append_message(message["role"], message["content"])
+                image_path = message.get("image_path", None)
+                self.append_message(message["role"], message["content"], image_path)
 
     def apply_theme(self, theme: Dict):
         self._configure_tags(theme)

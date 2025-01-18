@@ -176,7 +176,7 @@ class LLM(BaseModel):
         # Join and return status string
         self.response_statistic = "|".join(status_parts)
 
-    def forward(self, message: str) -> Iterator[str]:
+    def forward(self, message: str, image_path: Optional[str] = None) -> Iterator[str]:
         """
         Generate text from user input using the specified LLM.
 
@@ -186,7 +186,13 @@ class LLM(BaseModel):
         Returns:
             An iterator that yields the generated text in chunks.
         """
-        self.messages.append({"role": "user", "content": message})
+
+        message = {"role": "user", "content": message}
+        if image_path:
+            # TODO add more images support
+            message["images"] = [image_path]
+
+        self.messages.append(message)
 
         assistant_role = None
         generated_content = ""

@@ -8,6 +8,7 @@ pyvenv.cfg
 
 history*.json
 example*.txt
+example*.jpg
 
 *.wav
 

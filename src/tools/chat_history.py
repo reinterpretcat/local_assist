@@ -286,11 +286,13 @@ class ChatHistory:
 
         return nodes
 
-    def append_message(self, role, content):
+    def append_message(self, role, content, image_path=None):
         """Append message to active chat"""
         node = self._ensure_active_chat_node()
-
-        node["messages"].append({"role": role, "content": content})
+        message = {"role": role, "content": content}
+        if image_path:
+            message["image_path"] = image_path
+        node["messages"].append(message)
 
     def append_message_partial(self, role, token, is_first_token):
         """Append message token to active chat"""
