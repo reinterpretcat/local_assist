@@ -211,6 +211,8 @@ class ChatInput:
             self.user_input.delete("1.0", tk.END)
             self.user_input.insert("1.0", f"{current_text}{self.image_placeholder}")
 
+        self.user_input.focus()
+
     def _consume_input(self):
         user_message = self.user_input.get("1.0", "end-1c").strip()
         image_to_send = None
