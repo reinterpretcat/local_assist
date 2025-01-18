@@ -1,3 +1,4 @@
+import os
 import tkinter as tk
 from tkinter import filedialog
 from typing import Callable, Optional
@@ -88,6 +89,7 @@ class ChatInput:
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
 
         self.selected_image: Optional[str] = None
+        self.image_placeholder = None  # Track the exact placeholder text
 
     def handle_modify(self, event=None):
         """Dynamically adjust text widget height after a small delay."""
@@ -189,19 +191,33 @@ class ChatInput:
             filetypes=[("Image files", "*.png *.jpg *.jpeg *.gif *.bmp")]
         )
         if file_path:
-            self.selected_image = file_path
-            self._consume_input(with_image=True)
+            current_text = self.user_input.get("1.0", "end-1c")
+            if self.image_placeholder:
+                current_text = current_text.replace(self.image_placeholder, "").strip()
 
-    def _consume_input(self, with_image=False):
+            if current_text and not current_text.endswith("\n"):
+                current_text += "\n"
+
+            self.selected_image = file_path
+            self.image_placeholder = f"[Image: {os.path.basename(file_path)}]"
+
+            self.user_input.delete("1.0", tk.END)
+            self.user_input.insert("1.0", f"{current_text}{self.image_placeholder}")
+
+    def _consume_input(self):
         user_message = self.user_input.get("1.0", "end-1c").strip()
+        image_to_send = None
+
+        if self.image_placeholder and self.image_placeholder in user_message:
+            image_to_send = self.selected_image
+            user_message = user_message.replace(self.image_placeholder, "").strip()
+
+        self.selected_image = None
+        self.image_placeholder = None
         self.user_input.delete("1.0", tk.END)
 
-        if user_message or with_image:
-            if with_image:
-                self.on_user_input(user_message, image_path=self.selected_image)
-                self.selected_image = None
-            else:
-                self.on_user_input(user_message)
+        if user_message or image_to_send:
+            self.on_user_input(user_message, image_path=image_to_send)
 
     def disable(self):
         """Disable user input."""
