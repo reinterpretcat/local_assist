@@ -58,9 +58,19 @@ class ChatInput:
 
         self.is_record_enabled = True if on_record_voice is not None else False
 
+        self.image_button = tk.Button(
+            self.input_frame,
+            text="📷",
+            command=self.handle_image_selection,
+            font=("Arial", 10),
+            width=2,
+            height=1,
+        )
+        self.image_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
+
         self.record_button = tk.Button(
             self.input_frame,
-            text="🎙️ Record",
+            text="🎙️ Rec",
             command=lambda: (
                 self.handle_record_voice() if self.is_record_enabled else None
             ),
@@ -76,14 +86,6 @@ class ChatInput:
             font=("Arial", 12),
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
-
-        self.image_button = tk.Button(
-            self.input_frame,
-            text="📷 Image",
-            command=self.handle_image_selection,
-            font=("Arial", 12),
-        )
-        self.image_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
 
         self.selected_image: Optional[str] = None
 
@@ -226,6 +228,7 @@ class ChatInput:
         for button in [
             self.send_button,
             self.record_button,
+            self.image_button,
         ]:
             button.configure(**button_config)
 
