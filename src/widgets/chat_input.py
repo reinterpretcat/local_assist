@@ -142,10 +142,17 @@ class ChatInput:
         self.user_input.mark_set(tk.INSERT, tk.END)
         return "break"  # Prevents default behavior
 
-    def set_edit_text(self, new_text):
+    def set_edit_text(self, new_text, new_image):
         """Sets text to user input."""
         self.user_input.delete("1.0", tk.END)
-        self.user_input.insert(tk.END, new_text)
+
+        if new_image:
+            self.image_placeholder = f"[Image: {os.path.basename(new_image)}]"
+            self.selected_image = new_image
+            self.user_input.insert(tk.END, f"{new_text}{self.image_placeholder}")
+        else:
+            self.user_input.insert(tk.END, new_text)
+
         self.send_button.config(text="Edit")
 
     def handle_return_key(self, event):

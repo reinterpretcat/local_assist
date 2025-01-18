@@ -105,28 +105,38 @@ class ChatToolBar:
         for i in range(len(messages) - 1, -1, -1):
             if messages[i]["role"] == RoleNames.USER:
                 last_user_message_index = i
-                # old_content = messages[i]["content"]
                 old_message = messages[i]
 
-                def on_edit(new_content):
-                    if (
+                def on_edit(new_content, new_image):
+                    content_modified = (
                         new_content is not None
                         and new_content.strip() != old_message["content"]
-                    ):
-                        old_message["content"] = new_content.strip()
-                    else:
-                        # No changes made, exit without removing the assistant message
-                        return False
-                    messages = self.chat_history.get_active_chat_messages()
-                    # Step 2: Remove last message for role_to_remove if user message was modified
-                    if last_user_message_index is not None:
-                        for i in range(len(messages) - 1, last_user_message_index, -1):
-                            if messages[i]["role"] == RoleNames.ASSISTANT:
-                                messages.pop(i)
-                                break
-                    return True
+                    )
+                    image_modified = (
+                        new_image is not None
+                        and new_image != old_message.get("image_path")
+                    )
 
-                self.on_chat_edit(old_message["content"], on_edit)
+                    if content_modified or image_modified:
+                        if content_modified:
+                            old_message["content"] = new_content.strip()
+                        if image_modified:
+                            old_message["image_path"] = new_image
+
+                        # Remove the last assistant message if user message was modified
+                        for j in range(len(messages) - 1, last_user_message_index, -1):
+                            if messages[j]["role"] == RoleNames.ASSISTANT:
+                                messages.pop(j)
+                                break
+
+                        return True  # Indicate that changes were made
+                    return False  # No changes were made
+
+                self.on_chat_edit(
+                    old_message["content"],
+                    old_message.get("image_path", None),
+                    on_edit,
+                )
                 return
 
     def remove_last_message(self):

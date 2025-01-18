@@ -215,7 +215,7 @@ class AIChatUI:
         """Handle user input from input."""
 
         if self.on_input_edit is not None:
-            self.on_input_edit(user_message)
+            self.on_input_edit(user_message, image_path)
             self.on_input_edit = None
             return
 
@@ -236,7 +236,7 @@ class AIChatUI:
 
         self.trigger_ai_response(message, image_path)
 
-    def trigger_ai_response(self, message, image_path: None):
+    def trigger_ai_response(self, message, image_path=None):
         """Handle user message and initiate AI reply without changing chat display and history."""
         if not self.chat_history.get_chat_settings().replies_allowed:
             self.update_status_message(message="AI reply is disabled.")
@@ -371,13 +371,13 @@ class AIChatUI:
         self.chat_display.append_partial(role, token, is_first_token)
         self.chat_history.append_message_partial(role, token, is_first_token)
 
-    def handle_chat_edit(self, old_content, on_toolbar_edit: Callable):
-        self.chat_input.set_edit_text(old_content)
+    def handle_chat_edit(self, old_content, old_image, on_toolbar_edit: Callable):
+        self.chat_input.set_edit_text(old_content, old_image)
 
-        def on_input_edit(new_content):
-            if on_toolbar_edit(new_content):
+        def on_input_edit(new_content, new_image):
+            if on_toolbar_edit(new_content, new_image):
                 self.handle_chat_select()
-                self.trigger_ai_response(new_content)
+                self.trigger_ai_response(new_content, new_image)
 
         self.on_input_edit = on_input_edit
 
