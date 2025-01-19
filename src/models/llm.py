@@ -4,8 +4,17 @@ This module provides a class for interacting with a Language Model (LLM) using t
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Iterator, List, Optional
-from ollama import Client, ResponseError, Options, ListResponse, list
+from typing import Callable, Dict, Iterator, List, Optional
+from ollama import (
+    Client,
+    ResponseError,
+    Options,
+    ListResponse,
+    list,
+    ProcessResponse,
+    ps,
+)
+import threading
 
 from .common import BaseModel
 from ..utils import print_system_message
@@ -29,6 +38,13 @@ class ModelInfo:
     model: str
     size: ModelSize
     details: Optional[ModelDetails] = None
+
+
+@dataclass
+class ModelStatus:
+    name: str
+    size_vram: int
+    size: int
 
 
 class LLM(BaseModel):
@@ -70,6 +86,34 @@ class LLM(BaseModel):
 
         self.model_id_dyn = None
         self.response_statistic = None
+
+        # status update
+        self._stop_event = threading.Event()
+        self._current_status: Optional[ModelStatus] = None
+        self._monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
+        self._monitor_thread.start()
+
+    def _monitor_loop(self):
+        """Main monitoring loop"""
+        while not self._stop_event.is_set():
+            try:
+                response: ProcessResponse = ps()
+                if not response.models:
+                    self._current_status = None
+                    return
+
+                # Find current model or use first available
+                model = next(
+                    (m for m in response.models if m.model == self.model_id),
+                    response.models[0],
+                )
+
+                self._current_status = ModelStatus(
+                    name=model.model, size_vram=model.size_vram, size=model.size
+                )
+            except Exception:
+                self._current_status = None
+            self._stop_event.wait(5.0)  # Wait 5 seconds
 
     def set_system_prompt(self, prompt: str):
         """Update the system prompt and ensure it is reflected in messages."""
@@ -127,6 +171,10 @@ class LLM(BaseModel):
 
         print_system_message(f"LLM Options are set to: {self.options}")
 
+    def get_model_info(self) -> Optional[ModelStatus]:
+        """Returns last model status."""
+        return self._current_status
+
     def load_history(self, history: List[Dict[str, str]]):
         """Load conversation history into the LLM class."""
         # Ensure the system prompt is preserved if present
@@ -174,7 +222,7 @@ class LLM(BaseModel):
                         family=model.details.family,
                         parameter_size=model.details.parameter_size,
                         quantization_level=model.details.quantization_level,
-                    )
+                    ),
                 )
             )
 

@@ -13,7 +13,7 @@ class ChatStatusBar(tk.Frame):
         label_widths = {
             "chat_info": 10,
             "state_info": 10,
-            "model_info": 20,
+            "model_info": 30,
             "stats": 20,
             "sys_msg": 50,
         }
@@ -21,7 +21,7 @@ class ChatStatusBar(tk.Frame):
         column_weights = {
             "chat_info": 2,
             "state_info": 2,
-            "model_info": 5,
+            "model_info": 6,
             "stats": 3,
             "sys_msg": 6,
         }
@@ -37,7 +37,7 @@ class ChatStatusBar(tk.Frame):
         self.separator2 = tk.Label(self, text="│", padx=1)
         self.model_info = tk.Label(
             self,
-            text="Model Info",
+            text="--",
             width=label_widths["model_info"],
             anchor=tk.W,
             padx=5,
@@ -85,9 +85,9 @@ class ChatStatusBar(tk.Frame):
         """Update chat name display"""
         self.chat_info.config(text=f"  {chat_name}")
 
-    def update_model_info(self, model_name):
+    def update_model_info(self, model_info):
         """Updates model info"""
-        self.model_info.config(text=model_name)
+        self.model_info.config(text=model_info)
 
     def update_stats(self, messages):
         """Update chat statistics"""

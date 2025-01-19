@@ -509,11 +509,26 @@ class AIChatUI:
         self.chat_statusbar.update_chat_info(self.chat_history.active_path[-1])
 
         chat_settings = self.chat_history.get_chat_settings()
+
+        def get_model_info(model_id):
+            model_status = self.llm_model.get_model_info()
+            if model_status and model_id == model_status.name:
+                vram_ratio = int(
+                    round((model_status.size_vram / model_status.size) * 100)
+                )
+                cpu_ram = 100 - vram_ratio
+                return f"{model_id}  {cpu_ram}%/{vram_ratio}% (CPU/GPU)"
+            return model_id
+
         # update model info
         if chat_settings.llm.model_id:
-            self.chat_statusbar.update_model_info(chat_settings.llm.model_id)
+            self.chat_statusbar.update_model_info(
+                get_model_info(chat_settings.llm.model_id)
+            )
         else:
-            self.chat_statusbar.update_model_info(self.llm_model.model_id)
+            self.chat_statusbar.update_model_info(
+                get_model_info(self.llm_model.model_id)
+            )
 
         self.chat_statusbar.update_state_info(self.chat_history.get_chat_settings())
 
