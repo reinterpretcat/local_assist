@@ -3,11 +3,32 @@ This module provides a class for interacting with a Language Model (LLM) using t
 """
 
 import logging
+from dataclasses import dataclass
 from typing import Dict, Iterator, List, Optional
-from ollama import Client, ResponseError, Options
+from ollama import Client, ResponseError, Options, ListResponse, list
 
 from .common import BaseModel
 from ..utils import print_system_message
+
+
+@dataclass
+class ModelSize:
+    real: int  # Size in bytes
+
+
+@dataclass
+class ModelDetails:
+    format: str
+    family: str
+    parameter_size: str
+    quantization_level: str
+
+
+@dataclass
+class ModelInfo:
+    model: str
+    size: ModelSize
+    details: Optional[ModelDetails] = None
 
 
 class LLM(BaseModel):
@@ -138,6 +159,26 @@ class LLM(BaseModel):
             return True
         except ResponseError:
             return False
+
+    def get_available_models(self) -> List[ModelInfo]:
+        """Returns the list of available models."""
+        models_info = []
+        response: ListResponse = list()
+        for model in response.models:
+            models_info.append(
+                ModelInfo(
+                    model=model.model,
+                    size=ModelSize(real=model.size.real),
+                    details=ModelDetails(
+                        format=model.details.format,
+                        family=model.details.family,
+                        parameter_size=model.details.parameter_size,
+                        quantization_level=model.details.quantization_level,
+                    )
+                )
+            )
+
+        return models_info
 
     def _update_statistics(self, response):
         """Generate a compact status string for a chat response."""
