@@ -100,7 +100,7 @@ class LLM(BaseModel):
                 response: ProcessResponse = ps()
                 if not response.models:
                     self._current_status = None
-                    return
+                    continue
 
                 # Find current model or use first available
                 model = next(
@@ -113,7 +113,8 @@ class LLM(BaseModel):
                 )
             except Exception:
                 self._current_status = None
-            self._stop_event.wait(5.0)  # Wait 5 seconds
+            finally:
+                self._stop_event.wait(5.0)
 
     def set_system_prompt(self, prompt: str):
         """Update the system prompt and ensure it is reflected in messages."""
@@ -231,19 +232,22 @@ class LLM(BaseModel):
     def _update_statistics(self, response):
         """Generate a compact status string for a chat response."""
 
-        def format_duration(ns):
+        def format_duration(key):
             """Convert nanoseconds to human-readable format."""
-            ns = int(ns)
+            value = response.get(key, None)
+            if value is None:
+                return -1
+            ns = int(value)
             if ns >= 1e9:
                 return f"{ns / 1e9:.2f}s"
             elif ns >= 1e6:
                 return f"{ns / 1e6:.2f}ms"
             return None  # Ignore durations less than milliseconds
 
-        total_duration = format_duration(response["total_duration"])
-        load_duration = format_duration(response["load_duration"])
-        prompt_eval_duration = format_duration(response["prompt_eval_duration"])
-        eval_duration = format_duration(response["eval_duration"])
+        total_duration = format_duration("total_duration")
+        load_duration = format_duration("load_duration")
+        prompt_eval_duration = format_duration("prompt_eval_duration")
+        eval_duration = format_duration("eval_duration")
 
         # Optional: timestamp conversion for logging/debugging
         eval_count = response["eval_count"]

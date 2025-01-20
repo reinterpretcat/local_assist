@@ -11,17 +11,17 @@ class ChatStatusBar(tk.Frame):
 
         # Set label width to prevent shifting
         label_widths = {
-            "chat_info": 10,
+            "chat_info": 15,
             "state_info": 10,
-            "model_info": 30,
+            "model_info": 40,
             "stats": 20,
-            "sys_msg": 50,
+            "sys_msg": 30,
         }
 
         column_weights = {
-            "chat_info": 2,
+            "chat_info": 3,
             "state_info": 2,
-            "model_info": 6,
+            "model_info": 7,
             "stats": 3,
             "sys_msg": 6,
         }
@@ -40,9 +40,9 @@ class ChatStatusBar(tk.Frame):
             text="--",
             width=label_widths["model_info"],
             anchor=tk.W,
-            padx=5,
+            padx=1,
         )
-        self.separator3 = tk.Label(self, text="│", padx=2)
+        self.separator3 = tk.Label(self, text="│", padx=1)
         self.stats = tk.Label(
             self, text="", width=label_widths["stats"], anchor=tk.W, padx=5
         )

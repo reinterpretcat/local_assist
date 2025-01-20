@@ -43,6 +43,9 @@ def open_llm_settings_dialog(
         )
 
     current_model_id = get_llm_option_value(llm_model, llm_settings.model_id, "model")
+    if current_model_id is None:
+        current_model_id = llm_model.model_id
+
     current_temperature = get_llm_option_value(
         llm_model, llm_settings.temperature, "temperature"
     )

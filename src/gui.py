@@ -516,8 +516,7 @@ class AIChatUI:
                 vram_ratio = int(
                     round((model_status.size_vram / model_status.size) * 100)
                 )
-                cpu_ram = 100 - vram_ratio
-                return f"{model_id}  {cpu_ram}%/{vram_ratio}% (CPU/GPU)"
+                return f"{model_id}  {vram_ratio}% (GPU)"
             return model_id
 
         # update model info
