@@ -1,6 +1,9 @@
 import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox
 from typing import Dict
+from pygments import lex
+from pygments.lexers import PythonLexer
+from pygments.token import Token
 import subprocess
 from ..tools import configure_scrolled_text, get_button_config
 
@@ -33,6 +36,9 @@ class CodeEditorWindow(tk.Toplevel):
         )
         self.output_text.pack(side="top", fill="x", padx=5)
 
+        self.code_text.bind("<KeyRelease>", self.highlight_syntax)
+
+        self.highlight_syntax()
         self.apply_theme(theme)
 
     def run_code(self):
@@ -54,6 +60,47 @@ class CodeEditorWindow(tk.Toplevel):
         self.output_text.delete("1.0", tk.END)
         self.output_text.insert(tk.INSERT, output)
         self.output_text.config(state="disabled")
+
+    def highlight_syntax(self, event=None):
+        """Apply syntax highlighting to the code_text widget."""
+        code = self.code_text.get("1.0", tk.END)
+        self.code_text.mark_set("range_start", "1.0")
+
+        # Remove all previous syntax tags
+        self.code_text.tag_remove("keyword", "1.0", tk.END)
+        self.code_text.tag_remove("builtin", "1.0", tk.END)
+        self.code_text.tag_remove("string", "1.0", tk.END)
+        self.code_text.tag_remove("comment", "1.0", tk.END)
+
+        # Process code with Pygments
+        for token, content in lex(code, PythonLexer()):
+            self.code_text.mark_set("range_end", f"range_start + {len(content)}c")
+
+            if token in Token.Keyword:
+                self.code_text.tag_add("keyword", "range_start", "range_end")
+            elif token in Token.Name.Builtin:
+                self.code_text.tag_add("builtin", "range_start", "range_end")
+            elif token in Token.Literal.String:
+                self.code_text.tag_add("string", "range_start", "range_end")
+            elif token in Token.Comment:
+                self.code_text.tag_add("comment", "range_start", "range_end")
+
+            # Move the range start marker
+            self.code_text.mark_set("range_start", "range_end")
+
+        # Define the styles (colors and fonts) for each token type
+        self.code_text.tag_configure(
+            "keyword", foreground="#81a1c1", font=("Courier", 12, "bold")
+        )
+        self.code_text.tag_configure(
+            "builtin", foreground="darkorange", font=("Courier", 12)
+        )
+        self.code_text.tag_configure(
+            "string", foreground="green", font=("Courier", 12, "italic")
+        )
+        self.code_text.tag_configure(
+            "comment", foreground="gray", font=("Courier", 12, "italic")
+        )
 
     def apply_theme(self, theme: Dict):
         self.config(bg=theme["bg"], borderwidth=1, relief="solid")

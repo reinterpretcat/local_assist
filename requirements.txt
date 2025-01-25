@@ -9,6 +9,7 @@ PyAudio>=0.2.14
 pydantic-settings>=2.3.1
 PyPDF2>=3.0.1
 pygame>=2.5.2
+pygments>=2.18.0
 pynput>=1.7.7
 torch>=2.3.1
 torchaudio>=2.3.1
