@@ -91,13 +91,16 @@ class ChatSettings:
 class ChatHistory:
     """Manages chat history."""
 
-    def __init__(self, history_path=None, history_sort=False):
+    def __init__(
+        self, default_prompt: Optional[str], history_path=None, history_sort=False
+    ):
         self.root = {
             "type": "group",
             "name": "/",
             "children": {},  # {name: {type: group/chat, children/messages}}
         }
         self.active_path = None  # List of names forming path to active chat
+        self.default_prompt = default_prompt
 
         self.history_sort = history_sort
         if history_path:
@@ -149,10 +152,13 @@ class ChatHistory:
                 f"Item already exists at path: {'/'.join(parent_path or [])}/{name}"
             )
 
+        settings = ChatSettings()
+        settings.llm.system_prompt = self.default_prompt
+
         parent["children"][name] = {
             "type": "chat",
             "name": name,
-            "settings": ChatSettings().to_dict(),
+            "settings": settings.to_dict(),
             "messages": [{"role": "tool", "content": "Welcome to your new chat!"}],
         }
 

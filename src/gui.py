@@ -39,6 +39,7 @@ class AIChatUI:
 
         self.history_path = self.config.get("chat", {}).get("history_path", {})
         self.chat_history = ChatHistory(
+            default_prompt=config.get("llm", {}).get("system_prompt", None),
             history_path=self.history_path,
             history_sort=self.config.get("chat", {}).get("history_sort", False),
         )

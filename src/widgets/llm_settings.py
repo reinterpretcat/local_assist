@@ -185,7 +185,8 @@ def open_llm_settings_dialog(
         fg=theme["input_fg"],
         insertbackground=theme["input_fg"],
     )
-    prompt_text.insert(tk.END, current_prompt)
+    if current_prompt:
+        prompt_text.insert(tk.END, current_prompt)
     prompt_text.grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
 
     def save_settings():
@@ -226,8 +227,8 @@ def open_llm_settings_dialog(
         update_setting("num_predict", num_predict_entry.get(), llm_settings.num_predict)
 
         new_prompt = prompt_text.get(1.0, tk.END).strip()
-        if new_prompt and new_prompt != (llm_settings.system_prompt or ""):
-            llm_settings.system_prompt = new_prompt
+        if new_prompt != llm_settings.system_prompt:
+            llm_settings.system_prompt = new_prompt if new_prompt != "" else None
             updated = True
 
         if updated:

@@ -132,8 +132,11 @@ class LLM(BaseModel):
 
         if system_message_index is not None:
             # Update the existing system message
-            self.messages[system_message_index]["content"] = prompt
-        else:
+            if prompt is None:
+                self.messages.pop(system_message_index)
+            else:
+                self.messages[system_message_index]["content"] = prompt
+        elif prompt is not None:
             # Add a new system message if none exists
             self.messages.insert(0, {"role": "system", "content": prompt})
 
@@ -167,10 +170,12 @@ class LLM(BaseModel):
             self.options = None
 
         # Update the system prompt if different from the current one
-        if system_prompt is not None and system_prompt != self.system_prompt:
+        if system_prompt != self.system_prompt:
             self.set_system_prompt(system_prompt)
 
-        print_system_message(f"LLM Options are set to: {self.options}")
+        print_system_message(
+            f"LLM Options are set to: {self.options}, prompt: {system_prompt}"
+        )
 
     def get_model_info(self) -> Optional[ModelStatus]:
         """Returns last model status."""
