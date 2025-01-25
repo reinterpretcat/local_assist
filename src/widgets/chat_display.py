@@ -3,16 +3,13 @@ from tkinter.scrolledtext import ScrolledText
 from typing import Dict
 from PIL import Image, ImageTk
 from ..models import RoleNames, RoleTags
-from ..tools import (
-    ChatHistory,
-    render_markdown,
-    has_markdown_syntax,
-    setup_markdown_tags,
-)
+from ..tools import *
+from .code_editor import CodeEditorWindow
 
 
 class ChatDisplay:
     def __init__(self, parent, chat_history: ChatHistory):
+        self.parent = parent
         self.chat_history = chat_history
         self.images = []  # Keep references to prevent garbage collection
 
@@ -23,6 +20,13 @@ class ChatDisplay:
             font=("Arial", 12),
         )
         self.display.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        # Attach context menu
+        self.context_menu = tk.Menu(parent, tearoff=0)
+        self.context_menu.add_command(
+            label="    Edit and Run", command=self.edit_and_run_code
+        )
+        self.display.bind("<Button-3>", self.show_context_menu)
 
     def _configure_tags(self, theme):
         self.display.tag_configure(
@@ -134,25 +138,25 @@ class ChatDisplay:
                 image_path = message.get("image_path", None)
                 self.append_message(message["role"], message["content"], image_path)
 
-    def apply_theme(self, theme: Dict):
-        self._configure_tags(theme)
+    def show_context_menu(self, event):
+        self.context_menu.post(event.x_root, event.y_root)
 
-        # Configure chat display
-        self.display.configure(
-            bg=theme["chat_bg"],
-            fg=theme["chat_fg"],
-            font=("Arial", 12),
-            insertbackground=theme["chat_fg"],
-            selectbackground=theme["list_select_bg"],
-            selectforeground=theme["list_select_fg"],
-            highlightbackground=theme["chat_border"],
-            relief="solid",
-            borderwidth=1,
+    def edit_and_run_code(self):
+        selected_text = self.display.get(tk.SEL_FIRST, tk.SEL_LAST)
+        editor_window = CodeEditorWindow(
+            parent=self.parent, theme=self.theme, code=selected_text
         )
-        self.display.vbar.configure(
-            bg=theme["scrollbar_bg"],
-            activebackground=theme["scrollbar_hover"],
-            troughcolor=theme["scrollbar_bg"],
-            width=12,
-            elementborderwidth=0,
+        editor_window.transient(self.parent)
+        editor_window.grab_set()
+        editor_window.mainloop()
+
+    def apply_theme(self, theme: Dict):
+        self.theme = theme
+        self._configure_tags(theme)
+        configure_scrolled_text(self.display, theme)
+        self.context_menu.configure(
+            bg=theme["menu_bg"],
+            fg=theme["fg"],
+            activebackground=theme["button_bg"],
+            activeforeground=theme["button_fg"],
         )

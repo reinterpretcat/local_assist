@@ -1,4 +1,5 @@
 from tkinter import ttk
+from tkinter.scrolledtext import ScrolledText
 from typing import Dict
 
 dark_theme = {
@@ -72,3 +73,24 @@ def get_list_style(theme: Dict) -> ttk.Style:
     )
     style.map("Treeview.Heading", background=[("active", theme["button_bg_hover"])])
     return style
+
+
+def configure_scrolled_text(scrolled_text: ScrolledText, theme: Dict):
+    scrolled_text.configure(
+        bg=theme["chat_bg"],
+        fg=theme["chat_fg"],
+        font=("Arial", 12),
+        insertbackground=theme["chat_fg"],
+        selectbackground=theme["list_select_bg"],
+        selectforeground=theme["list_select_fg"],
+        highlightbackground=theme["chat_border"],
+        relief="solid",
+        borderwidth=1,
+    )
+    scrolled_text.vbar.configure(
+        bg=theme["scrollbar_bg"],
+        activebackground=theme["scrollbar_hover"],
+        troughcolor=theme["scrollbar_bg"],
+        width=12,
+        elementborderwidth=0,
+    )
