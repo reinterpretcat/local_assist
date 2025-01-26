@@ -163,6 +163,7 @@ class AIChatUI:
         self.chat_statusbar.pack(side=tk.BOTTOM, fill=tk.X)
 
         self.root.bind("<Escape>", self.cancel_ai_response)
+        self.root.bind("<Control-Tab>", self.switch_chats)
 
         self.apply_theme(self.theme)
 
@@ -388,6 +389,12 @@ class AIChatUI:
         self.refresh_llm_settings()
         self.chat_display.update(messages)
         self.llm_model.load_history(messages)
+
+    def switch_chats(self, event=None):
+        if self.chat_tree.enabled:
+            self.chat_tree.switch_chats()
+            return "break"
+        return None
 
     def handle_llm_settings(self, llm_settings):
         """Handles LLM settings change for selected chat."""

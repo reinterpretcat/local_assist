@@ -75,7 +75,6 @@ class ChatTree:
         self.tree.bind("<Button-1>", self.on_click)
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
-        self.tree.bind("<Control-Tab>", self.switch_chats)
 
         # Setup drag and drop
         self.tree.bind("<ButtonPress-1>", self.on_drag_start)
@@ -83,6 +82,7 @@ class ChatTree:
         self.tree.bind("<ButtonRelease-1>", self.on_drag_release)
         self._drag_data = {"item": None, "x": 0, "y": 0}
 
+        self.enabled = True
         self.load_tree()
         self.expand_to_path(self.chat_history.active_path)
 
@@ -374,6 +374,7 @@ class ChatTree:
 
     def enable(self):
         """Enable chat tree input."""
+        self.enabled = True
         self.set_tree_state(enabled=True)
         self.new_chat_button.config(state=tk.NORMAL)
         self.new_group_button.config(state=tk.NORMAL)
@@ -382,6 +383,7 @@ class ChatTree:
 
     def disable(self):
         """Disable chat tree input."""
+        self.enabled = False
         self.set_tree_state(enabled=False)
         self.new_chat_button.config(state=tk.DISABLED)
         self.new_group_button.config(state=tk.DISABLED)
