@@ -110,6 +110,7 @@ class CodeEditorWindow(tk.Toplevel):
         self.code_text.bind("<Configure>", on_change)
         self.code_text.bind("<Control-a>", self.select_all)
         self.code_text.bind("<Control-z>", self.undo)
+        self.code_text.bind("<KeyRelease>", lambda _: self.update_language())
 
         # Button to run the code (middle portion)
         self.run_button = tk.Button(
@@ -117,23 +118,20 @@ class CodeEditorWindow(tk.Toplevel):
         )
         self.run_button.pack(pady=10)
 
-        # ScrolledText for displaying output (bottom portion)
         self.output_text = scrolledtext.ScrolledText(
             self.text_frame, wrap=tk.WORD, state="disabled", height=10
         )
         self.output_text.pack(side="top", fill="x", padx=5)
-
-        self.code_text.bind("<KeyRelease>", lambda _: self.highlight_syntax())
 
         self.bind("<Escape>", lambda _: self.destroy())
 
         if code:
             self.code_text.insert(tk.INSERT, code)
 
-        self.highlight_syntax()
+        self.update_language()
         self.apply_theme(theme)
 
-    def update_language(self, _=None):
+    def update_language(self, event=None):
         """Update the lexer and highlight syntax based on the selected language."""
         selected_language = self.selected_language.get()
         self.highlight_syntax(lexer=self.languages[selected_language]())
@@ -145,10 +143,7 @@ class CodeEditorWindow(tk.Toplevel):
         # Define the command for each language
         commands = {
             "Python": ["python3", "-c", code],
-            "Rust": [
-                "rustc",
-                "-",
-            ],  # Rust requires a file, so adjust for real implementation
+            "Rust": ["rustc", "-"],
         }
 
         if not code:
@@ -244,6 +239,23 @@ class CodeEditorWindow(tk.Toplevel):
         for scrolled_text in [self.code_text, self.output_text]:
             configure_scrolled_text(scrolled_text, theme)
             scrolled_text.configure(bg=theme["input_bg"], fg=theme["input_fg"])
+
+        self.language_menu.configure(
+            width=12,  # Set the width (number of characters)
+            bg=theme["input_bg"],
+            fg=theme["input_fg"],
+            activebackground=theme["input_bg"],
+            activeforeground=theme["input_fg"],
+            borderwidth=0,
+        )
+        self.language_menu["menu"].configure(
+            bg=theme["input_bg"],
+            fg=theme["input_fg"],
+            activebackground=theme["input_bg"],
+            activeforeground=theme["input_fg"],
+            borderwidth=1,
+            relief="flat",
+        )
 
         self.run_button.configure(**get_button_config(theme))
 

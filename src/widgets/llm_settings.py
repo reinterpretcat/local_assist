@@ -260,6 +260,8 @@ def open_llm_settings_dialog(
     save_button.configure(**get_button_config(theme))
     save_button.pack(pady=5)
 
+    settings_window.bind("<Escape>", lambda _: settings_window.destroy())
+
     settings_window.transient(root)
     settings_window.grab_set()
     settings_window.wait_window(settings_window)
