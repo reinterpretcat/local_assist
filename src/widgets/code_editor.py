@@ -53,7 +53,6 @@ class CodeView(tk.Text):
             dict[str, dict[str, str | int]] | str | None
         ) = default_syntax_scheme,
         tab_width: int = 4,
-        linenums_theme: Callable[[], tuple[str, str]] | tuple[str, str] | None = None,
         autohide_scrollbar: bool = False,
         **kwargs,
     ) -> None:
@@ -64,7 +63,7 @@ class CodeView(tk.Text):
         kwargs.setdefault("wrap", "none")
         kwargs.setdefault("font", ("monospace", 11))
 
-        linenum_justify = kwargs.pop("justify", "left")
+        linenum_justify = kwargs.pop("justify", "right")
 
         super().__init__(self._frame, undo=True, **kwargs)
         super().grid(row=0, column=1, sticky="nswe")
@@ -76,7 +75,6 @@ class CodeView(tk.Text):
             self._frame,
             self,
             justify=linenum_justify,
-            colors=linenums_theme,
             borderwidth=0,
         )
         self._vs = Scrollbar(
