@@ -64,7 +64,7 @@ class CustomScrolledText(scrolledtext.ScrolledText):
 
 
 class CodeEditorWindow(tk.Toplevel):
-    def __init__(self, parent, theme, code):
+    def __init__(self, parent, theme, code=None):
         super().__init__(parent)
         self.title("Code Editor")
 
@@ -95,7 +95,6 @@ class CodeEditorWindow(tk.Toplevel):
         self.code_text.bind("<Configure>", on_change)
         self.code_text.bind("<Control-a>", self.select_all)
         self.code_text.bind("<Control-z>", self.undo)
-        self.code_text.insert(tk.INSERT, code)
 
         # Button to run the code (middle portion)
         self.run_button = tk.Button(
@@ -112,6 +111,9 @@ class CodeEditorWindow(tk.Toplevel):
         self.code_text.bind("<KeyRelease>", self.highlight_syntax)
 
         self.bind("<Escape>", lambda _: self.destroy())
+
+        if code:
+            self.code_text.insert(tk.INSERT, code)
 
         self.highlight_syntax()
         self.apply_theme(theme)
