@@ -66,9 +66,13 @@ class CustomScrolledText(scrolledtext.ScrolledText):
 
 
 class CodeEditorWindow(tk.Toplevel):
-    def __init__(self, parent, theme, code=None):
+    def __init__(self, parent, theme, code=None, tab_size=4):
         super().__init__(parent)
         self.title("Code Editor")
+
+        # Store tab size
+        self.tab_size = tab_size
+        self.tab_spaces = " " * tab_size
 
         # Supported languages and their respective lexers
         self.languages = {"Python": PythonLexer, "Rust": RustLexer}
@@ -111,6 +115,8 @@ class CodeEditorWindow(tk.Toplevel):
         self.code_text.bind("<Control-a>", self.select_all)
         self.code_text.bind("<Control-z>", self.undo)
         self.code_text.bind("<KeyRelease>", lambda _: self.update_language())
+        self.code_text.bind("<Tab>", self.insert_tab_spaces)
+        self.code_text.bind("<Return>", self.auto_indent)
 
         # Button to run the code (middle portion)
         self.run_button = tk.Button(
@@ -126,6 +132,7 @@ class CodeEditorWindow(tk.Toplevel):
         self.bind("<Escape>", lambda _: self.destroy())
 
         if code:
+            code = self.replace_tabs_with_spaces(code)
             self.code_text.insert(tk.INSERT, code)
 
         self.update_language()
@@ -224,6 +231,22 @@ class CodeEditorWindow(tk.Toplevel):
         """Undo the most recent action."""
         self.code_text.edit_undo()
         return "break"
+
+    def insert_tab_spaces(self, event):
+        """Replace Tab key with spaces."""
+        self.code_text.insert(tk.INSERT, self.tab_spaces)
+        return "break"  # Prevent the default tab behavior
+
+    def auto_indent(self, event):
+        """Auto-indent the next line to match the current line's indentation."""
+        current_line = self.code_text.get("insert linestart", "insert")
+        indentation = len(current_line) - len(current_line.lstrip(" "))
+        self.code_text.insert(tk.INSERT, "\n" + " " * indentation)
+        return "break"  # Prevent the default newline behavior
+
+    def replace_tabs_with_spaces(self, code):
+        """Replace all tabs with spaces in the provided code."""
+        return code.replace("\t", self.tab_spaces)
 
     def apply_theme(self, theme: Dict):
         self.config(bg=theme["bg"], borderwidth=1, relief="solid")
