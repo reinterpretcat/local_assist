@@ -25,8 +25,8 @@ dark_theme = {
     "chat_bg": "#2f343f",
     "chat_fg": "#d3dae3",
     "chat_border": "#3b4048",
-    "scrollbar_bg": "#3b4048",
-    "scrollbar_fg": "#4c566a",
+    "scrollbar_bg": "#4c566a",
+    "scrollbar_fg": "#3b4048",
     "scrollbar_hover": "#5e6a82",
     "tree_bg": "#3b4048",
     "tree_fg": "#d3dae3",
@@ -87,10 +87,11 @@ def configure_scrolled_text(scrolled_text: ScrolledText, theme: Dict):
         relief="solid",
         borderwidth=1,
     )
+
     scrolled_text.vbar.configure(
         bg=theme["scrollbar_bg"],
         activebackground=theme["scrollbar_hover"],
-        troughcolor=theme["scrollbar_bg"],
+        troughcolor=theme["scrollbar_fg"],
         width=12,
         elementborderwidth=0,
     )

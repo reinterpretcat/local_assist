@@ -8,20 +8,93 @@ import subprocess
 from ..tools import configure_scrolled_text, get_button_config
 
 
+class TextLineNumbers(tk.Canvas):
+    def __init__(self, *args, **kwargs):
+        tk.Canvas.__init__(self, *args, **kwargs)
+        self.textwidget = None
+
+    def attach(self, text_widget):
+        self.textwidget = text_widget
+
+    def redraw(self, *args):
+        """redraw line numbers"""
+        self.delete("all")
+
+        i = self.textwidget.index("@0,0")
+        while True:
+            dline = self.textwidget.dlineinfo(i)
+            if dline is None:
+                break
+            y = dline[1]
+            linenum = str(i).split(".")[0]
+            self.create_text(
+                2, y, anchor="nw", text=linenum, fill=self.foreground_color
+            )
+            i = self.textwidget.index("%s+1line" % i)
+
+
+class CustomScrolledText(scrolledtext.ScrolledText):
+    def __init__(self, *args, **kwargs):
+        tk.Text.__init__(self, *args, **kwargs)
+
+        # create a proxy for the underlying widget
+        self._orig = self._w + "_orig"
+        self.tk.call("rename", self._w, self._orig)
+        self.tk.createcommand(self._w, self._proxy)
+
+    def _proxy(self, *args):
+        # let the actual widget perform the requested action
+        cmd = (self._orig,) + args
+        result = self.tk.call(cmd)
+
+        # generate an event if something was added or deleted,
+        # or the cursor position changed
+        if (
+            args[0] in ("insert", "replace", "delete")
+            or args[0:3] == ("mark", "set", "insert")
+            or args[0:2] == ("xview", "moveto")
+            or args[0:2] == ("xview", "scroll")
+            or args[0:2] == ("yview", "moveto")
+            or args[0:2] == ("yview", "scroll")
+        ):
+            self.event_generate("<<Change>>", when="tail")
+
+        # return what the actual widget returned
+        return result
+
+
 class CodeEditorWindow(tk.Toplevel):
     def __init__(self, parent, theme, code):
         super().__init__(parent)
         self.title("Code Editor")
 
         # Frame to hold code_text, run_button, and output_text
-        self.text_frame = tk.Frame(self)  # Assign to self.text_frame for styling
+        self.text_frame = tk.Frame(self)
         self.text_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
-        # ScrolledText for editing code (top portion)
-        self.code_text = scrolledtext.ScrolledText(
-            self.text_frame, wrap=tk.WORD, undo=True
+        # Frame to hold line numbers and code_text
+        self.code_frame = tk.Frame(self.text_frame)
+        self.code_frame.pack(side="top", expand=True, fill="both", pady=(0, 5), padx=5)
+
+        self.code_text = CustomScrolledText(self.code_frame, undo=True)
+        self.code_text.vbar = tk.Scrollbar(
+            self.code_frame, orient="vertical", command=self.code_text.yview
         )
-        self.code_text.pack(side="top", expand=True, fill="both", pady=(0, 5), padx=5)
+        self.code_text.configure(yscrollcommand=self.code_text.vbar.set)
+        self.line_numbers = TextLineNumbers(self.code_frame, width=90)
+        self.line_numbers.attach(self.code_text)
+
+        self.code_text.vbar.pack(side="right", fill="y")
+        self.line_numbers.pack(side="left", fill="y")
+        self.code_text.pack(side="right", fill="both", expand=True)
+
+        def on_change(event):
+            self.line_numbers.redraw()
+
+        self.code_text.bind("<<Change>>", on_change)
+        self.code_text.bind("<Configure>", on_change)
+        self.code_text.bind("<Control-a>", self.select_all)
+        self.code_text.bind("<Control-z>", self.undo)
         self.code_text.insert(tk.INSERT, code)
 
         # Button to run the code (middle portion)
@@ -37,6 +110,8 @@ class CodeEditorWindow(tk.Toplevel):
         self.output_text.pack(side="top", fill="x", padx=5)
 
         self.code_text.bind("<KeyRelease>", self.highlight_syntax)
+
+        self.bind("<Escape>", lambda _: self.destroy())
 
         self.highlight_syntax()
         self.apply_theme(theme)
@@ -102,9 +177,26 @@ class CodeEditorWindow(tk.Toplevel):
             "comment", foreground="gray", font=("Courier", 12, "italic")
         )
 
+    def select_all(self, event=None):
+        """Select all text in the code text widget."""
+        self.code_text.tag_add("sel", "1.0", "end")
+        return "break"
+
+    def undo(self, event=None):
+        """Undo the most recent action."""
+        self.code_text.edit_undo()
+        return "break"
+
     def apply_theme(self, theme: Dict):
         self.config(bg=theme["bg"], borderwidth=1, relief="solid")
         self.text_frame.configure(bg=theme["bg"])
+        self.code_frame.configure(bg=theme["bg"])
+
+        self.line_numbers.config(background=theme["input_bg"], borderwidth=0)
+        self.line_numbers.foreground_color = theme["input_fg"]
+        self.line_numbers.config(
+            highlightbackground=theme["input_bg"], highlightcolor=theme["input_bg"]
+        )
 
         for scrolled_text in [self.code_text, self.output_text]:
             configure_scrolled_text(scrolled_text, theme)
