@@ -8,6 +8,7 @@ class ChatTree:
     def __init__(self, parent_frame, chat_history, on_chat_select: Callable):
         self.chat_history = chat_history
         self.on_chat_select = on_chat_select
+        self.previous_chat = None
 
         self.frame = tk.Frame(parent_frame)
         self.frame.pack(fill=tk.BOTH, expand=True)
@@ -74,6 +75,7 @@ class ChatTree:
         self.tree.bind("<Button-1>", self.on_click)
         self.tree.bind("<Double-1>", self.on_double_click)
         self.tree.bind("<<TreeviewSelect>>", self.on_select)
+        self.tree.bind("<Control-Tab>", self.switch_chats)
 
         # Setup drag and drop
         self.tree.bind("<ButtonPress-1>", self.on_drag_start)
@@ -243,6 +245,16 @@ class ChatTree:
             self.on_chat_select()
         except ValueError as e:
             messagebox.showerror("Error", str(e))
+
+    def switch_chats(self, event=None):
+        """Switches chats"""
+        if self.previous_chat != self.chat_history.active_path:
+            previous_chat = self.previous_chat
+            self.previous_chat = self.chat_history.active_path
+            if previous_chat != None:
+                self.expand_to_path(previous_chat)
+                return "break"
+        return None
 
     def on_double_click(self, event):
         """Handles double click."""
