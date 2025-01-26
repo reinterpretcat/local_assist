@@ -2,9 +2,11 @@ import tkinter as tk
 from tkinter import scrolledtext, simpledialog, messagebox
 from typing import Dict
 from pygments import lex
-from pygments.lexers import PythonLexer
+from pygments.lexers import PythonLexer, RustLexer
 from pygments.token import Token
 import subprocess
+import tempfile
+import os
 from ..tools import configure_scrolled_text, get_button_config
 
 
@@ -68,9 +70,22 @@ class CodeEditorWindow(tk.Toplevel):
         super().__init__(parent)
         self.title("Code Editor")
 
+        # Supported languages and their respective lexers
+        self.languages = {"Python": PythonLexer, "Rust": RustLexer}
+        self.selected_language = tk.StringVar(value="Python")  # Default to Python
+
         # Frame to hold code_text, run_button, and output_text
         self.text_frame = tk.Frame(self)
         self.text_frame.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # Dropdown for selecting language
+        self.language_menu = tk.OptionMenu(
+            self.text_frame,
+            self.selected_language,
+            *self.languages.keys(),
+            command=self.update_language,
+        )
+        self.language_menu.pack(side="top", anchor="w", pady=(0, 5))
 
         # Frame to hold line numbers and code_text
         self.code_frame = tk.Frame(self.text_frame)
@@ -108,7 +123,7 @@ class CodeEditorWindow(tk.Toplevel):
         )
         self.output_text.pack(side="top", fill="x", padx=5)
 
-        self.code_text.bind("<KeyRelease>", self.highlight_syntax)
+        self.code_text.bind("<KeyRelease>", lambda _: self.highlight_syntax())
 
         self.bind("<Escape>", lambda _: self.destroy())
 
@@ -118,27 +133,53 @@ class CodeEditorWindow(tk.Toplevel):
         self.highlight_syntax()
         self.apply_theme(theme)
 
+    def update_language(self, _=None):
+        """Update the lexer and highlight syntax based on the selected language."""
+        selected_language = self.selected_language.get()
+        self.highlight_syntax(lexer=self.languages[selected_language]())
+
     def run_code(self):
-        code = self.code_text.get("1.0", tk.END)
+        code = self.code_text.get("1.0", tk.END).strip()
+        selected_language = self.selected_language.get()
+
+        # Define the command for each language
+        commands = {
+            "Python": ["python3", "-c", code],
+            "Rust": [
+                "rustc",
+                "-",
+            ],  # Rust requires a file, so adjust for real implementation
+        }
+
+        if not code:
+            messagebox.showwarning("Warning", "Code cannot be empty!")
+            return
 
         # Run the code using subprocess
         try:
-            result = subprocess.run(
-                ["python3", "-c", code], capture_output=True, text=True, check=True
-            )
-            output = result.stdout
+            if selected_language == "Rust":
+                output = run_rust_code(code)
+            else:
+                result = subprocess.run(
+                    commands[selected_language],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                output = result.stdout
         except subprocess.CalledProcessError as e:
             output = e.stderr
         except Exception as e:
             output = str(e)
 
         # Update the output text widget
+        self.output_text.pack(side="top", fill="x", padx=5)  # Show output
         self.output_text.config(state="normal")
         self.output_text.delete("1.0", tk.END)
         self.output_text.insert(tk.INSERT, output)
         self.output_text.config(state="disabled")
 
-    def highlight_syntax(self, event=None):
+    def highlight_syntax(self, lexer=PythonLexer()):
         """Apply syntax highlighting to the code_text widget."""
         code = self.code_text.get("1.0", tk.END)
         self.code_text.mark_set("range_start", "1.0")
@@ -150,7 +191,7 @@ class CodeEditorWindow(tk.Toplevel):
         self.code_text.tag_remove("comment", "1.0", tk.END)
 
         # Process code with Pygments
-        for token, content in lex(code, PythonLexer()):
+        for token, content in lex(code, lexer):
             self.code_text.mark_set("range_end", f"range_start + {len(content)}c")
 
             if token in Token.Keyword:
@@ -205,3 +246,38 @@ class CodeEditorWindow(tk.Toplevel):
             scrolled_text.configure(bg=theme["input_bg"], fg=theme["input_fg"])
 
         self.run_button.configure(**get_button_config(theme))
+
+
+def run_rust_code(code):
+    # Create a temporary file for Rust code
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".rs") as temp_file:
+        temp_file.write(code.encode("utf-8"))
+        temp_file_path = temp_file.name
+
+    binary_path = temp_file_path.replace(".rs", "")
+
+    # Compile the Rust code
+    compile_result = subprocess.run(
+        ["rustc", temp_file_path, "-o", binary_path],
+        capture_output=True,
+        text=True,
+        timeout=20,  # Add timeout to prevent hanging
+    )
+    if compile_result.returncode != 0:
+        output = compile_result.stderr
+    else:
+
+        run_result = subprocess.run(
+            [binary_path],
+            capture_output=True,
+            text=True,
+            timeout=10,  # Add timeout for execution
+        )
+        output = run_result.stdout if run_result.returncode == 0 else run_result.stderr
+
+    # Cleanup the temporary files
+    os.remove(temp_file_path)
+    if os.path.exists(binary_path):
+        os.remove(binary_path)
+
+    return output
