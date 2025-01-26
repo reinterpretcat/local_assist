@@ -184,10 +184,22 @@ def open_llm_settings_dialog(
         bg=theme["input_bg"],
         fg=theme["input_fg"],
         insertbackground=theme["input_fg"],
+        undo=True,
     )
     if current_prompt:
         prompt_text.insert(tk.END, current_prompt)
     prompt_text.grid(row=6, column=0, columnspan=2, padx=10, pady=5, sticky="nsew")
+
+    def undo(event=None):
+        prompt_text.edit_undo()
+        return "break"
+
+    def select_all(event=None):
+        prompt_text.tag_add("sel", "1.0", "end")
+        return "break"
+
+    prompt_text.bind("<Control-a>", select_all)
+    prompt_text.bind("<Control-z>", undo)
 
     def save_settings():
         updated = False
