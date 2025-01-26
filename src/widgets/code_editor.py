@@ -355,6 +355,13 @@ class CodeEditorWindow(tk.Toplevel):
         super().__init__(parent)
         self.title("Code Editor")
 
+        # Allow resizing in both directions
+        self.resizable(True, True)
+        # Set the size of the new window based on the parent window size
+        new_width = int(parent.winfo_width() * 0.75)
+        new_height = int(parent.winfo_height() * 0.95)
+        self.geometry(f"{new_width}x{new_height}")
+
         # Store tab size
         self.tab_size = tab_size
         self.tab_spaces = " " * tab_size
