@@ -67,11 +67,58 @@ def get_list_style(theme: Dict) -> ttk.Style:
     )
     style.configure(
         "Treeview.Heading",
+        gripcount=0,  # Remove grip
         background=theme["header_bg"],
         foreground=theme["fg"],
         relief="flat",
+        width=12,  # Width of the scrollbar
     )
     style.map("Treeview.Heading", background=[("active", theme["button_bg_hover"])])
+    return style
+
+
+def get_scrollbar_style(theme: Dict):
+    style = ttk.Style()
+
+    # Configure the appearance of the scrollbar
+    style.configure(
+        "CustomScrollbar.TScrollbar",
+        gripcount=0,  # Remove grip
+        background=theme["scrollbar_bg"],  # Thumb background color
+        troughcolor=theme["scrollbar_fg"],  # Trough (track) color
+        bordercolor=theme["border_color"],  # Border color
+        relief="flat",  # Flat appearance
+        width=12,  # Width of the scrollbar
+    )
+
+    # Define hover behavior
+    style.map(
+        "CustomScrollbar.TScrollbar",
+        background=[("active", theme["scrollbar_hover"])],  # Highlight on hover
+    )
+
+    # Define layout for the horizontal scrollbar
+    style.layout(
+        "Horizontal.CustomScrollbar.TScrollbar",
+        [
+            (
+                "Horizontal.Scrollbar.trough",
+                {"children": [("Horizontal.Scrollbar.thumb", {"expand": "1"})]},
+            )
+        ],
+    )
+
+    # Define layout for the vertical scrollbar
+    style.layout(
+        "Vertical.CustomScrollbar.TScrollbar",
+        [
+            (
+                "Vertical.Scrollbar.trough",
+                {"children": [("Vertical.Scrollbar.thumb", {"expand": "1"})]},
+            )
+        ],
+    )
+
     return style
 
 

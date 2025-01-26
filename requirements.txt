@@ -15,4 +15,5 @@ torch>=2.3.1
 torchaudio>=2.3.1
 transformers>=4.40.2
 tk>=0.1.0
+tklinenums>=1.7.1
 sentence_transformers>=3.3.1
