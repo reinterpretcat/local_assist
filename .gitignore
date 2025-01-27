@@ -7,6 +7,7 @@ pyvenv.cfg
 .vscode/
 
 history*.json
+history*.json.bak
 example*.txt
 example*.jpg
 

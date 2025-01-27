@@ -1,6 +1,9 @@
+import shutil
 import json
+import os
 from typing import Any, Dict, Optional
 from dataclasses import dataclass, asdict
+from ..utils import print_system_message
 
 
 @dataclass
@@ -105,6 +108,12 @@ class ChatHistory:
         self.history_sort = history_sort
         if history_path:
             self.load_chats(history_path)
+
+            backup_file = history_path + ".bak"
+            if os.path.exists(backup_file):
+                os.remove(backup_file)
+            shutil.copy2(history_path, backup_file)
+            print_system_message(f"history file backed up: `{backup_file}`")
 
         self.ensure_default_chat()
 
