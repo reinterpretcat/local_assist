@@ -32,6 +32,7 @@ This is an experimental project focusing on functionality over code architecture
 - Customizable system prompts and LLM settings (per chat)
 - Custom themes support
 - Basic markdown rendering support and syntax highlighting
+- Basic multi-model support (Image to Text)
 
 ## Installation
 
