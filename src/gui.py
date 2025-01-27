@@ -117,13 +117,7 @@ class AIChatUI:
             self.root,
             on_save_chats_to_file=self.save_chats_to_file,
             on_load_chats_from_file=self.load_chats_from_file,
-            on_llm_settings=lambda: open_llm_settings_dialog(
-                root=self.root,
-                theme=self.theme,
-                llm_model=self.llm_model,
-                llm_settings=self.chat_history.get_chat_settings().llm,
-                on_complete=self.handle_llm_settings,
-            ),
+            on_llm_settings=self.open_llm_settings,
             on_load_theme=self.load_theme,
             on_code_editor=self.handle_run_code,
             on_toggle_rag_panel=self.rag_panel.toggle if self.rag_model else None,
@@ -166,6 +160,8 @@ class AIChatUI:
 
         self.root.bind("<Escape>", self.cancel_ai_response)
         self.root.bind("<Control-Tab>", self.switch_chats)
+        self.root.bind("<F5>", lambda _: self.handle_run_code())
+        self.root.bind("<F8>", self.open_llm_settings)
 
         self.apply_theme(self.theme)
 
@@ -411,6 +407,15 @@ class AIChatUI:
         )
         self.update_status_message(message="LLM settings for the chat are changed.")
         self.refresh_llm_settings()
+
+    def open_llm_settings(self, event=None):
+        open_llm_settings_dialog(
+            root=self.root,
+            theme=self.theme,
+            llm_model=self.llm_model,
+            llm_settings=self.chat_history.get_chat_settings().llm,
+            on_complete=self.handle_llm_settings,
+        )
 
     def refresh_llm_settings(self):
         """Resets LLM options for active chat."""
