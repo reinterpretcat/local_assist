@@ -125,6 +125,7 @@ class AIChatUI:
                 on_complete=self.handle_llm_settings,
             ),
             on_load_theme=self.load_theme,
+            on_code_editor=self.handle_run_code,
             on_toggle_rag_panel=self.rag_panel.toggle if self.rag_model else None,
         )
 
@@ -143,6 +144,7 @@ class AIChatUI:
             chat_history=self.chat_history,
             on_chat_change=self.handle_chat_select,
             on_chat_edit=self.handle_chat_edit,
+            on_code_run=self.handle_run_code,
         )
 
         # Input area at the bottom (outside main content frame)
@@ -389,6 +391,12 @@ class AIChatUI:
         self.refresh_llm_settings()
         self.chat_display.update(messages)
         self.llm_model.load_history(messages)
+
+    def handle_run_code(self, code=None):
+        editor_window = CodeEditorWindow(parent=self.root, theme=self.theme, code=code)
+        editor_window.transient(self.root)
+        editor_window.grab_set()
+        editor_window.mainloop()
 
     def switch_chats(self, event=None):
         if self.chat_tree.enabled:

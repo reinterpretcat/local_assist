@@ -22,6 +22,7 @@ class ChatMenu:
         on_load_chats_from_file: Callable,
         on_llm_settings: Callable,
         on_load_theme: Callable,
+        on_code_editor: Callable,
         on_toggle_rag_panel: Optional[Callable],
     ):
         """Adds chat menu"""
@@ -57,14 +58,8 @@ class ChatMenu:
 
         self.menu_bar.add_cascade(label="Tools", menu=self.tols_menu)
         self.tols_menu.add_command(
-            label=pad_label("Show Code Editor"), command=self.show_code_editor
+            label=pad_label("Show Code Editor"), command=on_code_editor
         )
-
-    def show_code_editor(self):
-        editor_window = CodeEditorWindow(parent=self.root, theme=self.theme, code=None)
-        editor_window.transient(self.root)
-        editor_window.grab_set()
-        editor_window.mainloop()
 
     def apply_theme(self, theme: Dict):
         self.theme = theme

@@ -1,7 +1,8 @@
 import tkinter as tk
+import re
 from ..models import RoleNames
 from typing import Callable
-from tkinter import simpledialog
+from tkinter import simpledialog, messagebox
 
 
 class ChatToolBar:
@@ -12,10 +13,12 @@ class ChatToolBar:
         chat_history,
         on_chat_change: Callable,
         on_chat_edit: Callable,
+        on_code_run: Callable,
     ):
         self.chat_history = chat_history
         self.on_chat_change = on_chat_change
         self.on_chat_edit = on_chat_edit
+        self.on_code_run = on_code_run
 
         self.frame = tk.Frame(parent, bg="lightgray", bd=1, relief=tk.SOLID)
         self.frame.place(x=0, y=0)  # Initial placement
@@ -33,6 +36,13 @@ class ChatToolBar:
         )
         self.remove_last_btn.pack(side=tk.RIGHT, padx=2)
         self._create_tooltip(self.remove_last_btn, "Remove Last Message")
+
+        # Run last code snippet button
+        self.run_last_btn = tk.Button(
+            self.frame, text="▶", command=self.run_code_snippet, **button_style
+        )
+        self.run_last_btn.pack(side=tk.RIGHT, padx=2)
+        self._create_tooltip(self.run_last_btn, "Run Last Code Snippet")
 
         # Edit last message button
         self.edit_last_btn = tk.Button(
@@ -139,12 +149,30 @@ class ChatToolBar:
                 )
                 return
 
+    def run_code_snippet(self):
+        """Extracts code from the last message and runs it"""
+        messages = self.chat_history.get_active_chat_messages()
+        if messages:
+            last_message = messages[-1]["content"]
+            pattern = r"```(\w*)\n(.*?)\n```"
+
+            # Find all matches in the markdown text
+            matches = re.findall(pattern, last_message, re.DOTALL)
+            if matches:
+                language, content = matches[-1]
+                if content.strip():
+                    self.on_code_run(content.strip())
+
     def remove_last_message(self):
         """Remove the last message from the active chat."""
         messages = self.chat_history.get_active_chat_messages()
         if messages:
-            messages.pop()
-            self.on_chat_change()
+            confirm = messagebox.askyesno(
+                "Confirm", "Are you sure you want to remove the last message?"
+            )
+            if confirm:
+                messages.pop()
+                self.on_chat_change()
 
     def position_toolbar(self, chat_display):
         """Position toolbar at the top-right corner of the chat display."""
@@ -170,7 +198,11 @@ class ChatToolBar:
             "activeforeground": theme["button_fg"],
         }
 
-        self.copy_last_btn.configure(**button_style)
-        self.copy_all_btn.configure(**button_style)
-        self.edit_last_btn.configure(**button_style)
-        self.remove_last_btn.configure(**button_style)
+        for button in [
+            self.copy_last_btn,
+            self.copy_all_btn,
+            self.edit_last_btn,
+            self.remove_last_btn,
+            self.run_last_btn,
+        ]:
+            button.configure(**button_style)
