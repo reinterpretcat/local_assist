@@ -46,7 +46,15 @@ class ChatDisplay:
         )
         self.display.tag_configure(RoleTags.CONTENT, foreground="black")
 
+        self._setup_codetags()
         setup_markdown_tags(chat_display=self.display, theme=theme)
+
+    def _setup_codetags(self) -> None:
+        # TODO allow to change tags
+        tags = parse_scheme(default_syntax_scheme)
+        for key, value in tags.items():
+            if isinstance(value, str):
+                self.display.tag_configure(f"Token.{key}", foreground=value)
 
     def append_message(self, role, content, image_path=None):
         self.display.config(state=tk.NORMAL)

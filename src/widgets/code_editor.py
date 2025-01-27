@@ -8,7 +8,7 @@ import os
 from contextlib import suppress
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, scrolledtext, messagebox
+from tkinter import ttk, scrolledtext, messagebox, filedialog
 from tkinter.font import Font
 from typing import Any, Callable, Dict, Type, Union
 import pygments
@@ -374,36 +374,45 @@ class CodeEditorWindow(tk.Toplevel):
         self.selected_language = tk.StringVar(value="Python")  # Default to Python
 
         # Frame to hold code_text, run_button, and output_text
-        self.text_frame = tk.Frame(self)
-        self.text_frame.pack(expand=True, fill="both", padx=10, pady=10)
+        self.editor_frame = tk.Frame(self)
+        self.editor_frame.pack(expand=True, fill="both", padx=10, pady=10)
+
+        self.button_frame = tk.Frame(self.editor_frame)
+        self.button_frame.pack(side="top", fill="x", padx=10, pady=10)
 
         # Dropdown for selecting language
         self.language_menu = tk.OptionMenu(
-            self.text_frame,
+            self.button_frame,
             self.selected_language,
             *self.get_mainstream_languages(),
             command=self.update_language,
         )
-        self.language_menu.pack(side="top", anchor="w", pady=(0, 5))
+        self.language_menu.pack(side="left")
+
+        self.save_to_file = tk.Button(
+            self.button_frame, text="Save as", command=self.save_to_file
+        )
+        self.save_to_file.pack(side="right")
+
+        # Centered button
+        self.run_button = tk.Button(
+            self.button_frame, command=self.run_code, width=20, text="Run Code"
+        )
+        self.run_button.pack(side="left", expand=True)
 
         # Frame to hold line numbers and code_text
-        self.code_frame = tk.Frame(self.text_frame)
+        self.code_frame = tk.Frame(self.editor_frame)
         self.code_frame.pack(side="top", expand=True, fill="both", pady=(0, 5), padx=5)
 
         self.code_text = CodeView(root=self.code_frame)
         self.code_text.pack(side="right", fill="both", expand=True)
 
-        # Button to run the code (middle portion)
-        self.run_button = tk.Button(
-            self.text_frame, text="Run Code", command=self.run_code
-        )
-        self.run_button.pack(pady=10)
-
         self.output_text = scrolledtext.ScrolledText(
-            self.text_frame, wrap=tk.WORD, state="disabled", height=10
+            self.editor_frame, wrap=tk.WORD, state="disabled", height=10
         )
         self.output_text.pack(side="top", fill="x", padx=5)
 
+        self.bind(f"<F5>", self.run_code)
         self.bind("<Escape>", lambda _: self.destroy())
 
         if code:
@@ -488,20 +497,32 @@ class CodeEditorWindow(tk.Toplevel):
         """Enable run button only for supported languages."""
         selected_language = self.selected_language.get()
 
+        self.clear_output()
         # Check if the selected language is in supported languages
         if selected_language in self.languages:
             self.run_button.config(state=tk.NORMAL)
         else:
             self.run_button.config(state=tk.DISABLED)
             # Optionally, show a tooltip or message about unsupported language
-            self.output_text.config(state="normal")
-            self.output_text.delete("1.0", tk.END)
             self.output_text.insert(
                 tk.INSERT, f"Running code is not supported for {selected_language}"
             )
             self.output_text.config(state="disabled")
 
-    def run_code(self):
+    def clear_output(self):
+        self.output_text.config(state="normal")
+        self.output_text.delete("1.0", tk.END)
+
+    def save_to_file(self):
+        file_path = filedialog.asksaveasfilename()
+
+        if file_path:
+            code = self.code_text.get("1.0", tk.END).strip()
+            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(file_path, "w", encoding="utf-8") as f:
+                f.write(code)
+
+    def run_code(self, event=None):
         code = self.code_text.get("1.0", tk.END).strip()
         selected_language = self.selected_language.get()
 
@@ -544,7 +565,8 @@ class CodeEditorWindow(tk.Toplevel):
 
     def apply_theme(self, theme: Dict):
         self.config(bg=theme["bg"], borderwidth=1, relief="solid")
-        self.text_frame.configure(bg=theme["bg"])
+        self.editor_frame.configure(bg=theme["bg"])
+        self.button_frame.configure(bg=theme["bg"])
         self.code_frame.configure(bg=theme["bg"])
 
         editor_schema = {
@@ -584,7 +606,9 @@ class CodeEditorWindow(tk.Toplevel):
             relief="flat",
         )
 
-        self.run_button.configure(**get_button_config(theme))
+        button_config = get_button_config(theme)
+        for button in [self.run_button, self.save_to_file]:
+            button.configure(**button_config)
 
 
 def run_rust_code(code):

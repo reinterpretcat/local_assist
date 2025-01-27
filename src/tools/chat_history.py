@@ -35,7 +35,7 @@ class LLMSettings:
 class ChatSettings:
     """Manages chat-specific settings."""
 
-    def __init__(self, markdown_enabled=False, replies_allowed=True, llm=LLMSettings()):
+    def __init__(self, markdown_enabled=True, replies_allowed=True, llm=LLMSettings()):
         self.markdown_enabled = markdown_enabled
         self.replies_allowed = replies_allowed
         self.llm: LLMSettings = llm
@@ -66,7 +66,7 @@ class ChatSettings:
     def from_dict(cls, data: dict) -> "ChatSettings":
         """Create settings from dictionary."""
         settings = cls()
-        settings.markdown_enabled = data.get("markdown_enabled", False)
+        settings.markdown_enabled = data.get("markdown_enabled", True)
         settings.replies_allowed = data.get("replies_allowed", True)
         settings.llm = LLMSettings.from_dict(data.get("llm"))
         # settings._custom_settings = data.get("custom_settings", {})
