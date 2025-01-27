@@ -46,8 +46,8 @@ class ChatSettings:
         result = {}
 
         # Only include non-default values
-        if self.markdown_enabled:
-            result["markdown_enabled"] = True
+        if not self.markdown_enabled:
+            result["markdown_enabled"] = False
         if not self.replies_allowed:
             result["replies_allowed"] = False
 
