@@ -63,20 +63,20 @@ default_config = {
     # retrieval augument generation config
     "rag": {
         # LLM to use for RAG
-        "model": "llama3.1:8b-instruct-q4_0",
+        "model": "qwen2.5-coder:14b",
         # NOTE same as for llm, but used only for RAG
         "options": {
             # "seed": 123,
             # "num_ctx": 1024
             # "num_predict": 20
-            "num_ctx": 4096,
+            "num_ctx": 8192,
             # "temperature": 0.3,
             # "top_p": 0.8,  # More focused token selection
         },
         # where to store data
         "persist_directory": ".chromadb",
         # how many tokens to request
-        "token_limit": 4096,
+        "token_limit": 8192,
         # summarization relevance threshold
         "min_relevance": 0.1,
         # maximum number of results (chunks) to retrieve from store

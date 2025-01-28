@@ -15,8 +15,8 @@ class ChatInput:
         on_user_input: Callable,
         on_record_voice: Optional[Callable],
         on_cancel_response: Callable,
-        min_height: int = 2,
-        max_height: int = 8,
+        min_height: int = 3,
+        max_height: int = 12,
     ):
 
         self.root = root

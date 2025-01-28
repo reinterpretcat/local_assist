@@ -585,9 +585,8 @@ class AIChatUI:
         # Get currently selected chat, if any
         if self.chat_history.active_path:
             # Reset active chat with initial system message
-            messages = [messages[0]]
-            self.chat_history.set_active_chat_history(messages)
-            self.chat_display.update(messages)
+            self.chat_history.set_active_chat_history([messages[0]])
+            self.chat_display.update([messages[0]])
 
             # Process user's message
             self.handle_user_message(messages[1]["content"])

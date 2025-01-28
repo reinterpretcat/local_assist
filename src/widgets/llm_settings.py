@@ -8,7 +8,6 @@ from ..tools import LLMSettings, get_button_config
 def create_model_info_frame(parent, theme: Dict, model_info: ModelInfo):
     """Create a frame displaying model information."""
     info_frame = tk.Frame(parent, bg=theme["popup_bg"])
-
     info_text = (
         f"{'Size:':<12}{f'{(model_info.size.real / 1024 / 1024):.2f} MB':<20}"
         f"{'Parameters:':<15}{model_info.details.parameter_size if model_info.details else 'N/A':<20}\n"
@@ -114,7 +113,9 @@ def open_llm_settings_dialog(
 
     # Model info frame
     info_frame = create_model_info_frame(
-        settings_window, theme, model_dict[current_model_id]
+        settings_window,
+        theme,
+        model_dict.get(current_model_id, ModelInfo(model="", size=0)),
     )
     info_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=5)
 
