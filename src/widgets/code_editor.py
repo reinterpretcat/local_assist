@@ -351,9 +351,19 @@ class CodeView(tk.Text):
 class CodeEditorWindow(tk.Toplevel):
     """Actual window to edit and run code."""
 
-    def __init__(self, parent, theme, code=None, tab_size=4):
+    def __init__(
+        self,
+        parent,
+        theme,
+        language: None,
+        code=None,
+        tab_size=4,
+        on_close: Callable = None,
+    ):
         super().__init__(parent)
         self.title("Code Editor")
+
+        self.on_close = on_close
 
         # Allow resizing in both directions
         self.resizable(True, True)
@@ -371,7 +381,14 @@ class CodeEditorWindow(tk.Toplevel):
             "Python": pygments.lexers.PythonLexer,
             "Rust": pygments.lexers.RustLexer,
         }
-        self.selected_language = tk.StringVar(value="Python")  # Default to Python
+
+        self.selected_language = tk.StringVar(
+            value=(
+                language.capitalize()
+                if language != None and language != ""
+                else "Python"
+            )
+        )
 
         # Frame to hold code_text, run_button, and output_text
         self.editor_frame = tk.Frame(self)
@@ -413,7 +430,8 @@ class CodeEditorWindow(tk.Toplevel):
         self.output_text.pack(side="top", fill="x", padx=5)
 
         self.bind(f"<F5>", self.run_code)
-        self.bind("<Escape>", lambda _: self.destroy())
+        self.bind("<Escape>", lambda _: self.close())
+        self.protocol("WM_DELETE_WINDOW", self.close)
 
         if code:
             self.code_text.insert(tk.INSERT, code)
@@ -609,6 +627,13 @@ class CodeEditorWindow(tk.Toplevel):
         button_config = get_button_config(theme)
         for button in [self.run_button, self.save_to_file]:
             button.configure(**button_config)
+
+    def close(self):
+        selected_language = self.selected_language.get()
+        code = self.code_text.get("1.0", tk.END).strip()
+
+        self.on_close(selected_language, code)
+        self.destroy()
 
 
 def run_rust_code(code):

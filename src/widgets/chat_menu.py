@@ -1,6 +1,5 @@
 import tkinter as tk
 from typing import Callable, Optional, Dict
-from .code_editor import CodeEditorWindow
 
 
 def pad_label(label, width=30):
@@ -50,14 +49,14 @@ class ChatMenu:
         )
         self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
 
-        self.tols_menu = tk.Menu(self.menu_bar, tearoff=0)
+        self.tools_menu = tk.Menu(self.menu_bar, tearoff=0)
         if on_toggle_rag_panel:
-            self.tols_menu.add_command(
+            self.tools_menu.add_command(
                 label=pad_label("Toggle RAG Editor"), command=on_toggle_rag_panel
             )
 
-        self.menu_bar.add_cascade(label="Tools", menu=self.tols_menu)
-        self.tols_menu.add_command(
+        self.menu_bar.add_cascade(label="Tools", menu=self.tools_menu)
+        self.tools_menu.add_command(
             label=pad_label("Show Code Editor"), command=on_code_editor
         )
 

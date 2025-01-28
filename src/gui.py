@@ -52,6 +52,9 @@ class AIChatUI:
         if self.tts_model:
             self.audio_io = AudioIO()
 
+        self.code_language = None
+        self.code_content = None
+
         # Main container for all elements
         self.main_container = tk.Frame(root)
         self.main_container.pack(fill=tk.BOTH, expand=True)
@@ -128,7 +131,9 @@ class AIChatUI:
         self.main_paned_window.add(self.chat_display_frame)
 
         self.chat_display = ChatDisplay(
-            parent=self.chat_display_frame, chat_history=self.chat_history
+            parent=self.chat_display_frame,
+            chat_history=self.chat_history,
+            on_code_editor=self.handle_run_code,
         )
 
         # Add toolbar after chat display but before input frame
@@ -138,7 +143,7 @@ class AIChatUI:
             chat_history=self.chat_history,
             on_chat_change=self.handle_chat_select,
             on_chat_edit=self.handle_chat_edit,
-            on_code_run=self.handle_run_code,
+            on_code_editor=self.handle_run_code,
         )
 
         # Input area at the bottom (outside main content frame)
@@ -160,7 +165,12 @@ class AIChatUI:
 
         self.root.bind("<Escape>", self.cancel_ai_response)
         self.root.bind("<Control-Tab>", self.switch_chats)
-        self.root.bind("<F5>", lambda _: self.handle_run_code())
+        self.root.bind(
+            "<F5>",
+            lambda _: self.handle_run_code(
+                language=self.code_language, code=self.code_content
+            ),
+        )
         self.root.bind("<F8>", self.open_llm_settings)
 
         self.apply_theme(self.theme)
@@ -388,8 +398,20 @@ class AIChatUI:
         self.chat_display.update(messages)
         self.llm_model.load_history(messages)
 
-    def handle_run_code(self, code=None):
-        editor_window = CodeEditorWindow(parent=self.root, theme=self.theme, code=code)
+    def handle_run_code(self, language=None, code=None):
+        """Launches code editor."""
+
+        def handle_editor_close(language, code):
+            self.code_language = language
+            self.code_content = code
+
+        editor_window = CodeEditorWindow(
+            parent=self.root,
+            theme=self.theme,
+            language=language,
+            code=code,
+            on_close=handle_editor_close,
+        )
         editor_window.transient(self.root)
         editor_window.grab_set()
         editor_window.mainloop()

@@ -13,12 +13,12 @@ class ChatToolBar:
         chat_history,
         on_chat_change: Callable,
         on_chat_edit: Callable,
-        on_code_run: Callable,
+        on_code_editor: Callable,
     ):
         self.chat_history = chat_history
         self.on_chat_change = on_chat_change
         self.on_chat_edit = on_chat_edit
-        self.on_code_run = on_code_run
+        self.on_code_editor = on_code_editor
 
         self.frame = tk.Frame(parent, bg="lightgray", bd=1, relief=tk.SOLID)
         self.frame.place(x=0, y=0)  # Initial placement
@@ -161,7 +161,7 @@ class ChatToolBar:
             if matches:
                 language, content = matches[-1]
                 if content.strip():
-                    self.on_code_run(content.strip())
+                    self.on_code_editor(language, content.strip())
 
     def remove_last_message(self):
         """Remove the last message from the active chat."""

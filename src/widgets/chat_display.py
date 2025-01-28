@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
-from typing import Dict
+from typing import Callable, Dict
 from PIL import Image, ImageTk
 from ..models import RoleNames, RoleTags
 from ..tools import *
@@ -8,9 +8,10 @@ from .code_editor import CodeEditorWindow
 
 
 class ChatDisplay:
-    def __init__(self, parent, chat_history: ChatHistory):
+    def __init__(self, parent, chat_history: ChatHistory, on_code_editor: Callable):
         self.parent = parent
         self.chat_history = chat_history
+        self.on_code_editor = on_code_editor
         self.images = []  # Keep references to prevent garbage collection
 
         self.display = ScrolledText(
@@ -24,7 +25,7 @@ class ChatDisplay:
         # Attach context menu
         self.context_menu = tk.Menu(parent, tearoff=0)
         self.context_menu.add_command(
-            label="    Edit and Run", command=self.edit_and_run_code
+            label="    Edit and Run", command=self.handle_code_run
         )
         self.display.bind("<Button-3>", self.show_context_menu)
 
@@ -149,14 +150,9 @@ class ChatDisplay:
     def show_context_menu(self, event):
         self.context_menu.post(event.x_root, event.y_root)
 
-    def edit_and_run_code(self):
+    def handle_code_run(self):
         selected_text = self.display.get(tk.SEL_FIRST, tk.SEL_LAST)
-        editor_window = CodeEditorWindow(
-            parent=self.parent, theme=self.theme, code=selected_text
-        )
-        editor_window.transient(self.parent)
-        editor_window.grab_set()
-        editor_window.mainloop()
+        self.on_code_editor(None, selected_text)
 
     def apply_theme(self, theme: Dict):
         self.theme = theme
