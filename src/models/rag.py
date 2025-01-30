@@ -363,3 +363,7 @@ Answer:
         self.chroma_client.delete_collection(collection_name)
         if collection_name in self._pipelines:
             del self._pipelines[collection_name]
+
+    def forward(self, model_input):
+        print("not implemented")
+        return super().forward(model_input)
