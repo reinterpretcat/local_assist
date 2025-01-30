@@ -62,40 +62,15 @@ default_config = {
     },
     # retrieval augument generation config
     "rag": {
-        # LLM to use for RAG
-        "model": "qwen2.5-coder:14b",
-        # NOTE same as for llm, but used only for RAG
-        "options": {
-            # "seed": 123,
-            # "num_ctx": 1024
-            # "num_predict": 20
-            "num_ctx": 8192,
-            # "temperature": 0.3,
-            # "top_p": 0.8,  # More focused token selection
-        },
-        # where to store data
+        # vector store path
         "persist_directory": ".chromadb",
-        # how many tokens to request
-        "token_limit": 8192,
-        # summarization relevance threshold
-        "min_relevance": 0.1,
-        # maximum number of results (chunks) to retrieve from store
-        "top_k": 2048,
-        # summarization prompt is used to extract information from documents
-        "summarize_prompt": """You are a precise document summarizer. Create a concise summary that:
-    1. Preserves key information (dates, numbers, names, technical details)
-    2. Maintains the logical flow of information
-    3. Focuses on factual content rather than narrative
-    4. Uses clear structure with paragraphs for different topics
-    5. Uses original language of the text
-    6. Returns rather empty string if cannot summarize
-    Prioritize accuracy of technical details and specific information over brevity.""",
-        # context prompt is used to chat over used documents
-        "context_prompt": """You are a helpful assistant that provides accurate answers based on the given context.
-    Follow these guidelines:
-    1. Only use information from the provided context
-    2. If the context doesn't contain enough information, acknowledge the limitations
-    3. Maintain a natural, conversational tone while being precise""",
+        # Text splitting parameters
+        "chunk_size": 512,
+        "chunk_overlap": 64,
+        # Retrieval parameters
+        "similarity_top_k": 2,
+        # Supported file types: stick to internal details
+        "supported_extensions": None,
     },
     # speech to text config
     "stt": {

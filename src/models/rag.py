@@ -1,601 +1,285 @@
-from dataclasses import dataclass
-from collections import defaultdict
-from typing import List, Iterator, Optional, Dict, Set, Any
-from sentence_transformers import SentenceTransformer
-from PyPDF2 import PdfReader
 import chromadb
-from chromadb.config import DEFAULT_TENANT, DEFAULT_DATABASE, Settings
-from ollama import Client, Options
-import os
+import datetime
+from dataclasses import dataclass
+from typing import Any, List, Optional
 from pathlib import Path
-from .common import BaseModel
-from colorama import Fore
-from ..utils import print_system_message
+
+from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
+from llama_index.core.ingestion import IngestionPipeline
+from llama_index.core.schema import BaseNode, TransformComponent
+from llama_index.core.text_splitter import SentenceSplitter
+from llama_index.llms.ollama import Ollama
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.vector_stores.chroma import ChromaVectorStore
+from llama_index.core.vector_stores import MetadataFilters
+from llama_index.core import Settings
 
 
 @dataclass
-class DocumentReference:
-    """Reference information for a document in a collection."""
+class RAGParameters:
+    """Configuration parameters for the RAG system."""
 
-    collection_name: str
-    document_id: str
-    source: str
+    # Embedding model parameters
+    embed_model_name: str = "all-MiniLM-L6-v2"
+
+    # LLM parameters
+    llm_model: str = "llama3:latest"
+    temperature: float = 0.0
+
+    # Text splitting parameters
+    chunk_size: int = 512
+    chunk_overlap: int = 64
+
+    # Retrieval parameters
+    similarity_top_k: int = 2
+
+    # Supported file types
+    supported_extensions: List[str] = None
+
+    def __post_init__(self):
+        if self.supported_extensions is None:
+            # Taken from https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
+            self.supported_extensions = [
+                ".csv",
+                ".docx",
+                ".epub",
+                ".md ",
+                ".pdf",
+                ".ppt",
+                ".pptm",
+                ".pptx",
+            ]
 
 
-class RAGCollection:
-    def __init__(self, collection_name: str, chroma_client):
-        self.name = collection_name
-        self.model = SentenceTransformer("all-MiniLM-L6-v2")
+class TextCleaner(TransformComponent):
+    """Cleans text by removing unwanted characters and formatting."""
 
-        self.collection = chroma_client.get_or_create_collection(
-            name=collection_name,
-            # https://docs.trychroma.com/docs/collections/configure
-            metadata={
-                # use cosine similarity metric while default is Squared L2
-                "hnsw:space": "cosine",
-                # determines the size of the dynamic candidate list used while searching for the nearest neighbors.
-                # A higher value improves recall and accuracy by exploring more potential neighbors but increases
-                # query time and computational cost, while a lower value results in faster but less accurate searches.
-                # The default value is 10.
-                "hnsw:search_ef": 30,
-            },
+    def __call__(self, nodes: List[BaseNode], **kwargs) -> List[BaseNode]:
+        for node in nodes:
+            content = node.get_content()
+            content = content.replace("\t", " ").replace(" \n", " ")
+            node.set_content(content)
+        return nodes
+
+
+class DocumentManager:
+    """Manages document collections and operations using ChromaDB."""
+
+    def __init__(self, persist_dir: str, params: Optional[RAGParameters] = None):
+        self.persist_dir = Path(persist_dir)
+        self.persist_dir.mkdir(parents=True, exist_ok=True)
+        self.params = params or RAGParameters()
+        self.embed_model = HuggingFaceEmbedding(model_name=self.params.embed_model_name)
+        self.llm = Ollama(
+            model=self.params.llm_model,
+            temperature=self.params.temperature,
+            timeout=120,  # Timeout in seconds
         )
+        self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
 
-    def add_document(self, file_path: str, chunks: List[str]) -> List[str]:
-        """Add document chunks to collection and return their IDs."""
-        if not chunks:
-            return []
+        Settings.embed_model = self.embed_model
+        Settings.llm = self.llm
 
-        embeddings = self.model.encode(chunks, convert_to_numpy=True)
+        self._pipelines = {}
 
-        # Generate unique IDs for this collection
-        base_id = f"{self.name}_{os.path.basename(file_path)}".replace(" ", "_")
-        chunk_ids = [f"{base_id}_{idx}" for idx in range(len(chunks))]
+    def list_collections(self) -> List[dict]:
+        """
+        List all available document collections with their basic info.
 
-        # Always add as new documents since we want independent copies in each collection
-        new_embeddings = [embedding.tolist() for embedding in embeddings]
-        new_metadatas = [
-            {
-                "source": file_path,
-                "id": chunk_id,
-                "chunk_index": idx,
-                "collection": self.name,
+        Returns:
+            List[dict]: List of collection information dictionaries
+        """
+        collections = []
+        for name in self.chroma_client.list_collections():
+            info = self.get_collection_info(name)
+            if info:
+                collections.append(info)
+        return collections
+
+    def get_collection_info(self, collection_name: str) -> Optional[dict]:
+        """
+        Get detailed information about a specific collection.
+
+        Args:
+            collection_name (str): Name of the collection
+
+        Returns:
+            dict: Collection information including document count and metadata summary
+        """
+        try:
+            collection = self._get_collection(collection_name)
+            metadata_result = collection.get(include=["metadatas"])
+            metadatas = metadata_result.get("metadatas", [])
+
+            unique_sources = {meta.get("source") for meta in metadatas if meta}
+            return {
+                "name": collection_name,
+                "document_count": collection.count(),
+                "unique_sources": list(unique_sources),
             }
-            for idx, chunk_id in enumerate(chunk_ids)
-        ]
+        except Exception as e:
+            print(f"Error fetching collection '{collection_name}': {e}")
+            return None
 
-        self.collection.add(
-            ids=chunk_ids,
-            documents=chunks,
-            embeddings=new_embeddings,
-            metadatas=new_metadatas,
-        )
+    def add_documents(
+        self, path: str, collection_name: str, file_filter: Optional[List[str]] = None
+    ):
+        """
+        Add documents from a file or directory into a specified collection.
 
-        return chunk_ids
-
-    def __repr__(self):
-        return self.name
-
-    def query(
-        self, query: str, top_k: int, selected_ids: Optional[List[str]] = None
-    ) -> Dict:
-        """Query the collection with optional document filtering."""
-        query_embedding = self.model.encode([query])[0]
-
-        # If specific documents are selected, use where filter
-        where = {"id": {"$in": selected_ids}} if selected_ids else None
-
-        return self.collection.query(
-            query_embeddings=[query_embedding.tolist()], n_results=top_k, where=where
-        )
-
-    def get_documents(self) -> Set[str]:
-        """Get all unique document sources in this collection."""
-        results = self.collection.get(include=["metadatas"])
-        return {metadata["source"] for metadata in results["metadatas"]}
-
-
-@dataclass
-class ChunkInfo:
-    text: str
-    tokens: int
-    relevance: float
-    metadata: Dict[str, Any]
-    source: str
-    source_position: int
-
-
-class ContextManager:
-    def __init__(self, **kwargs):
-        self.token_limit = int(kwargs.get("token_limit", 4000))
-        self.min_relevance = float(kwargs.get("min_relevance", 0.7))
-        self.top_k = int(kwargs.get("top_k", 5))
-
-    def _estimate_tokens(self, text: str) -> int:
-        """Estimate token count using word-based approximation."""
-        return int(len(text.split()) * 1.3)
-
-    def get_context_text(
-        self,
-        user_query: str,
-        summarize_prompt: str,
-        collections: List[RAGCollection],
-        selected_ids: Dict[str, List[str]],
-        chat_callback,
-        progress_callback,
-    ) -> str:
-        # Retrieve and group relevant chunks
-        grouped_chunks = self._retrieve_and_limit_context(
-            query=user_query,
-            collections=collections,
-            selected_ids=selected_ids,
-        )
-
-        if not grouped_chunks:
-            return "No relevant context found."
-
-        # Calculate token limit per chunk based on number of chunks
-        total_chunks = sum(len(chunks) for chunks in grouped_chunks.values())
-        # Reserve 20% of tokens for prompts and overhead
-        available_tokens = int(self.token_limit * 0.8)
-        chunk_token_limit = (
-            available_tokens // total_chunks if total_chunks > 0 else available_tokens
-        )
-
-        context_text_blocks = []
-        accumulated_summary = ""
-
-        total_chunks: float = sum(
-            [len(source_chunks) for _, source_chunks in grouped_chunks.items()]
-        )
-        processed_chunks: float = 0
-
-        # Process chunks source by source
-        for group_idx, (source, source_chunks) in enumerate(grouped_chunks.items()):
-            print_system_message(
-                f"process group {group_idx} from {len(grouped_chunks.items())}"
+        Args:
+            path (str): Path to directory or specific file
+            collection_name (str): Name for the document collection
+            file_filter (Optional[List[str]]): List of specific filenames to load from directory
+        """
+        path = Path(path)
+        if path.is_file() and path.suffix in self.params.supported_extensions:
+            reader = SimpleDirectoryReader(input_files=[str(path)])
+        else:
+            reader = SimpleDirectoryReader(
+                input_dir=str(path),
+                required_exts=self.params.supported_extensions,
+                input_files=file_filter,
             )
 
-            source_summaries = []
-            for chunk_idx, chunk in enumerate(source_chunks):
-                print_system_message(
-                    f"process chunk {chunk_idx} from {len(source_chunks)}"
-                )
+        documents = reader.load_data()
+        pipeline = self._get_or_create_pipeline(collection_name)
+        nodes = pipeline.run(documents=documents)
 
-                if not isinstance(chunk.text, str) or not chunk.text.strip():
-                    continue
+        metadata = [
+            {
+                "id": str(i),
+                "source": str(path),
+                "chunk_size": self.params.chunk_size,
+                "created_at": datetime.datetime.now().isoformat(),
+            }
+            for i, _ in enumerate(nodes)
+        ]
 
-                # TODO can use  source, chunk.metadata to keep a reference to document
+        collection = self._get_collection(collection_name)
+        for node, meta in zip(nodes, metadata):
+            node.metadata.update(meta)
+            collection.upsert(
+                documents=[node.get_content()], metadatas=[meta], ids=[meta["id"]]
+            )
 
-                # Summarize the chunk
-                summary = self._summarize_chunks(
-                    summarize_prompt=summarize_prompt,
-                    context=accumulated_summary,
-                    chunk=chunk.text,  # Make sure we're passing the actual text content
-                    chunk_token_limit=chunk_token_limit,
-                    chat_callback=chat_callback,
-                )
+    def add_document(self, file_path: str, collection_name: str) -> None:
+        """
+        Add a single document to a collection.
 
-                if summary:
-                    source_summaries.append(summary)
-                    # Update accumulated summary and context messages
-                    accumulated_summary = self._update_accumulated_summary(
-                        accumulated_summary, summary
-                    )
-                if progress_callback:
-                    processed_chunks += 1
-                    progress_callback(processed_chunks, total_chunks)
+        Args:
+            file_path (str): Path to the document file
+            collection_name (str): Name of the collection to add the document to
+        """
+        self.add_documents(file_path, collection_name)
 
-            if source_summaries:
-                # Combine summaries for this source
-                source_block = self._format_source_block(source, source_summaries)
-                context_text_blocks.append(source_block)
+    def _get_or_create_pipeline(self, collection_name: str) -> IngestionPipeline:
+        if collection_name not in self._pipelines:
+            collection = self._get_collection(collection_name)
+            vector_store = ChromaVectorStore(chroma_collection=collection)
+            text_splitter = SentenceSplitter(
+                chunk_size=self.params.chunk_size,
+                chunk_overlap=self.params.chunk_overlap,
+            )
+            self._pipelines[collection_name] = IngestionPipeline(
+                transformations=[TextCleaner(), text_splitter],
+                vector_store=vector_store,
+            )
+        return self._pipelines[collection_name]
 
-        if not context_text_blocks:
-            return "No meaningful summaries generated from the context."
+    def _get_collection(self, name: str):
+        return self.chroma_client.get_or_create_collection(name)
 
-        # Final cleanup and structuring
-        return self._create_final_context(context_text_blocks)
+    def load_collection(self, collection_name: str) -> None:
+        """
+        Load an existing collection into memory for querying.
 
-    def _retrieve_and_limit_context(
+        Args:
+            collection_name (str): Name of the collection to load
+        """
+        collection = self._get_collection(collection_name)
+        vector_store = ChromaVectorStore(chroma_collection=collection)
+        self._pipelines[collection_name] = IngestionPipeline(vector_store=vector_store)
+
+    def retrieve_context(
         self,
         query: str,
-        collections: List[RAGCollection] = None,
-        selected_ids: Dict[str, List[str]] = None,
-    ) -> Dict[str, List[ChunkInfo]]:
-        """Retrieve and filter relevant chunks while preserving their natural order."""
-        all_chunks = []
+        collection_name: str,
+        metadata_filters: Optional[MetadataFilters] = None,
+    ) -> List[str]:
+        """
+        Retrieve relevant context for a query from a specific collection.
 
-        for collection in collections:
-            # Get selected IDs for this collection
-            collection_ids = selected_ids.get(collection.name) if selected_ids else None
+        Args:
+            query (str): Query string
+            collection_name (str): Name of the collection to search
+            metadata_filter (Optional[MetadataFilters]): Dictionary specifying metadata filtering criteria
 
-            # Query the collection
-            results = collection.query(query, self.top_k, collection_ids)
+        Returns:
+            List[str]: Relevant context content
+        """
+        collection = self._get_collection(collection_name)
+        vector_store = ChromaVectorStore(chroma_collection=collection)
+        index = VectorStoreIndex.from_vector_store(
+            vector_store, embed_model=self.embed_model
+        )
+        retriever = index.as_retriever(
+            similarity_top_k=self.params.similarity_top_k, filters=metadata_filters
+        )
+        return [node.get_content() for node in retriever.retrieve(query)]
 
-            # Process results
-            for idx, (chunk, metadata, distance) in enumerate(
-                zip(
-                    results["documents"][0],
-                    results["metadatas"][0],
-                    results["distances"][0],
-                )
-            ):
-                # Calculate relevance score (convert distance to similarity)
-                relevance_score = 1 - (distance / 2)
-
-                # Filter by minimum relevance
-                if relevance_score >= self.min_relevance:
-                    chunk_info = ChunkInfo(
-                        text=chunk,
-                        tokens=self._estimate_tokens(chunk),
-                        relevance=relevance_score,
-                        metadata=metadata,
-                        source=metadata.get("source", "unknown"),
-                        source_position=metadata.get("chunk_index", idx),
-                    )
-                    all_chunks.append(chunk_info)
-
-        return self._group_chunks(all_chunks)
-
-    def _group_chunks(
+    def answer_question(
         self,
-        chunks: List[ChunkInfo],
-    ) -> Dict[str, List[ChunkInfo]]:
-        """Group chunks by source and merge them if possible while respecting the context_size limit."""
-
-        # Reserve 10% of tokens for prompts and overhead
-        available_tokens = int(self.token_limit * 0.9)
-
-        # First group by source
-        initial_groups = defaultdict(list)
-        for chunk in chunks:
-            initial_groups[chunk.source].append(chunk)
-
-        # Sort each group by source_position
-        for source in initial_groups:
-            initial_groups[source].sort(key=lambda x: x.source_position)
-
-        # Merge chunks within each source group
-        final_groups = {}
-        for source, source_chunks in initial_groups.items():
-            merged_chunks = []
-            current_merged = None
-
-            for chunk in source_chunks:
-                if current_merged is None:
-                    # Start a new merged chunk
-                    current_merged = ChunkInfo(
-                        text=chunk.text,
-                        tokens=chunk.tokens,
-                        relevance=chunk.relevance,
-                        metadata=chunk.metadata.copy(),
-                        source=chunk.source,
-                        source_position=chunk.source_position,
-                    )
-                else:
-                    # Check if we can merge with the current chunk
-                    combined_tokens = current_merged.tokens + chunk.tokens
-                    if combined_tokens <= available_tokens:
-                        # Merge chunks
-                        current_merged.text = f"{current_merged.text}\n\n{chunk.text}"
-                        current_merged.tokens = combined_tokens
-                        # Update relevance as weighted average
-                        total_tokens = current_merged.tokens
-                        current_merged.relevance = (
-                            current_merged.relevance * (total_tokens - chunk.tokens)
-                            + chunk.relevance * chunk.tokens
-                        ) / total_tokens
-                        # Update metadata to indicate merged chunk
-                        current_merged.metadata.update(
-                            {
-                                "merged_chunk": True,
-                                "original_positions": current_merged.metadata.get(
-                                    "original_positions",
-                                    [current_merged.source_position],
-                                )
-                                + [chunk.source_position],
-                            }
-                        )
-                    else:
-                        # Add current merged chunk to results and start a new one
-                        merged_chunks.append(current_merged)
-                        current_merged = ChunkInfo(
-                            text=chunk.text,
-                            tokens=chunk.tokens,
-                            relevance=chunk.relevance,
-                            metadata=chunk.metadata.copy(),
-                            source=chunk.source,
-                            source_position=chunk.source_position,
-                        )
-
-            # Add the last merged chunk if exists
-            if current_merged is not None:
-                merged_chunks.append(current_merged)
-
-            final_groups[source] = merged_chunks
-
-        return dict(final_groups)
-
-    def _summarize_chunks(
-        self,
-        summarize_prompt: str,
-        context: str,
-        chunk: str,
-        chunk_token_limit: int,
-        chat_callback,
+        question: str,
+        collection_name: str,
+        metadata_filters: Optional[MetadataFilters] = None,
     ) -> str:
-        """Summarize chunk while considering previous context."""
+        """
+        Generate an answer to a question using a specific collection.
 
-        # Construct the summarization prompt that includes the chunk content
-        chunk_prompt = (
-            f"Please provide a summary for a query, if necessary using previous contexts in approximately {chunk_token_limit} words.\n\n"
-            f"[CONTEXT]{context}\n"
-            f"[QUERY]\n{chunk}"
+        Args:
+            question (str): Question to answer
+            collection_name (str): Name of the collection to use
+            metadata_filter (Optional[MetadataFilters]): Dictionary specifying metadata filtering criteria
+
+        Returns:
+            str: Generated answer
+        """
+        collection = self._get_collection(collection_name)
+        vector_store = ChromaVectorStore(chroma_collection=collection)
+        index = VectorStoreIndex.from_vector_store(
+            vector_store,
+            embed_model=self.embed_model,
+        )
+        query_engine = index.as_query_engine(
+            similarity_top_k=self.params.similarity_top_k,
+            filters=metadata_filters,
         )
 
-        # Prepare the messages for the LLM
-        messages = [
-            {"role": "system", "content": summarize_prompt},
-            {"role": "user", "content": chunk_prompt},
-        ]
+        context = [node.get_content() for node in query_engine.retrieve(question)]
+        context_string = " ".join(context)
 
-        print(f"{messages=}")
+        prompt = f"""
+Context: {context_string}
 
-        summary = chat_callback(messages).strip()
+Instructions:
+1. Answer the question using only the provided context.
+2. If the context is insufficient, say "I cannot answer this question based on the provided information."
+3. Be concise and accurate.
 
-        print(f"received: {summary=}")
+Question: {question}
 
-        # Ensure summary is within token limit
-        if self._estimate_tokens(summary) > chunk_token_limit:
-            words = summary.split()
-            estimated_words_limit = int(chunk_token_limit / 1.3)
-            summary = " ".join(words[:estimated_words_limit])
+Answer:
+        """
+        return self.llm.complete(prompt).text
 
-        return summary
+    def delete_collection(self, collection_name: str) -> None:
+        """
+        Delete a collection and its associated data.
 
-    def _update_accumulated_summary(
-        self, current_summary: str, new_summary: str
-    ) -> str:
-        if not current_summary:
-            return new_summary
-
-        combined = f"{current_summary}\n\n{new_summary}"
-        if self._estimate_tokens(combined) > self.token_limit:
-            words = combined.split()
-            estimated_words_limit = int(self.token_limit / 1.3)
-            combined = " ".join(words[-estimated_words_limit:])
-        return combined
-
-    def _format_source_block(self, source: str, summaries: List[str]) -> str:
-        formatted = f"\n### Source: {source}\n\n"
-        formatted += "\n".join(summaries)
-        return formatted
-
-    def _create_final_context(self, context_blocks: List[str]) -> str:
-        final_context = "\n\n".join(context_blocks)
-        final_context = self._post_process_chunk_summary(final_context)
-
-        if self._estimate_tokens(final_context) > self.token_limit:
-            words = final_context.split()
-            estimated_words_limit = int(self.token_limit / 1.3)
-            final_context = " ".join(words[:estimated_words_limit])
-
-        return final_context
-
-    def _post_process_chunk_summary(self, summary: str) -> str:
-        """Clean up and improve the summary structure"""
-        # Remove multiple consecutive newlines
-        while "\n\n\n" in summary:
-            summary = summary.replace("\n\n\n", "\n\n")
-
-        # Ensure consistent heading formatting
-        summary = summary.replace("####", "###")
-
-        # Clean up whitespace around headings
-        lines = summary.split("\n")
-        cleaned_lines = []
-        for i, line in enumerate(lines):
-            if line.startswith("###"):
-                if i > 0:
-                    cleaned_lines.append("")
-                cleaned_lines.append(line)
-                cleaned_lines.append("")
-            else:
-                cleaned_lines.append(line)
-
-        return "\n".join(cleaned_lines).strip()
-
-
-class RAG(BaseModel):
-    def __init__(self, **kwargs) -> None:
-        """A class for Retrieval Augmented Generation using the ollama library."""
-        super().__init__(**kwargs)
-
-        self.summarize_prompt = kwargs.get("summarize_prompt")
-        self.context_prompt = kwargs.get("context_prompt")
-
-        self.summary_chunk_prompt = kwargs.get("summary_chunk_prompt")
-
-        self.context_manager = ContextManager(**kwargs)
-
-        self.ollama_client = Client()
-        self.chroma_client = chromadb.PersistentClient(
-            path=kwargs.get("persist_directory"),
-            settings=Settings(allow_reset=True, is_persistent=True),
-            tenant=DEFAULT_TENANT,
-            database=DEFAULT_DATABASE,
-        )
-
-        # LLM options
-        self.options: Optional[Options] = kwargs.get("options")
-
-        # Dictionary to store all collections
-        self.collections: Dict[str, RAGCollection] = {}
-
-        # Dictionary to store document references
-        self.document_refs: Dict[str, DocumentReference] = {}
-
-        self._load_existing_collections_and_refs()
-        self.get_or_create_collection("default")
-
-    def _load_existing_collections_and_refs(self):
-        """Load existing collections and document references from the ChromaDB client."""
-        try:
-            existing_collections = self.chroma_client.list_collections()
-
-            for collection_name in existing_collections:
-                # Initialize the collection
-                collection = RAGCollection(collection_name, self.chroma_client)
-                self.collections[collection_name] = collection
-
-                # Load document references from the metadata
-                metadatas = collection.collection.get(include=["metadatas"])[
-                    "metadatas"
-                ]
-                for metadata in metadatas:
-                    document_id = metadata.get("id")
-                    source = metadata.get("source")
-                    if document_id and source:
-                        self.document_refs[document_id] = DocumentReference(
-                            collection_name=collection_name,
-                            document_id=document_id,
-                            source=source,
-                        )
-
-        except Exception as e:
-            print(f"Error loading existing collections or document references: {e}")
-
-    def get_or_create_collection(self, collection_name: str) -> RAGCollection:
-        """Get or create a RAG collection."""
-        if collection_name not in self.collections:
-            self.collections[collection_name] = RAGCollection(
-                collection_name, self.chroma_client
-            )
-        return self.collections[collection_name]
-
-    def get_collections(self) -> List[str]:
-        """Get list of available collections."""
-        return list(self.collections.keys())
-
-    def get_document_refs(self) -> Dict[str, DocumentReference]:
-        """Get all document references."""
-        return self.document_refs
-
-    def get_collection_documents(self, collection_name: str) -> List[Dict]:
-        """Get all documents in a collection."""
-        if collection_name not in self.collections:
-            return []
-
-        collection = self.collections[collection_name]
-        results = collection.collection.get(include=["metadatas"])
-        return results["metadatas"]
-
-    def add_document(
-        self, collection_name: str, file_path: str, document_type: str = None
-    ):
-        """Add a document to a specific collection."""
-        if document_type is None:
-            document_type = Path(file_path).suffix.lower()
-
-        # Get document chunks based on type
-        chunks = self._get_document_chunks(file_path, document_type)
-
-        # Get or create collection and add document
-        collection = self.get_or_create_collection(collection_name)
-        chunk_ids = collection.add_document(file_path, chunks)
-
-        # Store document references - now specific to this collection
-        for chunk_id in chunk_ids:
-            self.document_refs[chunk_id] = DocumentReference(
-                collection_name=collection_name, document_id=chunk_id, source=file_path
-            )
-
-    def _get_document_chunks(self, file_path: str, document_type: str) -> List[str]:
-        """Get chunks from document based on its type."""
-        if document_type in [".pdf", "pdf"]:
-            reader = PdfReader(file_path)
-            return [page.extract_text() for page in reader.pages if page.extract_text()]
-
-        elif document_type in [".md", "md", "markdown"]:
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            return content.split("\n\n")
-
-        else:  # Default to text processing
-            with open(file_path, "r", encoding="utf-8") as f:
-                return f.read().split("\n\n")
-
-    def get_init_messages(
-        self,
-        user_query: str,
-        collection_names: List[str] = None,
-        selected_ids: List[str] = None,
-        progress_callback=None,
-    ) -> List[Dict[str, str]]:
-        """Generates init messages for RAG chat."""
-
-        if collection_names:
-            collections_to_query = [
-                self.collections[name]
-                for name in collection_names
-                if name in self.collections
-            ]
-        else:
-            collections_to_query = list(self.collections.values())
-
-        def summarize_messages(messages):
-            return (
-                self.ollama_client.chat(
-                    model=self.model_id,
-                    messages=messages,
-                    options=self.options,
-                )
-                .get("message", {})
-                .get("content", "")
-            )
-
-        context_text = self.context_manager.get_context_text(
-            user_query=user_query,
-            summarize_prompt=self.summarize_prompt,
-            collections=collections_to_query,
-            selected_ids=selected_ids,
-            chat_callback=summarize_messages,
-            progress_callback=progress_callback,
-        )
-
-        # Construct messages with clear sections and instructions
-        messages = [
-            {"role": "system", "content": self.context_prompt},
-            {
-                "role": "user",
-                "content": f"Please answer based on the following context and query:\n[CONTEXT]\n{context_text}\n[QUERY]\n{user_query}",
-            },
-        ]
-
-        return messages
-
-    def forward(
-        self,
-        user_query: str,
-        collection_names: List[str] = None,
-        selected_ids: List[str] = None,
-    ) -> Iterator[str]:
-        """Generate a response using RAG with filtered and optimized context."""
-
-        messages = self.get_init_messages(
-            user_query=user_query,
-            collection_names=collection_names,
-            selected_ids=selected_ids,
-        )
-
-        # Generate response token by token
-        stream = self.ollama_client.chat(
-            model=self.model_id,
-            messages=messages,
-            stream=True,
-            options=self.options,
-        )
-
-        for chunk in stream:
-            yield chunk["message"]["content"]
+        Args:
+            collection_name (str): Name of the collection to delete
+        """
+        self.chroma_client.delete_collection(collection_name)
+        if collection_name in self._pipelines:
+            del self._pipelines[collection_name]
