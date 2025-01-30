@@ -80,8 +80,8 @@ class RAG(BaseModel):
             List[dict]: List of collection information dictionaries
         """
         collections = []
-        for collection in self.chroma_client.list_collections():
-            info = self.get_collection_info(collection.name)
+        for name in self.chroma_client.list_collections():
+            info = self.get_collection_info(name)
             if info:
                 collections.append(info)
         return collections
