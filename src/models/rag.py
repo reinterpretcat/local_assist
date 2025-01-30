@@ -1,7 +1,7 @@
 import chromadb
 import datetime
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 from pathlib import Path
 
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
@@ -16,7 +16,7 @@ from llama_index.core import Settings
 
 
 @dataclass
-class RAGParameters:
+class DocumentManagerParameters:
     """Configuration parameters for the RAG system."""
 
     # Embedding model parameters
@@ -34,21 +34,8 @@ class RAGParameters:
     similarity_top_k: int = 2
 
     # Supported file types
-    supported_extensions: List[str] = None
-
-    def __post_init__(self):
-        if self.supported_extensions is None:
-            # Taken from https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
-            self.supported_extensions = [
-                ".csv",
-                ".docx",
-                ".epub",
-                ".md ",
-                ".pdf",
-                ".ppt",
-                ".pptm",
-                ".pptx",
-            ]
+    # Taken from https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
+    supported_extensions: List[str] = [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"]
 
 
 class TextCleaner(TransformComponent):
@@ -65,10 +52,12 @@ class TextCleaner(TransformComponent):
 class DocumentManager:
     """Manages document collections and operations using ChromaDB."""
 
-    def __init__(self, persist_dir: str, params: Optional[RAGParameters] = None):
+    def __init__(
+        self, persist_dir: str, params: Optional[DocumentManagerParameters] = None
+    ):
         self.persist_dir = Path(persist_dir)
         self.persist_dir.mkdir(parents=True, exist_ok=True)
-        self.params = params or RAGParameters()
+        self.params = params or DocumentManagerParameters()
         self.embed_model = HuggingFaceEmbedding(model_name=self.params.embed_model_name)
         self.llm = Ollama(
             model=self.params.llm_model,
@@ -90,8 +79,8 @@ class DocumentManager:
             List[dict]: List of collection information dictionaries
         """
         collections = []
-        for name in self.chroma_client.list_collections():
-            info = self.get_collection_info(name)
+        for collection in self.chroma_client.list_collections():
+            info = self.get_collection_info(collection.name)
             if info:
                 collections.append(info)
         return collections
@@ -107,7 +96,7 @@ class DocumentManager:
             dict: Collection information including document count and metadata summary
         """
         try:
-            collection = self._get_collection(collection_name)
+            collection = self.get_collection(collection_name)
             metadata_result = collection.get(include=["metadatas"])
             metadatas = metadata_result.get("metadatas", [])
 
@@ -156,7 +145,7 @@ class DocumentManager:
             for i, _ in enumerate(nodes)
         ]
 
-        collection = self._get_collection(collection_name)
+        collection = self.get_collection(collection_name)
         for node, meta in zip(nodes, metadata):
             node.metadata.update(meta)
             collection.upsert(
@@ -173,9 +162,90 @@ class DocumentManager:
         """
         self.add_documents(file_path, collection_name)
 
+    def delete_document(self, collection_name: str, source_path: str) -> None:
+        """
+        Delete a document and all its chunks from a collection.
+
+        Args:
+            collection_name (str): Name of the collection
+            source_path (str): Source path of the document to delete
+        """
+        collection = self.get_collection(collection_name)
+        # Get all document chunks with matching source path
+        result = collection.get(
+            where={"source": str(source_path)},
+            include=["documents", "metadatas", "ids"],
+        )
+
+        if result["ids"]:
+            # Delete all chunks associated with the document
+            collection.delete(ids=result["ids"])
+
+    def rename_collection(self, old_name: str, new_name: str) -> None:
+        """
+        Rename a collection while preserving its contents.
+
+        Args:
+            old_name (str): Current name of the collection
+            new_name (str): New name for the collection
+        """
+        # Get the old collection
+        old_collection = self.get_collection(old_name)
+
+        # Get all documents from old collection
+        docs = old_collection.get()
+
+        # Create new collection
+        new_collection = self.get_collection(new_name)
+
+        # Copy documents to new collection if there are any
+        if docs["ids"]:
+            new_collection.add(
+                documents=docs["documents"],
+                metadatas=docs["metadatas"],
+                ids=docs["ids"],
+            )
+
+        # Delete old collection
+        self.delete_collection(old_name)
+
+    def get_document_info(self, collection_name: str, source_path: str) -> Dict:
+        """
+        Get information about a specific document in a collection.
+
+        Args:
+            collection_name (str): Name of the collection
+            source_path (str): Source path of the document
+
+        Returns:
+            Dict: Document information including chunk count and metadata
+        """
+        collection = self.get_collection(collection_name)
+        result = collection.get(
+            where={"source": str(source_path)}, include=["metadatas"]
+        )
+
+        if result["metadatas"]:
+            return {
+                "chunk_count": len(result["metadatas"]),
+                "source": source_path,
+                "created_at": result["metadatas"][0].get("created_at"),
+                "chunk_size": result["metadatas"][0].get("chunk_size"),
+            }
+        return None
+
     def _get_or_create_pipeline(self, collection_name: str) -> IngestionPipeline:
+        """
+        Get or create an ingestion pipeline for a collection.
+
+        Args:
+            collection_name (str): Name of the collection
+
+        Returns:
+            IngestionPipeline: The pipeline for document processing
+        """
         if collection_name not in self._pipelines:
-            collection = self._get_collection(collection_name)
+            collection = self.get_collection(collection_name)
             vector_store = ChromaVectorStore(chroma_collection=collection)
             text_splitter = SentenceSplitter(
                 chunk_size=self.params.chunk_size,
@@ -187,7 +257,16 @@ class DocumentManager:
             )
         return self._pipelines[collection_name]
 
-    def _get_collection(self, name: str):
+    def get_collection(self, name: str):
+        """
+        Get or create a ChromaDB collection.
+
+        Args:
+            name (str): Name of the collection
+
+        Returns:
+            chromadb.Collection: The ChromaDB collection
+        """
         return self.chroma_client.get_or_create_collection(name)
 
     def load_collection(self, collection_name: str) -> None:
@@ -197,7 +276,7 @@ class DocumentManager:
         Args:
             collection_name (str): Name of the collection to load
         """
-        collection = self._get_collection(collection_name)
+        collection = self.get_collection(collection_name)
         vector_store = ChromaVectorStore(chroma_collection=collection)
         self._pipelines[collection_name] = IngestionPipeline(vector_store=vector_store)
 
@@ -213,12 +292,12 @@ class DocumentManager:
         Args:
             query (str): Query string
             collection_name (str): Name of the collection to search
-            metadata_filter (Optional[MetadataFilters]): Dictionary specifying metadata filtering criteria
+            metadata_filters (Optional[MetadataFilters]): Metadata filtering criteria
 
         Returns:
             List[str]: Relevant context content
         """
-        collection = self._get_collection(collection_name)
+        collection = self.get_collection(collection_name)
         vector_store = ChromaVectorStore(chroma_collection=collection)
         index = VectorStoreIndex.from_vector_store(
             vector_store, embed_model=self.embed_model
@@ -240,12 +319,12 @@ class DocumentManager:
         Args:
             question (str): Question to answer
             collection_name (str): Name of the collection to use
-            metadata_filter (Optional[MetadataFilters]): Dictionary specifying metadata filtering criteria
+            metadata_filters (Optional[MetadataFilters]): Metadata filtering criteria
 
         Returns:
             str: Generated answer
         """
-        collection = self._get_collection(collection_name)
+        collection = self.get_collection(collection_name)
         vector_store = ChromaVectorStore(chroma_collection=collection)
         index = VectorStoreIndex.from_vector_store(
             vector_store,

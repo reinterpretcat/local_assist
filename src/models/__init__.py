@@ -1,5 +1,5 @@
 from .llm import LLM, ModelInfo
-from .rag import RAG, DocumentReference
+from .rag import DocumentManager, DocumentManagerParameters
 from .stt import STT
 from .tts import TTS
 

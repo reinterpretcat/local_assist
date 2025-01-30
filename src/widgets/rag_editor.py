@@ -1,16 +1,23 @@
 import tkinter as tk
 import os
+from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
-from typing import Optional
-from ..models import RAG
+from typing import Callable, Optional
+from ..models import DocumentManager
 from ..tools import get_button_config, get_list_style
 
 
 class RAGManagementUI:
-    def __init__(self, parent, rag: RAG, on_chat_start):
-        """Initialize the RAG Management UI."""
+    def __init__(self, parent, doc_manager: DocumentManager, on_chat_start: Callable):
+        """Initialize the RAG Management UI.
+
+        Args:
+            parent: The parent tkinter widget
+            doc_manager: Instance of DocumentManager class
+            on_chat_start: Callback function when starting a new chat
+        """
         self.parent = parent
-        self.rag_model = rag
+        self.doc_manager = doc_manager
         self.on_chat_start = on_chat_start
 
         self.rag_visible = True
@@ -137,7 +144,7 @@ class RAGManagementUI:
         name = tk.simpledialog.askstring("New Collection", "Enter collection name:")
         if name:
             try:
-                self.rag_model.get_or_create_collection(name)
+                _ = self.doc_manager.get_collection(name)
                 self.current_collection = name
                 self.refresh_data_store()
 
@@ -167,8 +174,8 @@ class RAGManagementUI:
 
         try:
             # Add document to the current collection
-            self.rag_model.add_document(
-                collection_name=self.current_collection, file_path=file_path
+            self.doc_manager.add_document(
+                file_path=file_path, collection_name=self.current_collection
             )
 
             # Refresh the tree view
@@ -200,36 +207,29 @@ class RAGManagementUI:
         self.data_store_tree.delete(*self.data_store_tree.get_children())
 
         try:
-            # Get all collections and document references
-            all_collections = self.rag_model.collections.keys()
-            document_refs = self.rag_model.get_document_refs()
-            collections_dict = {}
+            # Get all collections and their info
+            collections = self.doc_manager.list_collections()
 
-            # Group documents by collection and source file
-            for doc_ref in document_refs.values():
-                if doc_ref.collection_name not in collections_dict:
-                    collections_dict[doc_ref.collection_name] = set()
-                collections_dict[doc_ref.collection_name].add(doc_ref.source)
-
-            # Add all collections, even if empty
-            for collection_name in all_collections:
+            for collection_info in collections:
+                collection_name = collection_info["name"]
                 collection_id = f"collection_{collection_name}"
+
+                # Add collection node
                 self.data_store_tree.insert(
                     "", tk.END, iid=collection_id, text=collection_name, values=("", "")
                 )
 
-                # Add documents under collection if they exist
-                sources = collections_dict.get(collection_name, set())
-                for source_path in sources:
-                    file_name = os.path.basename(source_path)
-                    file_type = os.path.splitext(source_path)[1][1:].upper()
-                    doc_id = f"doc_{collection_name}_{hash(source_path)}"
+                # Add documents under collection
+                for source in collection_info["unique_sources"]:
+                    file_name = os.path.basename(source)
+                    file_type = Path(source).suffix[1:].upper()
+                    doc_id = f"doc_{collection_name}_{hash(source)}"
 
                     self.data_store_tree.insert(
                         collection_id,
                         tk.END,
                         iid=doc_id,
-                        tags=(source_path,),
+                        tags=(source,),
                         values=(file_name, file_type),
                     )
 
@@ -259,7 +259,7 @@ class RAGManagementUI:
                         "Confirm Delete",
                         f"Are you sure you want to delete the entire collection '{collection_name}'?",
                     ):
-                        self.rag_model.chroma_client.delete_collection(collection_name)
+                        self.doc_manager.delete_collection(collection_name)
                         if self.current_collection == collection_name:
                             self.current_collection = None
                 else:
@@ -267,10 +267,9 @@ class RAGManagementUI:
                     source_path = self.data_store_tree.item(item)["tags"][0]
                     parent_id = self.data_store_tree.parent(item)
                     collection_name = parent_id.replace("collection_", "")
-                    collection = self.rag_model.get_or_create_collection(
-                        collection_name
+                    self.doc_manager.delete_document(
+                        collection_name=collection_name, source_path=source_path
                     )
-                    collection.collection.delete(where={"source": source_path})
 
             self.refresh_data_store()
         except Exception as e:
@@ -290,24 +289,9 @@ class RAGManagementUI:
 
         if new_name and new_name != self.current_collection:
             try:
-                # Get the old collection
-                old_collection = self.rag_model.get_or_create_collection(
-                    self.current_collection
+                self.doc_manager.rename_collection(
+                    old_name=self.current_collection, new_name=new_name
                 )
-                # Create new collection
-                new_collection = self.rag_model.get_or_create_collection(new_name)
-
-                # Move all documents to new collection
-                docs = old_collection.collection.get()
-                if docs["ids"]:
-                    new_collection.collection.add(
-                        documents=docs["documents"],
-                        metadatas=docs["metadatas"],
-                        ids=docs["ids"],
-                    )
-
-                # Delete old collection
-                self.rag_model.chroma_client.delete_collection(self.current_collection)
 
                 # Update current collection
                 self.current_collection = new_name
@@ -322,95 +306,42 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
-    def get_messages(self, user_query, progress_callback=None):
-        """Gets a RAG messages with multiple selected collections."""
-        try:
-            selected_ids = {}
-            selected_collections = set()
-            selected_items = self.data_store_tree.selection()
+    def ask_question(self):
+        """Ask a question to the selected collection."""
+        if not self.current_collection:
+            messagebox.showwarning("Warning", "Please select a collection first.")
+            return
 
-            if selected_items:
-                document_refs = self.rag_model.get_document_refs()
+        question = tk.simpledialog.askstring(
+            "Ask Question",
+            "Enter your question:",
+        )
 
-                for item in selected_items:
-                    if item.startswith("doc_"):
-                        # Document selected
-                        source_path = self.data_store_tree.item(item)["tags"][0]
-                        collection_name = item.split("_")[
-                            1
-                        ]  # Extract collection name from item ID
-                        selected_collections.add(collection_name)
+        if question:
+            try:
+                answer = self.doc_manager.answer_question(
+                    question=question,
+                    collection_name=self.current_collection,
+                )
 
-                        # Get all document IDs associated with this source file
-                        doc_ids = [
-                            ref.document_id
-                            for ref in document_refs.values()
-                            if ref.source == source_path
-                        ]
-                        if collection_name not in selected_ids:
-                            selected_ids[collection_name] = []
-                        selected_ids[collection_name].extend(doc_ids)
-                    elif item.startswith("collection_"):
-                        # Entire collection selected
-                        collection_name = item.split("_", 1)[1]
-                        selected_collections.add(collection_name)
+                # Start chat with the answer
+                self.on_chat_start(
+                    [
+                        {"role": "user", "content": question},
+                        {"role": "assistant", "content": answer},
+                    ]
+                )
 
-                        # Add all document IDs for the collection
-                        for ref in document_refs.values():
-                            if ref.collection_name == collection_name:
-                                if collection_name not in selected_ids:
-                                    selected_ids[collection_name] = []
-                                selected_ids[collection_name].append(ref.document_id)
-
-            return self.rag_model.get_init_messages(
-                user_query=user_query,
-                collection_names=list(selected_collections),  # Pass list of collections
-                selected_ids=selected_ids,
-                progress_callback=progress_callback,
-            )
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to get chat messages: {e}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to get answer: {e}")
 
     def set_query(self):
         """Sets context to selected chat."""
-
-        editor = RAGQueryEditor(
-            self.parent,
-            theme=self.theme,
-            summarize_prompt=self.rag_model.summarize_prompt,
-            context_prompt=self.rag_model.context_prompt,
-        )
-        if hasattr(self, "theme"):
-            editor.apply_theme(theme=self.theme)
-
-        def progress_callback(current, total):
-            """Update the progress bar based on the progress_callback."""
-            progress = int((current / total) * 100)
-            editor.progress_bar["value"] = progress
-            editor.progress_label.configure(
-                text=f"Processing Progress: {current} of {total}"
-            )
-            editor.root.update_idletasks()
-
-            if progress < 100:
-                editor.root.after(100, self.parent)
-
-        def on_save_callback(user_query, updated_summary, updated_context):
-            self.rag_model.summarize_prompt = updated_summary
-            self.rag_model.context_prompt = updated_context
-            editor.progress_label.configure(text=f"Processing Progress: starting..")
-            editor.root.update_idletasks()
-            messages = self.get_messages(
-                user_query, progress_callback=progress_callback
-            )
-            self.on_chat_start(messages)
-
-        editor.on_save_callback = on_save_callback
+        print("not implemented")
 
     def toggle(self):
         """Toggle the visibility of the RAG panel."""
-        if not self.rag_model:
+        if not self.doc_manager:
             return
 
         if self.rag_visible:
