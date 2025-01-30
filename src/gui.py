@@ -112,7 +112,9 @@ class AIChatUI:
         # RAG UI
         if self.rag_model:
             self.rag_panel = RAGManagementUI(
-                self.left_panel, self.rag_model, on_chat_start=self.on_rag_chat_start
+                parent=self.left_panel,
+                rag_model=self.rag_model,
+                on_chat_start=self.on_rag_chat_start,
             )
             self.rag_panel.toggle()
 

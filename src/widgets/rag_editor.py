@@ -3,21 +3,21 @@ import os
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 from typing import Callable, Optional
-from ..models import DocumentManager
+from ..models import RAG
 from ..tools import get_button_config, get_list_style
 
 
 class RAGManagementUI:
-    def __init__(self, parent, doc_manager: DocumentManager, on_chat_start: Callable):
+    def __init__(self, parent, rag_model: RAG, on_chat_start: Callable):
         """Initialize the RAG Management UI.
 
         Args:
             parent: The parent tkinter widget
-            doc_manager: Instance of DocumentManager class
+            rag_model: Instance of RAG class
             on_chat_start: Callback function when starting a new chat
         """
         self.parent = parent
-        self.doc_manager = doc_manager
+        self.rag_model = rag_model
         self.on_chat_start = on_chat_start
 
         self.rag_visible = True
@@ -144,7 +144,7 @@ class RAGManagementUI:
         name = tk.simpledialog.askstring("New Collection", "Enter collection name:")
         if name:
             try:
-                _ = self.doc_manager.get_collection(name)
+                _ = self.rag_model.get_collection(name)
                 self.current_collection = name
                 self.refresh_data_store()
 
@@ -164,6 +164,9 @@ class RAGManagementUI:
 
         file_path = filedialog.askopenfilename(
             filetypes=[
+                ("Comma-Separated Values", "*.csv"),
+                ("Microsoft Word", "*.docx"),
+                ("EPUB ebook format", "*.epub"),
                 ("Text Files", "*.txt"),
                 ("Markdown Files", "*.md"),
                 ("PDF Files", "*.pdf"),
@@ -174,7 +177,7 @@ class RAGManagementUI:
 
         try:
             # Add document to the current collection
-            self.doc_manager.add_document(
+            self.rag_model.add_document(
                 file_path=file_path, collection_name=self.current_collection
             )
 
@@ -208,7 +211,7 @@ class RAGManagementUI:
 
         try:
             # Get all collections and their info
-            collections = self.doc_manager.list_collections()
+            collections = self.rag_model.list_collections()
 
             for collection_info in collections:
                 collection_name = collection_info["name"]
@@ -259,7 +262,7 @@ class RAGManagementUI:
                         "Confirm Delete",
                         f"Are you sure you want to delete the entire collection '{collection_name}'?",
                     ):
-                        self.doc_manager.delete_collection(collection_name)
+                        self.rag_model.delete_collection(collection_name)
                         if self.current_collection == collection_name:
                             self.current_collection = None
                 else:
@@ -267,7 +270,7 @@ class RAGManagementUI:
                     source_path = self.data_store_tree.item(item)["tags"][0]
                     parent_id = self.data_store_tree.parent(item)
                     collection_name = parent_id.replace("collection_", "")
-                    self.doc_manager.delete_document(
+                    self.rag_model.delete_document(
                         collection_name=collection_name, source_path=source_path
                     )
 
@@ -289,7 +292,7 @@ class RAGManagementUI:
 
         if new_name and new_name != self.current_collection:
             try:
-                self.doc_manager.rename_collection(
+                self.rag_model.rename_collection(
                     old_name=self.current_collection, new_name=new_name
                 )
 
@@ -319,7 +322,7 @@ class RAGManagementUI:
 
         if question:
             try:
-                answer = self.doc_manager.answer_question(
+                answer = self.rag_model.answer_question(
                     question=question,
                     collection_name=self.current_collection,
                 )
@@ -341,7 +344,7 @@ class RAGManagementUI:
 
     def toggle(self):
         """Toggle the visibility of the RAG panel."""
-        if not self.doc_manager:
+        if not self.rag_model:
             return
 
         if self.rag_visible:

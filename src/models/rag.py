@@ -1,6 +1,5 @@
 import chromadb
 import datetime
-from dataclasses import dataclass
 from typing import Any, List, Optional, Dict
 from pathlib import Path
 
@@ -14,28 +13,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.vector_stores import MetadataFilters
 from llama_index.core import Settings
 
-
-@dataclass
-class DocumentManagerParameters:
-    """Configuration parameters for the RAG system."""
-
-    # Embedding model parameters
-    embed_model_name: str = "all-MiniLM-L6-v2"
-
-    # LLM parameters
-    llm_model: str = "llama3:latest"
-    temperature: float = 0.0
-
-    # Text splitting parameters
-    chunk_size: int = 512
-    chunk_overlap: int = 64
-
-    # Retrieval parameters
-    similarity_top_k: int = 2
-
-    # Supported file types
-    # Taken from https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
-    supported_extensions: List[str] = [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"]
+from .common import BaseModel
 
 
 class TextCleaner(TransformComponent):
@@ -49,23 +27,46 @@ class TextCleaner(TransformComponent):
         return nodes
 
 
-class DocumentManager:
-    """Manages document collections and operations using ChromaDB."""
+class RAG(BaseModel):
+    """Manages RAG on document collections using ChromaDB."""
 
-    def __init__(
-        self, persist_dir: str, params: Optional[DocumentManagerParameters] = None
-    ):
-        self.persist_dir = Path(persist_dir)
+    DEFAULT_PARAMS = {
+        "persist_dir": "./chroma_db",
+        "embed_model_name": "all-MiniLM-L6-v2",
+        "model": "llama3:latest",
+        "temperature": 0.0,
+        "chunk_size": 512,
+        "chunk_overlap": 64,
+        "similarity_top_k": 2,
+        # Check https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
+        "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"],
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # Merge default params with user-provided params
+        params = {**self.DEFAULT_PARAMS, **kwargs}
+
+        self.persist_dir = Path(params["persist_dir"])
         self.persist_dir.mkdir(parents=True, exist_ok=True)
-        self.params = params or DocumentManagerParameters()
-        self.embed_model = HuggingFaceEmbedding(model_name=self.params.embed_model_name)
+
+        self.embed_model_name = params["embed_model_name"]
+        self.llm_model = params["model"]
+        self.temperature = params["temperature"]
+        self.chunk_size = params["chunk_size"]
+        self.chunk_overlap = params["chunk_overlap"]
+        self.similarity_top_k = params["similarity_top_k"]
+        self.supported_extensions = params["supported_extensions"]
+
+        self.embed_model = HuggingFaceEmbedding(model_name=self.embed_model_name)
         self.llm = Ollama(
-            model=self.params.llm_model,
-            temperature=self.params.temperature,
+            model=self.llm_model,
+            temperature=self.temperature,
             timeout=120,  # Timeout in seconds
         )
-        self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
 
+        self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
         Settings.embed_model = self.embed_model
         Settings.llm = self.llm
 
@@ -122,12 +123,12 @@ class DocumentManager:
             file_filter (Optional[List[str]]): List of specific filenames to load from directory
         """
         path = Path(path)
-        if path.is_file() and path.suffix in self.params.supported_extensions:
+        if path.is_file() and path.suffix in self.supported_extensions:
             reader = SimpleDirectoryReader(input_files=[str(path)])
         else:
             reader = SimpleDirectoryReader(
                 input_dir=str(path),
-                required_exts=self.params.supported_extensions,
+                required_exts=self.supported_extensions,
                 input_files=file_filter,
             )
 
@@ -139,7 +140,7 @@ class DocumentManager:
             {
                 "id": str(i),
                 "source": str(path),
-                "chunk_size": self.params.chunk_size,
+                "chunk_size": self.chunk_size,
                 "created_at": datetime.datetime.now().isoformat(),
             }
             for i, _ in enumerate(nodes)
@@ -248,8 +249,8 @@ class DocumentManager:
             collection = self.get_collection(collection_name)
             vector_store = ChromaVectorStore(chroma_collection=collection)
             text_splitter = SentenceSplitter(
-                chunk_size=self.params.chunk_size,
-                chunk_overlap=self.params.chunk_overlap,
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
             )
             self._pipelines[collection_name] = IngestionPipeline(
                 transformations=[TextCleaner(), text_splitter],
@@ -303,7 +304,7 @@ class DocumentManager:
             vector_store, embed_model=self.embed_model
         )
         retriever = index.as_retriever(
-            similarity_top_k=self.params.similarity_top_k, filters=metadata_filters
+            similarity_top_k=self.similarity_top_k, filters=metadata_filters
         )
         return [node.get_content() for node in retriever.retrieve(query)]
 
@@ -331,7 +332,7 @@ class DocumentManager:
             embed_model=self.embed_model,
         )
         query_engine = index.as_query_engine(
-            similarity_top_k=self.params.similarity_top_k,
+            similarity_top_k=self.similarity_top_k,
             filters=metadata_filters,
         )
 

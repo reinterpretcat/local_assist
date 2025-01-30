@@ -62,15 +62,15 @@ default_config = {
     },
     # retrieval augument generation config
     "rag": {
-        # vector store path
-        "persist_directory": ".chromadb",
+        "model": "llama3:latest",
+        "persist_dir": ".chromadb",
+        "embed_model_name": "all-MiniLM-L6-v2",
+        "temperature": 0.0,
         # Text splitting parameters
         "chunk_size": 512,
         "chunk_overlap": 64,
         # Retrieval parameters
         "similarity_top_k": 2,
-        # Supported file types: stick to internal details
-        "supported_extensions": None,
     },
     # speech to text config
     "stt": {
