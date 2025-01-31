@@ -116,7 +116,7 @@ class AIChatUI:
                 rag_model=self.rag_model,
                 on_context_set=self.handle_rag_context,
             )
-            self.rag_panel.toggle()
+            self.handle_rag_toggle()
 
         self.chat_menu = ChatMenu(
             self.root,
@@ -175,7 +175,7 @@ class AIChatUI:
         )
         self.root.bind("<F8>", self.open_llm_settings)
         if self.rag_model:
-            self.root.bind("<F9>", lambda _: self.rag_panel.toggle())
+            self.root.bind("<F9>", self.handle_rag_toggle)
 
         self.apply_theme(self.theme)
 
@@ -580,9 +580,17 @@ class AIChatUI:
 
         self.update_statistics()
 
-    def handle_rag_context(self, collection, metadata_filters):
+    def handle_rag_context(self, collection_name, metadata_filters):
         """Handle the start of a RAG chat with selected data"""
-        print(f"{collection=}\n{metadata_filters=}")
+        self.rag_collection = collection_name
+        self.rag_filters = metadata_filters
+
+    def handle_rag_toggle(self, event=None):
+        """Handles RAG toggling"""
+        self.rag_collection = None
+        self.rag_filters = None
+
+        self.rag_panel.toggle()
 
     def apply_theme(self, theme):
         # Configure root and main frames

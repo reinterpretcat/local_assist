@@ -274,18 +274,30 @@ class LLM(BaseModel):
         # Join and return status string
         self.response_statistic = "|".join(status_parts)
 
-    def forward(self, message: str, image_path: Optional[str] = None) -> Iterator[str]:
+    def forward(
+        self,
+        message: str,
+        prompt_callback: Optional[Callable] = None,
+        image_path: Optional[str] = None,
+    ) -> Iterator[str]:
         """
         Generate text from user input using the specified LLM.
 
         Args:
-            message: The user input message.
+            message:         The user input message.
+            prompt_callback: The prompt callback to format message's content differently
+            image_path     : Image path (for multimodal LLM only)
 
         Returns:
             An iterator that yields the generated text in chunks.
         """
 
-        message = {"role": "user", "content": message}
+        if prompt_callback == None:
+            prompt = message
+        else:
+            prompt = prompt_callback(message)
+
+        message = {"role": "user", "content": prompt}
         if image_path:
             # TODO add more images support
             message["images"] = [image_path]

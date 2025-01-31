@@ -84,16 +84,9 @@ class RAGManagementUI:
             command=self.delete_selected,
             **button_style,
         )
-        self.delete_button.pack(side=tk.LEFT, padx=5, pady=5)
+        self.delete_button.pack(side=tk.RIGHT, padx=5, pady=5)
         create_tooltip(self.delete_button, "Delete Selected Documents")
 
-        self.context_button = tk.Button(
-            self.collection_frame, text="📍", command=self.set_context, **button_style
-        )
-        self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
-        create_tooltip(self.context_button, "Set Context")
-
-        # Configure style for proper row height
         style = ttk.Style()
         style.configure(
             "RAG.Treeview",
@@ -145,6 +138,9 @@ class RAGManagementUI:
         # Identify the collection
         first_item = selected_items[0]
         if first_item.startswith("collection_"):
+            # Make sure that it is expanded
+            self.data_store_tree.item(first_item, open=True)
+
             # If collection node selected, select all its documents
             collection_name = first_item.replace("collection_", "")
             self.current_collection = collection_name
@@ -165,16 +161,17 @@ class RAGManagementUI:
             collection_parent = self.data_store_tree.parent(first_item)
             self.current_collection = collection_parent.replace("collection_", "")
 
-        self.update_button_states()
+        self.update_states()
 
-    def update_button_states(self):
-        """Update button states based on current selection."""
+    def update_states(self):
+        """Update button states and context based on current selection."""
         has_collection = bool(self.current_collection)
         self.rename_collection_button.config(
             state="normal" if has_collection else "disabled"
         )
         self.upload_button.config(state="normal" if has_collection else "disabled")
-        self.context_button.config(state="normal" if has_collection else "disabled")
+
+        self.handle_context_change()
 
     def create_new_collection(self):
         """Create a new collection."""
@@ -281,7 +278,7 @@ class RAGManagementUI:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to refresh data store: {e}")
 
-        self.update_button_states()
+        self.update_states()
 
     def delete_selected(self):
         """Delete selected documents and cleanup empty collections."""
@@ -315,7 +312,7 @@ class RAGManagementUI:
 
             # Refresh data store to reflect deletions
             self.refresh_data_store()
-            self.update_button_states()
+            self.update_states()
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete items: {e}")
@@ -351,12 +348,7 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
-    def set_context(self):
-        """Sets context to selected chat."""
-        if not self.current_collection:
-            messagebox.showwarning("Warning", "Please select a collection first.")
-            return
-
+    def handle_context_change(self):
         selected_items = self.data_store_tree.selection()
 
         # Exclude collection nodes
@@ -365,13 +357,14 @@ class RAGManagementUI:
         ]
 
         if not document_items:
+            self.on_context_set(None, None)
             return None
 
         selected_sources = {
             self.data_store_tree.item(item)["tags"][0] for item in document_items
         }
 
-        metadata_filers = (
+        metadata_filters = (
             MetadataFilters(
                 filters=[
                     ExactMatchFilter(key="source", value=source)
@@ -383,18 +376,21 @@ class RAGManagementUI:
             else None
         )
 
-        if not selected_sources:
-            if not messagebox.askyesno(
-                "No Documents Selected",
-                "No documents are selected. Do you want to search across all documents in the collection?",
-            ):
-                return
-            selected_sources = None
+        if metadata_filters == None:
+            self.on_context_set(None, None)
+        else:
+            self.on_context_set(
+                self.current_collection,
+                metadata_filters=metadata_filters,
+            )
 
-        self.on_context_set(
-            self.current_collection,
-            metadata_filters=metadata_filers,
-        )
+    def collapse_and_deselect(self):
+        # Collapse all items
+        for item in self.data_store_tree.get_children():
+            self.data_store_tree.item(item, open=False)
+
+        # Remove all selections
+        self.data_store_tree.selection_remove(*self.data_store_tree.selection())
 
     def toggle(self):
         """Toggle the visibility of the RAG panel."""
@@ -405,7 +401,9 @@ class RAGManagementUI:
             self.frame.pack_forget()
         else:
             self.frame.pack(fill=tk.BOTH, expand=True)
+
         self.rag_visible = not self.rag_visible
+        self.collapse_and_deselect()
 
     def apply_theme(self, theme):
         self.theme = theme
@@ -435,7 +433,6 @@ class RAGManagementUI:
             self.new_collection_button,
             self.rename_collection_button,
             self.upload_button,
-            self.context_button,
             self.delete_button,
         ]:
             button.configure(**button_config)
