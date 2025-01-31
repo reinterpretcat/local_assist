@@ -14,6 +14,8 @@ from .toolbar import create_tooltip
 
 
 class RAGManagementUI:
+    """Provides the way to use RAG on documents."""
+
     def __init__(self, parent, rag_model: RAG, on_context_set: Callable):
         """Initialize the RAG Management UI.
 
@@ -33,7 +35,7 @@ class RAGManagementUI:
         self.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
         # Data Store Section
-        self.data_store_frame = tk.LabelFrame(self.frame, text="Data Store")
+        self.data_store_frame = tk.LabelFrame(self.frame, text="RAG Data Store")
         self.data_store_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
 
         # Create a frame to hold the Treeview and scrollbars
