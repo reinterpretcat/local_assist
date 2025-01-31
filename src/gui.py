@@ -174,6 +174,8 @@ class AIChatUI:
             ),
         )
         self.root.bind("<F8>", self.open_llm_settings)
+        if self.rag_model:
+            self.root.bind("<F9>", lambda _: self.rag_panel.toggle())
 
         self.apply_theme(self.theme)
 
