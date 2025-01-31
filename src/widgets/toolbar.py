@@ -1,8 +1,9 @@
 import tkinter as tk
 import re
 from ..models import RoleNames
+from .tooltips import create_tooltip
 from typing import Callable
-from tkinter import simpledialog, messagebox
+from tkinter import messagebox
 
 
 class ChatToolBar:
@@ -35,59 +36,38 @@ class ChatToolBar:
             self.frame, text="🗑️", command=self.remove_last_message, **button_style
         )
         self.remove_last_btn.pack(side=tk.RIGHT, padx=2)
-        self._create_tooltip(self.remove_last_btn, "Remove Last Message")
+        create_tooltip(self.remove_last_btn, "Remove Last Message")
 
         # Run last code snippet button
         self.run_last_btn = tk.Button(
             self.frame, text="▶", command=self.run_code_snippet, **button_style
         )
         self.run_last_btn.pack(side=tk.RIGHT, padx=2)
-        self._create_tooltip(self.run_last_btn, "Run Last Code Snippet")
+        create_tooltip(self.run_last_btn, "Run Last Code Snippet")
 
         # Edit last message button
         self.edit_last_btn = tk.Button(
             self.frame, text="📝", command=self.edit_last_message, **button_style
         )
         self.edit_last_btn.pack(side=tk.RIGHT, padx=2)
-        self._create_tooltip(self.edit_last_btn, "Edit Last Message")
+        create_tooltip(self.edit_last_btn, "Edit Last Message")
 
         # Copy all messages button
         self.copy_all_btn = tk.Button(
             self.frame, text="📑", command=self.copy_all_messages, **button_style
         )
         self.copy_all_btn.pack(side=tk.RIGHT, padx=2)
-        self._create_tooltip(self.copy_all_btn, "Copy All Messages")
+        create_tooltip(self.copy_all_btn, "Copy All Messages")
 
         # Copy last message button
         self.copy_last_btn = tk.Button(
             self.frame, text="📋", command=self.copy_last_message, **button_style
         )
         self.copy_last_btn.pack(side=tk.RIGHT, padx=2)
-        self._create_tooltip(self.copy_last_btn, "Copy Last Message")
+        create_tooltip(self.copy_last_btn, "Copy Last Message")
 
         # Bind the resize event to reposition the toolbar
         parent.bind("<Configure>", lambda event: self.position_toolbar(chat_display))
-
-    def _create_tooltip(self, widget, text):
-        """Create a tooltip for a widget."""
-
-        def show_tooltip(event):
-            tooltip = tk.Toplevel()
-            tooltip.wm_overrideredirect(True)
-            tooltip.wm_geometry(f"+{event.x_root + 10}+{event.y_root + 10}")
-            label = tk.Label(
-                tooltip, text=text, relief="solid", bg="white", pady=2, padx=2
-            )
-            label.pack()
-            widget.tooltip = tooltip
-            widget.after(2000, lambda: tooltip.destroy())
-
-        def hide_tooltip(event):
-            if hasattr(widget, "tooltip"):
-                widget.tooltip.destroy()
-
-        widget.bind("<Enter>", show_tooltip)
-        widget.bind("<Leave>", hide_tooltip)
 
     def copy_last_message(self):
         """Copy the last message to the clipboard."""

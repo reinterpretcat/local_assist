@@ -45,7 +45,8 @@ class RAG(BaseModel):
         # NOTE: actually ignored, but required by BaseModel, so keep it for compatibility
         "model": "llama3:latest",
         # chroma path
-        "persist_dir": "./chroma_db",
+        "persist_dir": ".chroma_db",
+        "embed_cache": ".cache",
         "embed_model_name": "all-MiniLM-L6-v2",
         "chunk_size": 512,
         "chunk_overlap": 64,
@@ -69,7 +70,9 @@ class RAG(BaseModel):
         self.similarity_top_k = params["similarity_top_k"]
         self.supported_extensions = params["supported_extensions"]
 
-        self.embed_model = HuggingFaceEmbedding(model_name=self.embed_model_name)
+        self.embed_model = HuggingFaceEmbedding(
+            model_name=self.embed_model_name, cache_folder=params["embed_cache"]
+        )
         self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
         Settings.embed_model = self.embed_model
         # NOTE: set it only to prevent switching to defaults (which is OpenAI)

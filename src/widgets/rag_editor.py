@@ -10,6 +10,7 @@ from llama_index.core.vector_stores import (
 )
 from ..models import RAG
 from ..tools import get_button_config, get_list_style
+from .toolbar import create_tooltip
 
 
 class RAGManagementUI:
@@ -31,30 +32,6 @@ class RAGManagementUI:
         self.frame = tk.Frame(parent)
         self.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
-        # Collection Management Section
-        self.collection_frame = tk.LabelFrame(self.frame, text="Collection Management")
-        self.collection_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        # Collection management buttons
-        self.new_collection_button = tk.Button(
-            self.collection_frame,
-            text="New",
-            command=self.create_new_collection,
-        )
-        self.new_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        self.rename_collection_button = tk.Button(
-            self.collection_frame,
-            text="Rename",
-            command=self.rename_collection,
-        )
-        self.rename_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        self.delete_button = tk.Button(
-            self.collection_frame, text="Delete Selected", command=self.delete_selected
-        )
-        self.delete_button.pack(side=tk.RIGHT, padx=5, pady=5)
-
         # Data Store Section
         self.data_store_frame = tk.LabelFrame(self.frame, text="Data Store")
         self.data_store_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
@@ -62,6 +39,57 @@ class RAGManagementUI:
         # Create a frame to hold the Treeview and scrollbars
         self.tree_frame = tk.Frame(self.data_store_frame)
         self.tree_frame.pack(fill=tk.BOTH, padx=5, pady=5, expand=True)
+
+        # Collection Management Section
+        self.collection_frame = tk.LabelFrame(self.frame)
+        self.collection_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        button_style = {
+            "width": 2,
+            "height": 1,
+            "relief": "flat",
+            "font": ("TkDefaultFont", 8),
+        }
+
+        # Collection management buttons
+        self.new_collection_button = tk.Button(
+            self.collection_frame,
+            text="➕",
+            command=self.create_new_collection,
+            **button_style,
+        )
+        self.new_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.new_collection_button, "Create New Collection")
+
+        self.upload_button = tk.Button(
+            self.collection_frame, text="📎", command=self.upload_file, **button_style
+        )
+        self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.upload_button, "Upload New Document")
+
+        self.rename_collection_button = tk.Button(
+            self.collection_frame,
+            text="📝",
+            command=self.rename_collection,
+            **button_style,
+        )
+        self.rename_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.rename_collection_button, "Rename Collection")
+
+        self.delete_button = tk.Button(
+            self.collection_frame,
+            text="🗑",
+            command=self.delete_selected,
+            **button_style,
+        )
+        self.delete_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.delete_button, "Delete Selected Documents")
+
+        self.context_button = tk.Button(
+            self.collection_frame, text="📍", command=self.set_context, **button_style
+        )
+        self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
+        create_tooltip(self.context_button, "Set Context")
 
         # Configure style for proper row height
         style = ttk.Style()
@@ -80,10 +108,10 @@ class RAGManagementUI:
             style="RAG.Treeview",
         )
         self.data_store_tree.heading("Name", text="File Name")
-        self.data_store_tree.heading("Type", text="File Type")
+        self.data_store_tree.heading("Type", text="Type")
 
         # Set column widths
-        self.data_store_tree.column("Name", width=400, minwidth=200)
+        self.data_store_tree.column("Name", width=300, minwidth=150)
         self.data_store_tree.column("Type", width=100, minwidth=80)
 
         # Create vertical scrollbar
@@ -102,16 +130,6 @@ class RAGManagementUI:
 
         # Bind tree selection event
         self.data_store_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
-
-        self.upload_button = tk.Button(
-            self.data_store_frame, text="Upload File", command=self.upload_file
-        )
-        self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
-
-        self.context_button = tk.Button(
-            self.data_store_frame, text="Set Context", command=self.set_context
-        )
-        self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
         # Initialize the UI
         self.refresh_data_store()

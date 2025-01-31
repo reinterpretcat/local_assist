@@ -6,6 +6,7 @@ pyvenv.cfg
 .idea/
 .vscode/
 
+
 history*.json
 history*.json.bak
 example*.txt
@@ -20,4 +21,5 @@ temp/
 /lib
 /share
 
-/.chromadb*
+.chromadb*
+.cache
