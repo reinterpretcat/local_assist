@@ -1,7 +1,7 @@
 import chromadb
 from dataclasses import dataclass
 import datetime
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional
 from pathlib import Path
 
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
@@ -53,6 +53,20 @@ class RAG(BaseModel):
         "similarity_top_k": 2,
         # Check https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
         "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"],
+        # Prompt for answering question
+        "prompt_template": """
+Context: {context}
+
+Instructions:
+1. Answer the question using only the provided context.
+2. If the context is insufficient, say "I cannot answer this question based on the provided information."
+3. Be concise and accurate.
+4. You can use your main (system) prompt for further instructions
+
+Question: {question}
+
+Answer:
+        """,
     }
 
     def __init__(self, llm_model: LLM, **kwargs):
@@ -69,6 +83,7 @@ class RAG(BaseModel):
         self.chunk_overlap = params["chunk_overlap"]
         self.similarity_top_k = params["similarity_top_k"]
         self.supported_extensions = params["supported_extensions"]
+        self.prompt_template = params["prompt_template"]
 
         self.embed_model = HuggingFaceEmbedding(
             model_name=self.embed_model_name, cache_folder=params["embed_cache"]
@@ -79,6 +94,14 @@ class RAG(BaseModel):
         Settings.llm = Ollama(model=llm_model.model_id)
 
         self._pipelines = {}
+
+    def _format_prompt(self, **kwargs) -> str:
+        # Validate template contains required placeholders
+        required = ["{context}", "{question}"]
+        if not all(ph in self.prompt_template for ph in required):
+            raise ValueError(f"Template must contain: {required}")
+
+        return self.prompt_template.format(**kwargs)
 
     def list_collections(self) -> List[dict]:
         """
@@ -233,18 +256,6 @@ class RAG(BaseModel):
         # Delete old collection
         self.delete_collection(old_name)
 
-    # def get_document_sources(self, collection_name: str) -> List[str]:
-    #     """Get list of unique document sources in a collection."""
-    #     collection = self.get_collection(collection_name)
-    #     result = collection.get(
-    #         include=["metadatas"]
-    #     )
-    #     if result["metadatas"]:
-    #         # Extract unique source paths
-    #         sources = {meta["source"] for meta in result["metadatas"] if meta.get("source")}
-    #         return sorted(list(sources))
-    #     return []
-
     def get_document_info(self, collection_name: str, source_path: str) -> Dict:
         """
         Get information about a specific document in a collection.
@@ -344,14 +355,14 @@ class RAG(BaseModel):
         )
         return [node.get_content() for node in retriever.retrieve(query)]
 
-    def answer_question(
+    def retrieve_prompt(
         self,
         question: str,
         collection_name: str,
         metadata_filters: Optional[MetadataFilters] = None,
-    ) -> Iterator[str]:
+    ) -> str:
         """
-        Generate an answer to a question using a specific collection.
+        Retrieve a LLM prompt to a question using a specific collection.
 
         Args:
             question (str): Question to answer
@@ -359,7 +370,7 @@ class RAG(BaseModel):
             metadata_filters (Optional[MetadataFilters]): Metadata filtering criteria
 
         Returns:
-            str: Generated answer
+            str: A prompt to be used with LLM
         """
         collection = self.get_collection(collection_name)
         vector_store = ChromaVectorStore(chroma_collection=collection)
@@ -373,20 +384,33 @@ class RAG(BaseModel):
         )
 
         context = [node.get_content() for node in query_engine.retrieve(question)]
-        context_string = " ".join(context)
 
-        prompt = f"""
-Context: {context_string}
+        return self._format_prompt(question=question, context=" ".join(context))
 
-Instructions:
-1. Answer the question using only the provided context.
-2. If the context is insufficient, say "I cannot answer this question based on the provided information."
-3. Be concise and accurate.
-
-Question: {question}
-
-Answer:
+    def answer_question(
+        self,
+        question: str,
+        collection_name: str,
+        metadata_filters: Optional[MetadataFilters] = None,
+    ) -> Iterator[str]:
         """
+        Generate an answer to a question using default prompt and a specific collection.
+
+        Args:
+            question (str): Question to answer
+            collection_name (str): Name of the collection to use
+            metadata_filters (Optional[MetadataFilters]): Metadata filtering criteria
+
+        Returns:
+            str: Generated answer
+        """
+
+        prompt = self.retrieve_prompt(
+            question=question,
+            collection_name=collection_name,
+            metadata_filters=metadata_filters,
+        )
+
         return self.llm_model.forward(prompt)
 
     def delete_collection(self, collection_name: str) -> None:

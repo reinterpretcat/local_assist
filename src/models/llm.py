@@ -277,7 +277,6 @@ class LLM(BaseModel):
     def forward(
         self,
         message: str,
-        prompt_callback: Optional[Callable] = None,
         image_path: Optional[str] = None,
     ) -> Iterator[str]:
         """
@@ -285,19 +284,13 @@ class LLM(BaseModel):
 
         Args:
             message:         The user input message.
-            prompt_callback: The prompt callback to format message's content differently
             image_path     : Image path (for multimodal LLM only)
 
         Returns:
             An iterator that yields the generated text in chunks.
         """
 
-        if prompt_callback == None:
-            prompt = message
-        else:
-            prompt = prompt_callback(message)
-
-        message = {"role": "user", "content": prompt}
+        message = {"role": "user", "content": message}
         if image_path:
             # TODO add more images support
             message["images"] = [image_path]

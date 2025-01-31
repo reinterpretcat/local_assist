@@ -288,6 +288,14 @@ class AIChatUI:
         min_chunk_size = 10
         splitters = [".", ",", "?", ":", ";"]
 
+        if self.rag_collection != None:
+            user_message = self.rag_model.retrieve_prompt(
+                question=user_message,
+                collection_name=self.rag_collection,
+                metadata_filters=self.rag_filters,
+            )
+            print_system_message(f"RAG for {self.rag_collection}")
+
         for token in self.llm_model.forward(user_message, image_path):
             buffer.append(token)
             if token == "\n" or (len(buffer) >= min_chunk_size and token in splitters):
