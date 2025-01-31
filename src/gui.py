@@ -114,7 +114,7 @@ class AIChatUI:
             self.rag_panel = RAGManagementUI(
                 parent=self.left_panel,
                 rag_model=self.rag_model,
-                on_chat_start=self.on_rag_chat_start,
+                on_context_set=self.handle_rag_context,
             )
             self.rag_panel.toggle()
 
@@ -578,25 +578,9 @@ class AIChatUI:
 
         self.update_statistics()
 
-    def on_rag_chat_start(self, messages):
-        """Handle the start of a RAG chat with initial messages"""
-        if len(messages) != 2:
-            messagebox.showerror("RAG Chat", f"Unexpected messages: {messages}.")
-            return
-
-        # Get currently selected chat, if any
-        if self.chat_history.active_path:
-            # Reset active chat with initial system message
-            self.chat_history.set_active_chat_history([messages[0]])
-            self.chat_display.update([messages[0]])
-
-            # Process user's message
-            self.handle_user_message(messages[1]["content"])
-        else:
-            messagebox.showerror(
-                "RAG Chat",
-                "No selected chat. Please select a chat before starting RAG.",
-            )
+    def handle_rag_context(self, collection, metadata_filters):
+        """Handle the start of a RAG chat with selected data"""
+        print(f"{collection=}\n{metadata_filters=}")
 
     def apply_theme(self, theme):
         # Configure root and main frames

@@ -1,6 +1,7 @@
 import chromadb
+from dataclasses import dataclass
 import datetime
-from typing import Any, List, Optional, Dict
+from typing import Any, Dict, Iterator, List, Optional
 from pathlib import Path
 
 from llama_index.core import SimpleDirectoryReader, VectorStoreIndex
@@ -14,6 +15,16 @@ from llama_index.core.vector_stores import MetadataFilters
 from llama_index.core import Settings
 
 from .common import BaseModel
+from .llm import LLM
+
+
+@dataclass
+class RAGQuery:
+    """Contains data relevanf for quering RAG"""
+
+    question: str
+    collection_name: str
+    metadata_filters: Optional[MetadataFilters] = None
 
 
 class TextCleaner(TransformComponent):
@@ -31,10 +42,11 @@ class RAG(BaseModel):
     """Manages RAG on document collections using ChromaDB."""
 
     DEFAULT_PARAMS = {
+        # NOTE: actually ignored, but required by BaseModel, so keep it for compatibility
+        "model": "llama3:latest",
+        # chroma path
         "persist_dir": "./chroma_db",
         "embed_model_name": "all-MiniLM-L6-v2",
-        "model": "llama3:latest",
-        "temperature": 0.0,
         "chunk_size": 512,
         "chunk_overlap": 64,
         "similarity_top_k": 2,
@@ -42,33 +54,26 @@ class RAG(BaseModel):
         "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"],
     }
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
+    def __init__(self, llm_model: LLM, **kwargs):
         # Merge default params with user-provided params
         params = {**self.DEFAULT_PARAMS, **kwargs}
+        super().__init__(**params)
 
+        self.llm_model = llm_model
         self.persist_dir = Path(params["persist_dir"])
         self.persist_dir.mkdir(parents=True, exist_ok=True)
 
         self.embed_model_name = params["embed_model_name"]
-        self.llm_model = params["model"]
-        self.temperature = params["temperature"]
         self.chunk_size = params["chunk_size"]
         self.chunk_overlap = params["chunk_overlap"]
         self.similarity_top_k = params["similarity_top_k"]
         self.supported_extensions = params["supported_extensions"]
 
         self.embed_model = HuggingFaceEmbedding(model_name=self.embed_model_name)
-        self.llm = Ollama(
-            model=self.llm_model,
-            temperature=self.temperature,
-            timeout=120,  # Timeout in seconds
-        )
-
         self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
         Settings.embed_model = self.embed_model
-        Settings.llm = self.llm
+        # NOTE: set it only to prevent switching to defaults (which is OpenAI)
+        Settings.llm = Ollama(model=llm_model.model_id)
 
         self._pipelines = {}
 
@@ -136,22 +141,29 @@ class RAG(BaseModel):
         pipeline = self._get_or_create_pipeline(collection_name)
         nodes = pipeline.run(documents=documents)
 
-        metadata = [
-            {
-                "id": str(i),
+        # Generate unique IDs for each chunk based on source and chunk index
+        metadata = []
+        for i, node in enumerate(nodes):
+            unique_id = (
+                f"{path.stem}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{i}"
+            )
+            meta = {
+                "id": unique_id,
                 "source": str(path),
                 "chunk_size": self.chunk_size,
                 "created_at": datetime.datetime.now().isoformat(),
+                "chunk_index": i,
+                "total_chunks": len(nodes),
             }
-            for i, _ in enumerate(nodes)
-        ]
+            metadata.append(meta)
 
         collection = self.get_collection(collection_name)
-        for node, meta in zip(nodes, metadata):
-            node.metadata.update(meta)
-            collection.upsert(
-                documents=[node.get_content()], metadatas=[meta], ids=[meta["id"]]
-            )
+
+        # Upsert documents with unique IDs and metadata
+        documents_content = [node.get_content() for node in nodes]
+        ids = [meta["id"] for meta in metadata]
+
+        collection.upsert(documents=documents_content, metadatas=metadata, ids=ids)
 
     def add_document(self, file_path: str, collection_name: str) -> None:
         """
@@ -165,22 +177,30 @@ class RAG(BaseModel):
 
     def delete_document(self, collection_name: str, source_path: str) -> None:
         """
-        Delete a document and all its chunks from a collection.
+        Delete a document and all its chunks from a collection. If no documents are left, collection is also deleted.
 
         Args:
             collection_name (str): Name of the collection
             source_path (str): Source path of the document to delete
         """
         collection = self.get_collection(collection_name)
+
         # Get all document chunks with matching source path
+        # Note: Changed include parameter to only use "metadatas"
         result = collection.get(
-            where={"source": str(source_path)},
-            include=["documents", "metadatas", "ids"],
+            where={"source": str(source_path)}, include=["metadatas"]
         )
 
-        if result["ids"]:
+        # Get IDs from the metadata
+        if result["metadatas"]:
+            ids_to_delete = [meta["id"] for meta in result["metadatas"]]
             # Delete all chunks associated with the document
-            collection.delete(ids=result["ids"])
+            collection.delete(ids=ids_to_delete)
+
+        # Check if collection is now empty
+        remaining_docs = collection.count()
+        if remaining_docs == 0:
+            self.delete_collection(collection_name)
 
     def rename_collection(self, old_name: str, new_name: str) -> None:
         """
@@ -210,6 +230,18 @@ class RAG(BaseModel):
         # Delete old collection
         self.delete_collection(old_name)
 
+    # def get_document_sources(self, collection_name: str) -> List[str]:
+    #     """Get list of unique document sources in a collection."""
+    #     collection = self.get_collection(collection_name)
+    #     result = collection.get(
+    #         include=["metadatas"]
+    #     )
+    #     if result["metadatas"]:
+    #         # Extract unique source paths
+    #         sources = {meta["source"] for meta in result["metadatas"] if meta.get("source")}
+    #         return sorted(list(sources))
+    #     return []
+
     def get_document_info(self, collection_name: str, source_path: str) -> Dict:
         """
         Get information about a specific document in a collection.
@@ -232,6 +264,7 @@ class RAG(BaseModel):
                 "source": source_path,
                 "created_at": result["metadatas"][0].get("created_at"),
                 "chunk_size": result["metadatas"][0].get("chunk_size"),
+                "total_chunks": result["metadatas"][0].get("total_chunks"),
             }
         return None
 
@@ -313,7 +346,7 @@ class RAG(BaseModel):
         question: str,
         collection_name: str,
         metadata_filters: Optional[MetadataFilters] = None,
-    ) -> str:
+    ) -> Iterator[str]:
         """
         Generate an answer to a question using a specific collection.
 
@@ -351,7 +384,7 @@ Question: {question}
 
 Answer:
         """
-        return self.llm.complete(prompt).text
+        return self.llm_model.forward(prompt)
 
     def delete_collection(self, collection_name: str) -> None:
         """
@@ -364,6 +397,10 @@ Answer:
         if collection_name in self._pipelines:
             del self._pipelines[collection_name]
 
-    def forward(self, model_input):
-        print("not implemented")
-        return super().forward(model_input)
+    def forward(self, model_input: RAGQuery) -> Iterator[str]:
+        """Provides the way to query RAG system"""
+        return self.answer_question(
+            question=model_input.question,
+            collection_name=model_input.collection_name,
+            metadata_filters=model_input.metadata_filters,
+        )

@@ -62,10 +62,8 @@ default_config = {
     },
     # retrieval augument generation config
     "rag": {
-        "model": "llama3:latest",
         "persist_dir": ".chromadb",
         "embed_model_name": "all-MiniLM-L6-v2",
-        "temperature": 0.0,
         # Text splitting parameters
         "chunk_size": 512,
         "chunk_overlap": 64,

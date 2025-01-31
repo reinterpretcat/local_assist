@@ -2,23 +2,28 @@ import tkinter as tk
 import os
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
-from typing import Callable, Optional
+from typing import Callable, Optional, Set
+from llama_index.core.vector_stores import (
+    MetadataFilters,
+    ExactMatchFilter,
+    FilterCondition,
+)
 from ..models import RAG
 from ..tools import get_button_config, get_list_style
 
 
 class RAGManagementUI:
-    def __init__(self, parent, rag_model: RAG, on_chat_start: Callable):
+    def __init__(self, parent, rag_model: RAG, on_context_set: Callable):
         """Initialize the RAG Management UI.
 
         Args:
             parent: The parent tkinter widget
             rag_model: Instance of RAG class
-            on_chat_start: Callback function when starting a new chat
+            on_context_set: Callback function to set RAG context
         """
         self.parent = parent
         self.rag_model = rag_model
-        self.on_chat_start = on_chat_start
+        self.on_context_set = on_context_set
 
         self.rag_visible = True
         self.current_collection: Optional[str] = None
@@ -104,7 +109,7 @@ class RAGManagementUI:
         self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
 
         self.context_button = tk.Button(
-            self.data_store_frame, text="Set Query", command=self.set_query
+            self.data_store_frame, text="Set Context", command=self.set_context
         )
         self.context_button.pack(side=tk.RIGHT, padx=5, pady=5)
 
@@ -117,16 +122,28 @@ class RAGManagementUI:
         if not selected_items:
             return
 
-        # Get the selected item and its parent (if any)
-        item = selected_items[0]
-        parent = self.data_store_tree.parent(item)
+        # Identify the collection
+        first_item = selected_items[0]
+        if first_item.startswith("collection_"):
+            # If collection node selected, select all its documents
+            collection_name = first_item.replace("collection_", "")
+            self.current_collection = collection_name
 
-        # If the item is a collection (no parent)
-        if not parent:
-            self.current_collection = item.replace("collection_", "")
+            # Clear and select all documents in this collection
+            self.data_store_tree.selection_remove(*self.data_store_tree.selection())
+            for item in self.data_store_tree.get_children(first_item):
+                self.data_store_tree.selection_add(item)
         else:
-            # If the item is a document, use its parent collection
-            self.current_collection = parent.replace("collection_", "")
+            # For document selection, ensure all are from same collection
+            parent_collections = {
+                self.data_store_tree.parent(item) for item in selected_items
+            }
+            if len(parent_collections) > 1:
+                # If multiple collections, keep only first selection
+                self.data_store_tree.selection_remove(*selected_items[1:])
+
+            collection_parent = self.data_store_tree.parent(first_item)
+            self.current_collection = collection_parent.replace("collection_", "")
 
         self.update_button_states()
 
@@ -164,12 +181,12 @@ class RAGManagementUI:
 
         file_path = filedialog.askopenfilename(
             filetypes=[
-                ("Comma-Separated Values", "*.csv"),
-                ("Microsoft Word", "*.docx"),
-                ("EPUB ebook format", "*.epub"),
                 ("Text Files", "*.txt"),
                 ("Markdown Files", "*.md"),
                 ("PDF Files", "*.pdf"),
+                ("Comma-Separated Values", "*.csv"),
+                ("Microsoft Word", "*.docx"),
+                ("EPUB ebook format", "*.epub"),
             ]
         )
         if not file_path:
@@ -247,34 +264,39 @@ class RAGManagementUI:
         self.update_button_states()
 
     def delete_selected(self):
-        """Delete selected items (files or collections)."""
+        """Delete selected documents and cleanup empty collections."""
+
         selected_items = self.data_store_tree.selection()
-        if not selected_items:
-            messagebox.showwarning("Warning", "No items selected.")
+        selected_docs = [
+            item for item in selected_items if not item.startswith("collection_")
+        ]
+
+        doc_count = len(selected_docs)
+        if doc_count == 0:
+            messagebox.showwarning("Warning", "No documents selected for deletion.")
+            return
+
+        # Confirm deletion
+        if not messagebox.askyesno(
+            "Confirm Deletion",
+            f"Are you sure you want to delete {doc_count} document(s)?",
+        ):
             return
 
         try:
-            for item in selected_items:
-                if item.startswith("collection_"):
-                    # Delete entire collection
-                    collection_name = item.replace("collection_", "")
-                    if messagebox.askyesno(
-                        "Confirm Delete",
-                        f"Are you sure you want to delete the entire collection '{collection_name}'?",
-                    ):
-                        self.rag_model.delete_collection(collection_name)
-                        if self.current_collection == collection_name:
-                            self.current_collection = None
-                else:
-                    # Delete single document
-                    source_path = self.data_store_tree.item(item)["tags"][0]
-                    parent_id = self.data_store_tree.parent(item)
-                    collection_name = parent_id.replace("collection_", "")
-                    self.rag_model.delete_document(
-                        collection_name=collection_name, source_path=source_path
-                    )
+            for item in selected_docs:
+                source_path = self.data_store_tree.item(item)["tags"][0]
+                parent_id = self.data_store_tree.parent(item)
+                collection_name = parent_id.replace("collection_", "")
 
+                self.rag_model.delete_document(
+                    collection_name=collection_name, source_path=source_path
+                )
+
+            # Refresh data store to reflect deletions
             self.refresh_data_store()
+            self.update_button_states()
+
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete items: {e}")
 
@@ -309,38 +331,50 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to rename collection: {e}")
 
-    def ask_question(self):
-        """Ask a question to the selected collection."""
+    def set_context(self):
+        """Sets context to selected chat."""
         if not self.current_collection:
             messagebox.showwarning("Warning", "Please select a collection first.")
             return
 
-        question = tk.simpledialog.askstring(
-            "Ask Question",
-            "Enter your question:",
+        selected_items = self.data_store_tree.selection()
+
+        # Exclude collection nodes
+        document_items = [
+            item for item in selected_items if not item.startswith("collection_")
+        ]
+
+        if not document_items:
+            return None
+
+        selected_sources = {
+            self.data_store_tree.item(item)["tags"][0] for item in document_items
+        }
+
+        metadata_filers = (
+            MetadataFilters(
+                filters=[
+                    ExactMatchFilter(key="source", value=source)
+                    for source in selected_sources
+                ],
+                condition=FilterCondition.OR,
+            )
+            if len(selected_sources) > 0
+            else None
         )
 
-        if question:
-            try:
-                answer = self.rag_model.answer_question(
-                    question=question,
-                    collection_name=self.current_collection,
-                )
+        if not selected_sources:
+            if not messagebox.askyesno(
+                "No Documents Selected",
+                "No documents are selected. Do you want to search across all documents in the collection?",
+            ):
+                return
+            selected_sources = None
 
-                # Start chat with the answer
-                self.on_chat_start(
-                    [
-                        {"role": "user", "content": question},
-                        {"role": "assistant", "content": answer},
-                    ]
-                )
-
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to get answer: {e}")
-
-    def set_query(self):
-        """Sets context to selected chat."""
-        print("not implemented")
+        self.on_context_set(
+            self.current_collection,
+            metadata_filters=metadata_filers,
+        )
 
     def toggle(self):
         """Toggle the visibility of the RAG panel."""

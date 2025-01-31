@@ -27,9 +27,6 @@ async def _real_main(**kwargs):
     rag_config = config.get("rag") or {}
 
     llm_model = LLM(**llm_config) if llm_config else None
-    stt_model = STT(**stt_config) if stt_config else None
-    tts_model = TTS(**tts_config) if tts_config else None
-    rag_model = RAG(**rag_config) if rag_config else None
 
     if not llm_model.exists():
         print_system_message(
@@ -38,6 +35,10 @@ async def _real_main(**kwargs):
             log_level=logging.ERROR,
         )
         return 2
+
+    stt_model = STT(**stt_config) if stt_config else None
+    tts_model = TTS(**tts_config) if tts_config else None
+    rag_model = RAG(llm_model=llm_model, **rag_config) if rag_config else None
 
     root = tk.Tk()
     app = AIChatUI(root, config, llm_model, stt_model, tts_model, rag_model)
