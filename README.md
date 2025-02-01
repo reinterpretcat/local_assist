@@ -17,18 +17,18 @@ This is an experimental project focusing on functionality over code architecture
 - The application was partially used to improve itself - it generated some of its own code!
 - Prioritizes rapid experimentation over architectural patterns (no tests, no good design)
 - My primary use cases:
+  - Learning AI Engineering: experimental playground for understanding capabilities of local hosted LLM on consumer hardware
   - Language learning through AI conversation (e.g. with German TTS/STT configs)
   - Code assistant
-  - learning better AI Engineering: experimental playground for understanding capabilities of local hosted LLM on consumer hardware
 
 ## Key Features
 
 - Integration with Ollama for local LLM hosting
-- Chat history: saving and loading to the file
+- Chat history with sqlite database and ability export/import chat data to json
 - Text-to-Speech (TTS) for AI responses
 - Speech-to-Text (STT) for voice input
-- Code editor with ability to run code (python/rust)
-- A very naive RAG (Retrieval-Augmented Generation) support for chatting about your documents
+- Retrieval-Augmented Generation (RAG) support for chatting about your documents (via llama-index)
+- Code editor with ability to run code for some languages (python/rust)
 - Customizable system prompts and LLM settings (per chat)
 - Custom themes support
 - Basic markdown rendering support and syntax highlighting
@@ -92,7 +92,6 @@ The application supports chatting with your documents through RAG:
 - Upload PDF, Markdown and TXT document formats
 - Automatic document embedding and indexing
 - Context-aware responses based on your documents
-- Currently in experimental phase
 
 ## Known Limitations
 
@@ -110,4 +109,3 @@ This project is open source and available under the MIT License.
 
 - Initial inspiration from the [june](https://github.com/mezbaul-h/june) project
 - Various LLMs that helped generate and improve the code
-- The Ollama team for making local LLM hosting accessible
