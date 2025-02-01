@@ -493,25 +493,44 @@ class ChatHistory:
         target_path: List[str],
         position: Optional[int] = None,
     ):
-        """Move a node to a new location with optional position."""
+        """Move a node to a new location with optional position, including within the same parent."""
         source_id = self.db._get_node_id(source_path)
         target_id = self.db._get_node_id(target_path)
 
-        source_name = self.db._fetch_one(
-            "SELECT name FROM nodes WHERE id = ?", (source_id,)
-        )[0]
+        source_name, source_parent_id, source_position = self.db._fetch_one(
+            "SELECT name, parent_id, position FROM nodes WHERE id = ?", (source_id,)
+        )
 
-        # Check if name exists in target
+        # Check if moving within the same parent
+        is_same_parent = source_parent_id == target_id
+
+        # Check if name already exists in the target, excluding the node being moved
         exists = self.db._fetch_one(
-            "SELECT 1 FROM nodes WHERE parent_id = ? AND name = ?",
-            (target_id, source_name),
+            """
+            SELECT 1 FROM nodes 
+            WHERE parent_id = ? AND name = ? AND id != ?
+            """,
+            (target_id, source_name, source_id),
         )
 
         if exists:
-            raise ValueError(f"Item {source_name} already exists in target location")
+            raise ValueError(
+                f"Item '{source_name}' already exists in the target location."
+            )
 
         if position is not None:
-            # Update positions for reordering
+            if is_same_parent:
+                # Remove source node's position before shifting others
+                self.db._execute_query(
+                    """
+                    UPDATE nodes 
+                    SET position = position - 1 
+                    WHERE parent_id = ? AND position > ?
+                    """,
+                    (source_parent_id, source_position),
+                )
+
+            # Shift positions for target parent
             self.db._execute_query(
                 """
                 UPDATE nodes 
@@ -530,7 +549,7 @@ class ChatHistory:
                 (target_id, position, source_id),
             )
         else:
-            # Move to end of target
+            # Move to the end of target
             new_position = self.db._fetch_one(
                 "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (target_id,)
             )[0]
