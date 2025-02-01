@@ -54,7 +54,7 @@ default_config = {
         #     # controls how much of the previous conversation or text the model
         #     # should remember. This is especially important in longer conversations or when you want the model to keep
         #     # track of a lot of information.
-        #     "num_ctx": 1024
+        #     "num_ctx": 4096
         #
         #     # determines how much text the model generates. Use higher values for longer responses, and lower values for short ones.
         #     "num_predict": 20
@@ -62,13 +62,29 @@ default_config = {
     },
     # retrieval augument generation config
     "rag": {
+        # NOTE: actually ignored, but required by BaseModel, so keep it for compatibility
+        "model": "llama3:latest",
+        # chroma path
         "persist_dir": ".chromadb",
+        "embed_cache": ".cache",
         "embed_model_name": "all-MiniLM-L6-v2",
-        # Text splitting parameters
         "chunk_size": 512,
         "chunk_overlap": 64,
-        # Retrieval parameters
         "similarity_top_k": 2,
+        # Check https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
+        "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"],
+        # Prompt for answering question
+        "prompt_template": """Context: {context}
+
+Instructions:
+1. Answer the question using only the provided context.
+2. If the context is insufficient, say "I cannot answer this question based on the provided information."
+3. Be concise and accurate.
+4. You can use your main (system) prompt for further instructions.
+
+Question: {question}
+
+Answer:""",
     },
     # speech to text config
     "stt": {

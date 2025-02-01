@@ -126,6 +126,7 @@ class AIChatUI:
             on_load_theme=self.load_theme,
             on_code_editor=self.handle_run_code,
             on_toggle_rag_panel=self.rag_panel.toggle if self.rag_model else None,
+            on_rag_settings=self.open_rag_settings if self.rag_model else None,
         )
 
         # Right panel for chat display
@@ -449,6 +450,17 @@ class AIChatUI:
             llm_model=self.llm_model,
             llm_settings=self.chat_history.get_chat_settings().llm,
             on_complete=self.handle_llm_settings,
+        )
+
+    def open_rag_settings(self):
+        def on_save_callback(prompt_template, top_k):
+            self.update_status_message(f"RAG settings updated (globally)")
+
+        _ = RAGSettingsWindow(
+            root=self.root,
+            rag_model=self.rag_model,
+            theme=self.theme,
+            on_save_callback=on_save_callback,
         )
 
     def refresh_llm_settings(self):

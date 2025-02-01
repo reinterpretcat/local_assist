@@ -23,6 +23,7 @@ class ChatMenu:
         on_load_theme: Callable,
         on_code_editor: Callable,
         on_toggle_rag_panel: Optional[Callable],
+        on_rag_settings: Optional[Callable],
     ):
         """Adds chat menu"""
 
@@ -44,6 +45,10 @@ class ChatMenu:
             label=pad_label("LLM Settings"),
             command=on_llm_settings,
         )
+        if on_rag_settings:
+            self.settings_menu.add_command(
+                label=pad_label("RAG Settings"), command=on_rag_settings
+            )
         self.settings_menu.add_command(
             label=pad_label("Change Theme"), command=on_load_theme
         )

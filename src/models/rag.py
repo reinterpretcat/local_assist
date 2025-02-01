@@ -41,52 +41,23 @@ class TextCleaner(TransformComponent):
 class RAG(BaseModel):
     """Manages RAG on document collections using ChromaDB."""
 
-    DEFAULT_PARAMS = {
-        # NOTE: actually ignored, but required by BaseModel, so keep it for compatibility
-        "model": "llama3:latest",
-        # chroma path
-        "persist_dir": ".chroma_db",
-        "embed_cache": ".cache",
-        "embed_model_name": "all-MiniLM-L6-v2",
-        "chunk_size": 512,
-        "chunk_overlap": 64,
-        "similarity_top_k": 2,
-        # Check https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
-        "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"],
-        # Prompt for answering question
-        "prompt_template": """
-Context: {context}
-
-Instructions:
-1. Answer the question using only the provided context.
-2. If the context is insufficient, say "I cannot answer this question based on the provided information."
-3. Be concise and accurate.
-4. You can use your main (system) prompt for further instructions
-
-Question: {question}
-
-Answer:
-        """,
-    }
-
     def __init__(self, llm_model: LLM, **kwargs):
         # Merge default params with user-provided params
-        params = {**self.DEFAULT_PARAMS, **kwargs}
-        super().__init__(**params)
+        super().__init__(**kwargs)
 
         self.llm_model = llm_model
-        self.persist_dir = Path(params["persist_dir"])
+        self.persist_dir = Path(kwargs["persist_dir"])
         self.persist_dir.mkdir(parents=True, exist_ok=True)
 
-        self.embed_model_name = params["embed_model_name"]
-        self.chunk_size = params["chunk_size"]
-        self.chunk_overlap = params["chunk_overlap"]
-        self.similarity_top_k = params["similarity_top_k"]
-        self.supported_extensions = params["supported_extensions"]
-        self.prompt_template = params["prompt_template"]
+        self.embed_model_name = kwargs["embed_model_name"]
+        self.chunk_size = kwargs["chunk_size"]
+        self.chunk_overlap = kwargs["chunk_overlap"]
+        self.similarity_top_k = kwargs["similarity_top_k"]
+        self.supported_extensions = kwargs["supported_extensions"]
+        self.prompt_template = kwargs["prompt_template"]
 
         self.embed_model = HuggingFaceEmbedding(
-            model_name=self.embed_model_name, cache_folder=params["embed_cache"]
+            model_name=self.embed_model_name, cache_folder=kwargs["embed_cache"]
         )
         self.chroma_client = chromadb.PersistentClient(path=str(self.persist_dir))
         Settings.embed_model = self.embed_model
