@@ -278,8 +278,7 @@ class ChatTree:
 
     def on_drag_motion(self, event):
         """Handle drag motion"""
-        if self._drag_data["item"]:
-            self.tree.selection_set(self._drag_data["item"])
+        pass
 
     def on_drag_release(self, event):
         """End drag operation"""

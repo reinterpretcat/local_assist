@@ -207,11 +207,10 @@ def handle_command(self, command):
             )
 
     elif command.startswith("/remove"):
-        if len(args) != 2 and len(args) != 3:
+        if len(args) != 2:
             self.append_system_message(
                 "Syntax for message removal command:\n"
                 "/remove last_n  - Removes last n commands of currenlty selected chat\n"
-                "/remove from to - Removes messages in [from, to], range of currenlty selected chat\n"
             )
 
         elif len(args) == 2:
@@ -219,10 +218,5 @@ def handle_command(self, command):
             self.chat_history.clear_last_n_messages(last_n)
             self.handle_chat_select()
 
-        elif len(args) == 3:
-            start = int(args[1])
-            end = int(args[2])
-            self.chat_history.clear_messages_in_range(start, end)
-            self.handle_chat_select()
     else:
         self.append_system_message(f"Unknown command '{command}")
