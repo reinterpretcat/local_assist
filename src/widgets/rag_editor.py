@@ -56,27 +56,27 @@ class RAGManagementUI:
         # Collection management buttons
         self.new_collection_button = tk.Button(
             self.collection_frame,
-            text="🗂️",
+            text="➕",
             command=self.create_new_collection,
             **button_style,
         )
         self.new_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
         create_tooltip(self.new_collection_button, "Create New Collection")
 
-        self.upload_button = tk.Button(
-            self.collection_frame, text="➕", command=self.upload_file, **button_style
+        self.upload_file_button = tk.Button(
+            self.collection_frame, text="📄", command=self.upload_file, **button_style
         )
-        self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
-        create_tooltip(self.upload_button, "Upload New Document")
+        self.upload_file_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.upload_file_button, "Upload New Document")
 
-        self.rename_collection_button = tk.Button(
+        self.upload_folder_button = tk.Button(
             self.collection_frame,
-            text="📝",
-            command=self.rename_collection,
+            text="📂",
+            command=self.upload_folder_file,
             **button_style,
         )
-        self.rename_collection_button.pack(side=tk.LEFT, padx=5, pady=5)
-        create_tooltip(self.rename_collection_button, "Rename Collection")
+        self.upload_folder_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.upload_folder_button, "Upload New Folder")
 
         self.delete_button = tk.Button(
             self.collection_frame,
@@ -86,6 +86,15 @@ class RAGManagementUI:
         )
         self.delete_button.pack(side=tk.RIGHT, padx=5, pady=5)
         create_tooltip(self.delete_button, "Delete Selected Documents")
+
+        self.rename_collection_button = tk.Button(
+            self.collection_frame,
+            text="📝",
+            command=self.rename_collection,
+            **button_style,
+        )
+        self.rename_collection_button.pack(side=tk.RIGHT, padx=5, pady=5)
+        create_tooltip(self.rename_collection_button, "Rename Collection")
 
         style = ttk.Style()
         style.configure(
@@ -166,10 +175,13 @@ class RAGManagementUI:
     def update_states(self):
         """Update button states and context based on current selection."""
         has_collection = bool(self.current_collection)
-        self.rename_collection_button.config(
-            state="normal" if has_collection else "disabled"
-        )
-        self.upload_button.config(state="normal" if has_collection else "disabled")
+
+        for button in [
+            self.upload_file_button,
+            self.upload_folder_button,
+            self.rename_collection_button,
+        ]:
+            button.config(state="normal" if has_collection else "disabled")
 
         self.handle_context_change()
 
@@ -214,23 +226,44 @@ class RAGManagementUI:
             self.rag_model.add_document(
                 file_path=file_path, collection_name=self.current_collection
             )
-
-            # Refresh the tree view
-            self.refresh_data_store()
-
-            # Expand the current collection and collapse others
-            for item in self.data_store_tree.get_children():
-                if item == f"collection_{self.current_collection}":
-                    self.data_store_tree.item(item, open=True)
-                else:
-                    self.data_store_tree.item(item, open=False)
-
-            # Select the newly added file
-            collection_node = f"collection_{self.current_collection}"
-            self.data_store_tree.see(collection_node)
+            self._select_current_collection()
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to upload file: {e}")
+
+    def upload_folder_file(self):
+        if not self.current_collection:
+            messagebox.showwarning("Warning", "Please select a collection first.")
+            return
+
+        dir_path = filedialog.askdirectory()
+        if not dir_path:
+            return
+
+        try:
+            # Add all supported files from the folder to the current collection
+            self.rag_model.add_documents(
+                path=dir_path, collection_name=self.current_collection
+            )
+            self._select_current_collection()
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to upload file: {e}")
+
+    def _select_current_collection(self):
+        # Refresh the tree view
+        self.refresh_data_store()
+
+        # Expand the current collection and collapse others
+        for item in self.data_store_tree.get_children():
+            if item == f"collection_{self.current_collection}":
+                self.data_store_tree.item(item, open=True)
+            else:
+                self.data_store_tree.item(item, open=False)
+
+        # Select the newly added
+        collection_node = f"collection_{self.current_collection}"
+        self.data_store_tree.see(collection_node)
 
     def refresh_data_store(self):
         """Refresh the data store display with hierarchical view."""
@@ -432,7 +465,8 @@ class RAGManagementUI:
         for button in [
             self.new_collection_button,
             self.rename_collection_button,
-            self.upload_button,
+            self.upload_file_button,
+            self.upload_folder_button,
             self.delete_button,
         ]:
             button.configure(**button_config)

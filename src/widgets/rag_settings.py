@@ -131,7 +131,7 @@ class RAGSettingsWindow:
                 raise ValueError(f"Template must contain: {required}")
 
             self.rag_model.prompt_template = prompt_template
-            self.top_k = top_k
+            self.rag_model.similarity_top_k = top_k
 
             self.on_save_callback(prompt_template, top_k)
 
