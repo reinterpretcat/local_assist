@@ -135,6 +135,23 @@ class RAGManagementUI:
         # Bind tree selection event
         self.data_store_tree.bind("<<TreeviewSelect>>", self.on_tree_select)
 
+        # Create overlay frame for progress
+        self.overlay = tk.Frame(self.frame)
+
+        # Center progress frame
+        self.progress_frame = tk.Frame(self.overlay, relief="solid", borderwidth=1)
+        self.progress_frame.place(relx=0.5, rely=0.5, anchor="center")
+
+        self.progress_bar = ttk.Progressbar(
+            self.progress_frame, mode="indeterminate", length=200
+        )
+        self.progress_bar.pack(padx=20, pady=(20, 10))
+
+        self.progress_label = tk.Label(
+            self.progress_frame, text="", anchor="center", width=30
+        )
+        self.progress_label.pack(padx=20, pady=(0, 20))
+
         # Initialize the UI
         self.refresh_data_store()
 
@@ -222,6 +239,7 @@ class RAGManagementUI:
             return
 
         try:
+            self.show_progress(f"Adding {os.path.basename(file_path)}...")
             # Add document to the current collection
             self.rag_model.add_document(
                 file_path=file_path, collection_name=self.current_collection
@@ -230,6 +248,8 @@ class RAGManagementUI:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to upload file: {e}")
+        finally:
+            self.hide_progress()
 
     def upload_folder_file(self):
         if not self.current_collection:
@@ -241,6 +261,7 @@ class RAGManagementUI:
             return
 
         try:
+            self.show_progress(f"Adding files from {os.path.basename(dir_path)}...")
             # Add all supported files from the folder to the current collection
             self.rag_model.add_documents(
                 path=dir_path, collection_name=self.current_collection
@@ -249,6 +270,8 @@ class RAGManagementUI:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to upload file: {e}")
+        finally:
+            self.hide_progress()
 
     def _select_current_collection(self):
         # Refresh the tree view
@@ -425,6 +448,45 @@ class RAGManagementUI:
         # Remove all selections
         self.data_store_tree.selection_remove(*self.data_store_tree.selection())
 
+    def show_progress(self, message: str):
+        """Show modal progress overlay."""
+        self.overlay.configure(bg=self.theme["bg"])
+        self.overlay.place(x=0, y=0, relwidth=1, relheight=1)
+        self.progress_label.config(text=message)
+        self.progress_bar.start(10)
+
+        # Disable buttons
+        for widget in [
+            self.new_collection_button,
+            self.upload_file_button,
+            self.upload_folder_button,
+            self.delete_button,
+            self.rename_collection_button,
+        ]:
+            widget["state"] = "disabled"
+
+        self.data_store_tree.state(["disabled"])
+        self.frame.update()
+
+    def hide_progress(self):
+        """Hide progress overlay."""
+        self.overlay.place_forget()
+        self.progress_bar.stop()
+
+        # Re-enable buttons
+        for widget in [
+            self.new_collection_button,
+            self.upload_file_button,
+            self.upload_folder_button,
+            self.delete_button,
+            self.rename_collection_button,
+        ]:
+            widget["state"] = "normal"
+
+        self.data_store_tree.state(["!disabled"])
+        self.update_states()
+        self.frame.update()
+
     def toggle(self):
         """Toggle the visibility of the RAG panel."""
         if not self.rag_model:
@@ -484,3 +546,9 @@ class RAGManagementUI:
 
         # Apply styles to Treeview
         self.data_store_tree.configure(style="Treeview")
+
+        # Add progress bar and label theming
+        self.progress_frame.configure(bg=theme["bg"])
+        self.progress_label.configure(
+            bg=theme["bg"], fg=theme["fg"], font=("TkDefaultFont", 10)
+        )
