@@ -111,6 +111,15 @@ class ChatHistoryDB:
             """
             )
 
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS app_state (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """
+            )
+
             # Create root node if doesn't exist
             cursor = conn.execute("SELECT id FROM nodes WHERE parent_id IS NULL")
             if not cursor.fetchone():
@@ -223,7 +232,8 @@ class ChatHistory:
         self.db = ChatHistoryDB(db_path)
         self.default_prompt = default_prompt
         self.history_sort = history_sort
-        self.active_path: Optional[List[str]] = None
+
+        self.active_path = self.get_active_chat()
 
         # Cache for active chat messages
         self._active_messages: List[Dict[str, Any]] = []
@@ -365,8 +375,26 @@ class ChatHistory:
 
     def set_active_chat(self, path: List[str]):
         """Set active chat by path."""
+
+        self.db._execute_query(
+            """
+            INSERT OR REPLACE INTO app_state (key, value)
+            VALUES ('active_chat_path', ?)
+            """,
+            (json.dumps(path) if path else None,),
+        )
+
         self.active_path = path
         self._load_active_chat()
+
+    def get_active_chat(self) -> Optional[List[str]]:
+        """Retrieve the last active chat path from database."""
+        result = self.db._fetch_one(
+            "SELECT value FROM app_state WHERE key = 'active_chat_path'"
+        )
+        if result and result[0]:
+            return json.loads(result[0])
+        return None
 
     def get_active_chat_messages(self) -> List[Dict]:
         """Get messages for an active chat."""
