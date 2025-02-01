@@ -59,7 +59,7 @@ def open_llm_settings_dialog(
     )
 
     settings_window = tk.Toplevel(root)
-    settings_window.title("LLM Settings")
+    settings_window.title("🤖 LLM Settings")
     settings_window.configure(bg=theme["popup_bg"])
     settings_window.grid_columnconfigure(1, weight=1)  # Make second column expandable
 
