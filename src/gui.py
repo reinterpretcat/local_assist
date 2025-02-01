@@ -87,17 +87,6 @@ class AIChatUI:
         # Bind the configuration to when the window is fully loaded
         self.root.bind("<Map>", configure_sash)
 
-        def save_chat_history(event=None):
-            # # silently save to self.config.chat.history_path if defined, otherwise show save dialog
-            # if self.history_path:
-            #     self.chat_history.save_chats(self.history_path)
-            #     self.update_status_message(message="Chats are saved.")
-            # else:
-            #     self.save_chats_to_file()
-            self.chat_history.print_node_hierarchy()
-
-        self.root.bind("<Control-s>", save_chat_history)
-
         # Left panel for chat list and RAG
         self.left_panel = tk.Frame(self.main_paned_window)
         self.left_panel.pack_propagate(False)

@@ -78,6 +78,7 @@ class ChatHistoryDB:
 
     def __init__(self, db_path: str):
         self.db_path = db_path
+        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
     def _init_db(self):
@@ -710,28 +711,28 @@ class ChatHistory:
             default_chat_path = self.create_chat("💬 Default Chat")
             self.set_active_chat(default_chat_path)
 
-    def print_node_hierarchy(self):
-        """Debug method to print the entire node hierarchy."""
+    # def print_node_hierarchy(self):
+    #     """Debug method to print the entire node hierarchy."""
 
-        def print_node(node_id, level=0):
-            nodes = self.db._fetch_all(
-                """
-                SELECT id, name, type, parent_id 
-                FROM nodes 
-                WHERE parent_id = ? 
-                ORDER BY position
-                """,
-                (node_id,),
-            )
+    #     def print_node(node_id, level=0):
+    #         nodes = self.db._fetch_all(
+    #             """
+    #             SELECT id, name, type, parent_id
+    #             FROM nodes
+    #             WHERE parent_id = ?
+    #             ORDER BY position
+    #             """,
+    #             (node_id,),
+    #         )
 
-            for node in nodes:
-                print("  " * level + f"- {node[1]} ({node[2]})")
-                print_node(node[0], level + 1)
+    #         for node in nodes:
+    #             print("  " * level + f"- {node[1]} ({node[2]})")
+    #             print_node(node[0], level + 1)
 
-        root_id = self.db._fetch_one("SELECT id FROM nodes WHERE parent_id IS NULL")[0]
+    #     root_id = self.db._fetch_one("SELECT id FROM nodes WHERE parent_id IS NULL")[0]
 
-        print("Node Hierarchy:")
-        print_node(root_id)
+    #     print("Node Hierarchy:")
+    #     print_node(root_id)
 
     def save_chats(self, filepath: str):
         """Export chat history from SQLite to a JSON file."""

@@ -6,7 +6,7 @@
             "num_ctx": 4096
         }
     },
-    "rag": null,
+    "rag": {},
     "tts": null,
     "stt": null
 }
