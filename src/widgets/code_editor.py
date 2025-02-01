@@ -361,7 +361,7 @@ class CodeEditorWindow(tk.Toplevel):
         on_close: Callable = None,
     ):
         super().__init__(parent)
-        self.title("Code Editor")
+        self.title("💻 Code Editor")
 
         self.on_close = on_close
 

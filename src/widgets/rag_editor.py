@@ -35,7 +35,7 @@ class RAGManagementUI:
         self.frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
 
         # Data Store Section
-        self.data_store_frame = tk.LabelFrame(self.frame, text="RAG Data Store")
+        self.data_store_frame = tk.LabelFrame(self.frame, text="🔍 RAG Data Store")
         self.data_store_frame.pack(fill=tk.BOTH, padx=10, pady=5, expand=True)
 
         # Create a frame to hold the Treeview and scrollbars
@@ -56,7 +56,7 @@ class RAGManagementUI:
         # Collection management buttons
         self.new_collection_button = tk.Button(
             self.collection_frame,
-            text="➕",
+            text="🗂️",
             command=self.create_new_collection,
             **button_style,
         )
@@ -64,7 +64,7 @@ class RAGManagementUI:
         create_tooltip(self.new_collection_button, "Create New Collection")
 
         self.upload_button = tk.Button(
-            self.collection_frame, text="📎", command=self.upload_file, **button_style
+            self.collection_frame, text="➕", command=self.upload_file, **button_style
         )
         self.upload_button.pack(side=tk.LEFT, padx=5, pady=5)
         create_tooltip(self.upload_button, "Upload New Document")
@@ -80,7 +80,7 @@ class RAGManagementUI:
 
         self.delete_button = tk.Button(
             self.collection_frame,
-            text="🗑",
+            text="🗑️",
             command=self.delete_selected,
             **button_style,
         )

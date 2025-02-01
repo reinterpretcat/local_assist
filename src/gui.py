@@ -573,6 +573,9 @@ class AIChatUI:
 
     def update_status_bar(self):
         """Updates information on status bar."""
+        if not hasattr(self, "chat_statusbar"):
+            return
+
         self.chat_statusbar.update_chat_info(self.chat_history.active_path[-1])
 
         chat_settings = self.chat_history.get_chat_settings()
@@ -596,7 +599,10 @@ class AIChatUI:
                 get_model_info(self.llm_model.model_id)
             )
 
-        self.chat_statusbar.update_state_info(self.chat_history.get_chat_settings())
+        self.chat_statusbar.update_state_info(
+            settings=self.chat_history.get_chat_settings(),
+            is_rag_enabled=self.rag_collection != None,
+        )
 
         self.update_statistics()
 
@@ -604,6 +610,7 @@ class AIChatUI:
         """Handle the start of a RAG chat with selected data"""
         self.rag_collection = collection_name
         self.rag_filters = metadata_filters
+        self.update_status_bar()
 
     def handle_rag_toggle(self, event=None):
         """Handles RAG toggling"""

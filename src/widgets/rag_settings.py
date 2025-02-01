@@ -7,7 +7,7 @@ from ..models import RAG
 class RAGSettingsWindow:
     def __init__(self, root, rag_model: RAG, theme: Dict, on_save_callback):
         self.window = tk.Toplevel(root)
-        self.window.title("Settings")
+        self.window.title("🔍 RAG Settings")
         self.window.geometry("800x600")
         self.rag_model = rag_model
         self.theme = theme

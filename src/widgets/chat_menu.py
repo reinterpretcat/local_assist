@@ -33,36 +33,36 @@ class ChatMenu:
 
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(
-            label=pad_label("Save Chats"), command=on_save_chats_to_file
+            label=pad_label("💾 Save Chats"), command=on_save_chats_to_file
         )
         self.file_menu.add_command(
-            label=pad_label("Load Chats"), command=on_load_chats_from_file
+            label=pad_label("📂 Load Chats"), command=on_load_chats_from_file
         )
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         self.settings_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.settings_menu.add_command(
-            label=pad_label("LLM Settings"),
+            label=pad_label("🤖 LLM Settings"),
             command=on_llm_settings,
         )
         if on_rag_settings:
             self.settings_menu.add_command(
-                label=pad_label("RAG Settings"), command=on_rag_settings
+                label=pad_label("🔍 RAG Settings"), command=on_rag_settings
             )
         self.settings_menu.add_command(
-            label=pad_label("Change Theme"), command=on_load_theme
+            label=pad_label("🎨 Change Theme"), command=on_load_theme
         )
         self.menu_bar.add_cascade(label="Settings", menu=self.settings_menu)
 
         self.tools_menu = tk.Menu(self.menu_bar, tearoff=0)
         if on_toggle_rag_panel:
             self.tools_menu.add_command(
-                label=pad_label("Toggle RAG Editor"), command=on_toggle_rag_panel
+                label=pad_label("🔍 Toggle RAG Editor"), command=on_toggle_rag_panel
             )
 
         self.menu_bar.add_cascade(label="Tools", menu=self.tools_menu)
         self.tools_menu.add_command(
-            label=pad_label("Show Code Editor"), command=on_code_editor
+            label=pad_label("💻 Show Code Editor"), command=on_code_editor
         )
 
     def apply_theme(self, theme: Dict):

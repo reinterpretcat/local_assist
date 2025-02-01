@@ -100,7 +100,7 @@ class ChatStatusBar(tk.Frame):
 
         self.stats.config(text=f"Messages: {total_msgs} | Words: {total_words}")
 
-    def update_state_info(self, settings: ChatSettings):
+    def update_state_info(self, settings: ChatSettings, is_rag_enabled = False):
         """Update state info display"""
         state_infos = []
         if settings.replies_allowed:
@@ -112,6 +112,9 @@ class ChatStatusBar(tk.Frame):
             state_infos.append("📝✅")
         else:
             state_infos.append("📝❌")
+            
+        if is_rag_enabled:
+            state_infos.append("🔍")
 
         self.state_info.config(text=f"{' | '.join(state_infos)}")
 
