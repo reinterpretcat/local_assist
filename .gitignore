@@ -22,4 +22,5 @@ temp/
 /share
 
 .chromadb*
+.chat
 .cache

@@ -36,7 +36,7 @@ default_theme = dark_theme
 default_config = {
     # Chat config
     "chat": {
-        "history_path": "history.json",
+        "db_path": ".chat/chats.sqlite3",
         "history_sort": False,
     },
     # LLM config

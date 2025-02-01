@@ -1,6 +1,7 @@
 import tkinter as tk
 import re
 from ..models import RoleNames
+from ..tools import ChatHistory
 from .tooltips import create_tooltip
 from typing import Callable
 from tkinter import messagebox
@@ -11,7 +12,7 @@ class ChatToolBar:
         self,
         parent,
         chat_display,
-        chat_history,
+        chat_history: ChatHistory,
         on_chat_change: Callable,
         on_chat_edit: Callable,
         on_code_editor: Callable,
@@ -116,7 +117,7 @@ class ChatToolBar:
                         # Remove the last assistant message if user message was modified
                         for j in range(len(messages) - 1, last_user_message_index, -1):
                             if messages[j]["role"] == RoleNames.ASSISTANT:
-                                messages.pop(j)
+                                self.chat_history.clear_last_n_messages(n=1)
                                 break
 
                         return True  # Indicate that changes were made
@@ -145,14 +146,12 @@ class ChatToolBar:
 
     def remove_last_message(self):
         """Remove the last message from the active chat."""
-        messages = self.chat_history.get_active_chat_messages()
-        if messages:
-            confirm = messagebox.askyesno(
-                "Confirm", "Are you sure you want to remove the last message?"
-            )
-            if confirm:
-                messages.pop()
-                self.on_chat_change()
+        confirm = messagebox.askyesno(
+            "Confirm", "Are you sure you want to remove the last message?"
+        )
+        if confirm:
+            self.chat_history.clear_last_n_messages(n=1)
+            self.on_chat_change()
 
     def position_toolbar(self, chat_display):
         """Position toolbar at the top-right corner of the chat display."""

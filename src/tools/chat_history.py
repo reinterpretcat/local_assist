@@ -1,9 +1,8 @@
-import shutil
-import json
-import os
-from typing import Any, Dict, Optional
+import sqlite3
 from dataclasses import dataclass, asdict
-from ..utils import print_system_message
+import json
+from typing import List, Optional, Dict, Any
+from pathlib import Path
 
 
 @dataclass
@@ -59,10 +58,6 @@ class ChatSettings:
         if llm_dict:
             result["llm"] = llm_dict
 
-        # Include custom settings only if not empty
-        # if self._custom_settings:
-        #   result["custom_settings"] = self._custom_settings
-
         return result
 
     @classmethod
@@ -75,361 +70,770 @@ class ChatSettings:
         # settings._custom_settings = data.get("custom_settings", {})
         return settings
 
-    # def set_custom_setting(self, key: str, value: Any) -> None:
-    #     """Set a custom setting value."""
-    #     if value is None:
-    #         self._custom_settings.pop(key, None)
-    #     else:
-    #         self._custom_settings[key] = value
-
-    # def get_custom_setting(self, key: str, default: Any = None) -> Any:
-    #     """Get a custom setting value."""
-    #     return self._custom_settings.get(key, default)
-
     def replace(self, **kwargs):
         # Create a new object with the specified updated attributes
         return ChatSettings(**{**self.__dict__, **kwargs})
 
 
+class ChatHistoryDB:
+    """SQLite database manager for chat history."""
+
+    def __init__(self, db_path: str):
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        """Initialize database schema."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS nodes (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    type TEXT NOT NULL,
+                    parent_id INTEGER,
+                    position INTEGER,
+                    settings TEXT,
+                    FOREIGN KEY (parent_id) REFERENCES nodes (id)
+                )
+            """
+            )
+
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY,
+                    node_id INTEGER NOT NULL,
+                    role TEXT NOT NULL,
+                    content TEXT NOT NULL,
+                    image_path TEXT,
+                    position INTEGER NOT NULL,
+                    FOREIGN KEY (node_id) REFERENCES nodes (id)
+                )
+            """
+            )
+
+            # Create root node if doesn't exist
+            cursor = conn.execute("SELECT id FROM nodes WHERE parent_id IS NULL")
+            if not cursor.fetchone():
+                conn.execute(
+                    "INSERT INTO nodes (name, type, parent_id) VALUES (?, ?, ?)",
+                    ("/", "group", None),
+                )
+
+
 class ChatHistory:
-    """Manages chat history."""
+    """Manages chat history using SQLite storage."""
 
-    def __init__(
-        self, default_prompt: Optional[str], history_path=None, history_sort=False
-    ):
-        self.root = {
-            "type": "group",
-            "name": "/",
-            "children": {},  # {name: {type: group/chat, children/messages}}
-        }
-        self.active_path = None  # List of names forming path to active chat
+    def __init__(self, db_path: str, default_prompt: Optional[str], history_sort=False):
+        self.db = ChatHistoryDB(db_path)
         self.default_prompt = default_prompt
-
         self.history_sort = history_sort
-        if history_path:
-            self.load_chats(history_path)
+        self.active_path: Optional[List[str]] = None
 
-            backup_file = history_path + ".bak"
-            if os.path.exists(backup_file):
-                os.remove(backup_file)
-            shutil.copy2(history_path, backup_file)
-            print_system_message(f"history file backed up: `{backup_file}`")
+        # Cache for active chat messages
+        self._active_messages: List[Dict[str, Any]] = []
+        self._active_settings: Optional[ChatSettings] = None
 
         self.ensure_default_chat()
 
-    def ensure_default_chat(self):
-        """Ensure at least one default chat exists."""
-        if not self.root["children"]:
-            default_chat_path = self.create_chat("💬 Default Chat")
-            self.set_active_chat(default_chat_path)
+    def _get_node_id(self, path: List[str]) -> int:
+        """Get node ID for given path."""
+        with sqlite3.connect(self.db.db_path) as conn:
+            current_id = conn.execute(
+                "SELECT id FROM nodes WHERE parent_id IS NULL"
+            ).fetchone()[0]
 
-    def _get_node_by_path(self, path):
-        """Get node at specified path"""
-        current = self.root
-        if not path:
-            return current
+            for name in path:
+                current_id = conn.execute(
+                    "SELECT id FROM nodes WHERE parent_id = ? AND name = ?",
+                    (current_id, name),
+                ).fetchone()[0]
 
-        for name in path:
-            if name not in current["children"]:
-                raise ValueError(f"Path not found: {'/'.join(path)}")
-            current = current["children"][name]
-        return current
+            return current_id
 
-    def _get_parent_path(self, path):
-        """Get parent path and name from full path"""
-        return path[:-1], path[-1] if path else None
+    def _load_active_chat(self):
+        """Load active chat messages and settings into memory."""
+        if not self.active_path:
+            self._active_messages = []
+            self._active_settings = ChatSettings()
+            return
 
-    def create_group(self, name, parent_path=None):
-        """Create a new group at specified path"""
-        parent = self._get_node_by_path(parent_path if parent_path else [])
+        node_id = self._get_node_id(self.active_path)
 
-        if name in parent["children"]:
-            raise ValueError(
-                f"Item already exists at path: {'/'.join(parent_path or [])}/{name}"
+        with sqlite3.connect(self.db.db_path) as conn:
+            # Load messages
+            cursor = conn.execute(
+                """
+                SELECT role, content, image_path 
+                FROM messages 
+                WHERE node_id = ? 
+                ORDER BY position
+                """,
+                (node_id,),
             )
 
-        parent["children"][name] = {"type": "group", "name": name, "children": {}}
+            self._active_messages = [
+                {
+                    "role": role,
+                    "content": content,
+                    **({"image_path": img_path} if img_path else {}),
+                }
+                for role, content, img_path in cursor
+            ]
 
-        return (parent_path or []) + [name]
+            # Load settings
+            settings_json = conn.execute(
+                "SELECT settings FROM nodes WHERE id = ?", (node_id,)
+            ).fetchone()[0]
 
-    def create_chat(self, name, parent_path=None):
-        """Create a new chat at specified path"""
-        parent = self._get_node_by_path(parent_path if parent_path else [])
-
-        if name in parent["children"]:
-            raise ValueError(
-                f"Item already exists at path: {'/'.join(parent_path or [])}/{name}"
+            self._active_settings = (
+                ChatSettings.from_dict(json.loads(settings_json))
+                if settings_json
+                else ChatSettings()
             )
 
-        settings = ChatSettings()
-        settings.llm.system_prompt = self.default_prompt
+    def create_chat(
+        self, name: str, parent_path: Optional[List[str]] = None
+    ) -> List[str]:
+        """Create a new chat at specified path."""
+        parent_path = parent_path or []
 
-        parent["children"][name] = {
-            "type": "chat",
-            "name": name,
-            "settings": settings.to_dict(),
-            "messages": [{"role": "tool", "content": "Welcome to your new chat!"}],
-        }
+        with sqlite3.connect(self.db.db_path) as conn:
+            # Get parent node ID
+            parent_id = self._get_node_id(parent_path)
 
-        return (parent_path or []) + [name]
+            # Check if name exists
+            exists = conn.execute(
+                "SELECT 1 FROM nodes  WHERE parent_id = ? AND name = ?",
+                (parent_id, name),
+            ).fetchone()
 
-    def rename_node(self, old_path, new_name):
-        """Rename group or chat at specified path"""
-        parent_path, old_name = self._get_parent_path(old_path)
-        parent = self._get_node_by_path(parent_path)
+            if exists:
+                raise ValueError(
+                    f"Item already exists at path: {'/'.join(parent_path)}/{name}"
+                )
 
-        if new_name in parent["children"]:
-            raise ValueError(f"Item {new_name} already exists in this location")
+            # Create settings
+            settings = ChatSettings()
+            settings.llm.system_prompt = self.default_prompt
 
-        # Move node to new name
-        node = parent["children"].pop(old_name)
-        node["name"] = new_name
-        parent["children"][new_name] = node
+            # Insert new chat
+            position = conn.execute(
+                "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (parent_id,)
+            ).fetchone()[0]
+
+            cursor = conn.execute(
+                """
+                INSERT INTO nodes (name, type, parent_id, position, settings)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name, "chat", parent_id, position, json.dumps(settings.to_dict())),
+            )
+
+            # Add welcome message
+            conn.execute(
+                """
+                INSERT INTO messages (node_id, role, content, position)
+                VALUES (?, ?, ?, ?)
+                """,
+                (cursor.lastrowid, "tool", "Welcome to your new chat!", 0),
+            )
+
+        return parent_path + [name]
+
+    def append_message(self, role: str, content: str, image_path: Optional[str] = None):
+        """Append message to active chat."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        node_id = self._get_node_id(self.active_path)
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            position = len(self._active_messages)
+            conn.execute(
+                """
+                INSERT INTO messages (node_id, role, content, image_path, position)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (node_id, role, content, image_path, position),
+            )
+
+        # Update cache
+        message = {"role": role, "content": content}
+        if image_path:
+            message["image_path"] = image_path
+        self._active_messages.append(message)
+
+    def set_active_chat(self, path: List[str]):
+        """Set active chat by path."""
+        self.active_path = path
+        self._load_active_chat()
+
+    def get_active_chat_messages(self) -> List[Dict]:
+        """Get messages for an active chat."""
+        return self.get_chat_messages(path=None)
+
+    def get_chat_messages(
+        self, path: Optional[List[str]] = None
+    ) -> List[Dict[str, Any]]:
+        """Get messages for chat at specified path."""
+        if path is None:
+            return self._active_messages.copy()
+
+        if path == self.active_path:
+            return self._active_messages.copy()
+
+        node_id = self._get_node_id(path)
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT role, content, image_path 
+                FROM messages 
+                WHERE node_id = ? 
+                ORDER BY position
+                """,
+                (node_id,),
+            )
+
+            return [
+                {
+                    "role": role,
+                    "content": content,
+                    **({"image_path": img_path} if img_path else {}),
+                }
+                for role, content, img_path in cursor
+            ]
+
+    def get_nodes(self, path: Optional[List[str]] = None) -> List[Dict[str, str]]:
+        """Get all nodes at the specified path."""
+        path = path or []
+        parent_id = self._get_node_id(path)
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT name, type 
+                FROM nodes 
+                WHERE parent_id = ?
+                ORDER BY position
+                """,
+                (parent_id,),
+            )
+
+            nodes = [{"name": name, "type": node_type} for name, node_type in cursor]
+
+            if self.history_sort:
+                return sorted(
+                    nodes, key=lambda x: (x["type"] != "group", x["name"].lower())
+                )
+
+            return nodes
+
+    def create_group(
+        self, name: str, parent_path: Optional[List[str]] = None
+    ) -> List[str]:
+        """Create a new group at specified path."""
+        parent_path = parent_path or []
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            parent_id = self._get_node_id(parent_path)
+
+            # Check if name exists
+            exists = conn.execute(
+                "SELECT 1 FROM nodes  WHERE parent_id = ? AND name = ?",
+                (parent_id, name),
+            ).fetchone()
+
+            if exists:
+                raise ValueError(
+                    f"Item already exists at path: {'/'.join(parent_path)}/{name}"
+                )
+
+            # Insert new group
+            position = conn.execute(
+                "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (parent_id,)
+            ).fetchone()[0]
+
+            conn.execute(
+                """
+                INSERT INTO nodes (name, type, parent_id, position)
+                VALUES (?, ?, ?, ?)
+                """,
+                (name, "group", parent_id, position),
+            )
+
+        return parent_path + [name]
+
+    def rename_node(self, old_path: List[str], new_name: str):
+        """Rename group or chat at specified path."""
+        with sqlite3.connect(self.db.db_path) as conn:
+            node_id = self._get_node_id(old_path)
+            parent_id = conn.execute(
+                "SELECT parent_id FROM nodes WHERE id = ?", (node_id,)
+            ).fetchone()[0]
+
+            # Check if new name exists in parent
+            exists = conn.execute(
+                "SELECT 1 FROM nodes  WHERE parent_id = ? AND name = ?",
+                (parent_id, new_name),
+            ).fetchone()
+
+            if exists:
+                raise ValueError(f"Item {new_name} already exists in this location")
+
+            conn.execute("UPDATE nodes SET name = ? WHERE id = ?", (new_name, node_id))
 
         # Update active path if needed
         if self.active_path and old_path == self.active_path[: len(old_path)]:
             self.active_path = (
-                parent_path + [new_name] + self.active_path[len(old_path) :]
+                old_path[:-1] + [new_name] + self.active_path[len(old_path) :]
             )
 
-    def delete_node(self, path):
-        """Delete group or chat at specified path"""
-        parent_path, name = self._get_parent_path(path)
-        parent = self._get_node_by_path(parent_path)
+    def delete_node(self, path: List[str]):
+        """Delete group or chat at specified path."""
+        with sqlite3.connect(self.db.db_path) as conn:
+            node_id = self._get_node_id(path)
+
+            # Delete all descendant nodes and their messages recursively
+            conn.executescript(
+                f"""
+                WITH RECURSIVE descendants(id) AS (
+                    SELECT {node_id}
+                    UNION ALL
+                    SELECT n.id
+                    FROM nodes n
+                    JOIN descendants d ON n.parent_id = d.id
+                )
+                DELETE FROM messages WHERE node_id IN descendants;
+                
+                WITH RECURSIVE descendants(id) AS (
+                    SELECT {node_id}
+                    UNION ALL
+                    SELECT n.id
+                    FROM nodes n
+                    JOIN descendants d ON n.parent_id = d.id
+                )
+                DELETE FROM nodes WHERE id IN descendants;
+            """
+            )
 
         # Reset active path if deleting active chat or its parent
         if self.active_path and path == self.active_path[: len(path)]:
             self.active_path = None
+            self._active_messages = []
+            self._active_settings = None
 
-        del parent["children"][name]
+    def move_node(
+        self,
+        source_path: List[str],
+        target_path: List[str],
+        position: Optional[int] = None,
+    ):
+        """Move a node to a new location with optional position."""
+        with sqlite3.connect(self.db.db_path) as conn:
+            source_id = self._get_node_id(source_path)
+            target_id = self._get_node_id(target_path)
 
-    def move_node(self, source_path, target_path, position=None):
-        """Move a node to a new location with optional position.
+            source_name = conn.execute(
+                "SELECT name FROM nodes WHERE id = ?", (source_id,)
+            ).fetchone()[0]
 
-        Args:
-            source_path: Path of node to move
-            target_path: Destination path
-            position: Optional index position within target group
-        """
-        source_parent_path, source_name = self._get_parent_path(source_path)
-        source_parent = self._get_node_by_path(source_parent_path)
-        target_parent = self._get_node_by_path(target_path)
+            # Check if name exists in target
+            exists = conn.execute(
+                "SELECT 1 FROM nodes  WHERE parent_id = ? AND name = ?",
+                (target_id, source_name),
+            ).fetchone()
 
-        # Moving within same parent - reorder children
-        if source_parent is target_parent:
-            if position is not None:
-                # Get ordered list of children
-                children = list(source_parent["children"].items())
-
-                # Find source item
-                source_idx = next(
-                    i for i, (name, _) in enumerate(children) if name == source_name
+            if exists:
+                raise ValueError(
+                    f"Item {source_name} already exists in target location"
                 )
 
-                # Remove and reinsert at new position
-                item = children.pop(source_idx)
-                children.insert(position, item)
+            if position is not None:
+                # Update positions for reordering
+                conn.execute(
+                    """
+                    UPDATE nodes 
+                    SET position = position + 1
+                    WHERE parent_id = ? AND position >= ?
+                    """,
+                    (target_id, position),
+                )
 
-                # Update parent's children dict with new order
-                source_parent["children"] = dict(children)
-                return
+                conn.execute(
+                    """
+                    UPDATE nodes 
+                    SET parent_id = ?, position = ?
+                    WHERE id = ?
+                    """,
+                    (target_id, position, source_id),
+                )
+            else:
+                # Move to end of target
+                new_position = conn.execute(
+                    "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (target_id,)
+                ).fetchone()[0]
 
-        # Regular move between different parents
-        if source_name in target_parent["children"]:
-            raise ValueError(f"Item {source_name} already exists in target location")
+                conn.execute(
+                    """
+                    UPDATE nodes 
+                    SET parent_id = ?, position = ?
+                    WHERE id = ?
+                    """,
+                    (target_id, new_position, source_id),
+                )
 
-        node = source_parent["children"].pop(source_name)
-        target_parent["children"][source_name] = node
+            # Update active path if needed
+            if self.active_path and source_path == self.active_path[: len(source_path)]:
+                self.active_path = (
+                    target_path + [source_name] + self.active_path[len(source_path) :]
+                )
 
-        # Update active path if needed
-        if self.active_path and source_path == self.active_path[: len(source_path)]:
-            self.active_path = (
-                target_path + [source_name] + self.active_path[len(source_path) :]
-            )
-
-    def get_chat_settings(self, path=None) -> ChatSettings:
+    def get_chat_settings(self, path: Optional[List[str]] = None) -> ChatSettings:
         """Get settings for specified chat."""
         if path is None:
-            path = self.active_path
+            if not self._active_settings:
+                self._load_active_chat()
+            return self._active_settings
 
-        node = self._get_node_by_path(path)
-        if node["type"] != "chat":
-            raise ValueError("Not a chat node")
+        if path == self.active_path:
+            return self._active_settings
 
-        # Create settings if they don't exist (backward compatibility)
-        if "settings" not in node:
-            node["settings"] = ChatSettings().to_dict()
+        node_id = self._get_node_id(path)
 
-        return ChatSettings.from_dict(node["settings"])
+        with sqlite3.connect(self.db.db_path) as conn:
+            settings_json = conn.execute(
+                "SELECT settings FROM nodes WHERE id = ?", (node_id,)
+            ).fetchone()[0]
 
-    def set_chat_settings(self, settings: ChatSettings, path=None) -> None:
+            return ChatSettings.from_dict(
+                json.loads(settings_json) if settings_json else {}
+            )
+
+    def set_chat_settings(
+        self, settings: ChatSettings, path: Optional[List[str]] = None
+    ):
         """Set settings for specified chat."""
         if path is None:
             path = self.active_path
 
-        node = self._get_node_by_path(path)
-        if node["type"] != "chat":
-            raise ValueError("Not a chat node")
+        if not path:
+            raise ValueError("No chat selected")
 
-        node["settings"] = settings.to_dict()
+        node_id = self._get_node_id(path)
 
-    def get_chat_messages(self, path=None):
-        """Get messages for chat at specified path"""
-        if path is None:
-            path = self.active_path
-
-        node = self._get_node_by_path(path)
-        if node["type"] != "chat":
-            raise ValueError("Not a chat node")
-        return node["messages"]
-
-    def get_nodes(self, path=None):
-        """Get all nodes at the specified path."""
-        # Get parent node
-        parent = self._get_node_by_path(path if path else [])
-
-        # Convert children to list format expected by tree
-        nodes = []
-        for name, node in parent["children"].items():
-            nodes.append({"name": name, "type": node["type"]})
-
-        # Sort nodes: groups first, then alphabetically
-        if self.history_sort:
-            return sorted(
-                nodes, key=lambda x: (x["type"] != "group", x["name"].lower())
+        with sqlite3.connect(self.db.db_path) as conn:
+            conn.execute(
+                "UPDATE nodes SET settings = ? WHERE id = ?",
+                (json.dumps(settings.to_dict()), node_id),
             )
 
-        return nodes
+        if path == self.active_path:
+            self._active_settings = settings
 
-    def append_message(self, role, content, image_path=None):
-        """Append message to active chat"""
-        node = self._ensure_active_chat_node()
-        message = {"role": role, "content": content}
-        if image_path:
-            message["image_path"] = image_path
-        node["messages"].append(message)
-
-    def append_message_partial(self, role, token, is_first_token):
-        """Append message token to active chat"""
+    def append_message_partial(self, role: str, token: str, is_first_token: bool):
+        """Append message token to active chat."""
         if is_first_token:
             self.append_message(role, "")
-
-        # Update the content of the last message
-        messages = self.get_active_chat_messages()
-        if messages and messages[-1]["role"] == role:
-            current_content = messages[-1]["content"]
-            messages[-1]["content"] = current_content + token
-
-    def get_last_message(self):
-        """Returns last message in the active chat."""
-        return self.get_chat_messages(self.active_path)[-1]
-
-    def update_last_message(self, role, token):
-        """Update last message in active chat"""
-        if not self.active_path:
-            raise ValueError("No active chat")
-        node = self._get_node_by_path(self.active_path)
-
-        if node and node["messages"][-1]["role"] == role:
-            node["messages"][-1]["content"] += token
-
-    def set_active_chat(self, path):
-        """Set active chat by path"""
-        node = self._get_node_by_path(path)
-        if node["type"] != "chat":
-            raise ValueError("Selected path is not a chat")
-        self.active_path = path
-
-    def get_active_chat_messages(self):
-        """Get messages from active chat"""
-        if not self.active_path:
-            return []
-        return self.get_chat_messages(self.active_path)
-
-    def load_chats(self, file_path):
-        """Load chat data from external source"""
-
-        with open(file_path, "r", encoding="utf-8") as file:
-            data = json.load(file)
-
-        self.root["children"] = {}
-
-        chat_data = data.get("chats", {})
-        self.active_path = data.get("active_path")
-
-        for chat_name, chat_data in chat_data.items():
-            # Split group path into components
-            group_path = chat_data.get("group", "/").split("/")
-            group_path = [p for p in group_path if p]  # Remove empty components
-
-            # Create group hierarchy
-            current_path = []
-            for group_name in group_path:
-                try:
-                    self.create_group(group_name, current_path)
-                except ValueError:
-                    pass  # Group already exists
-                current_path.append(group_name)
-
-            # Create chat in final group
-            try:
-                chat_path = self.create_chat(chat_name, current_path)
-                node = self._get_node_by_path(chat_path)
-                if "settings" in chat_data:
-                    node["settings"] = chat_data["settings"]
-                node["messages"] = chat_data["messages"]
-            except ValueError:
-                continue  # Skip if chat already exists
-
-        # Restore active chat if valid
-        if self.active_path and self._get_node_by_path(self.active_path):
-            self.set_active_chat(self.active_path)
         else:
-            self.ensure_default_chat()
+            if not self.active_path:
+                raise ValueError("No active chat selected")
 
-    def save_chats(self, filepath):
-        """Save chat history to a JSON file."""
-        import json
+            node_id = self._get_node_id(self.active_path)
+            last_position = len(self._active_messages) - 1
+
+            with sqlite3.connect(self.db.db_path) as conn:
+                conn.execute(
+                    """
+                    UPDATE messages 
+                    SET content = content || ?
+                    WHERE node_id = ? AND position = ?
+                    """,
+                    (token, node_id, last_position),
+                )
+
+            # Update cache
+            self._active_messages[-1]["content"] += token
+
+    def get_last_message(self) -> Dict[str, Any]:
+        """Returns last message in the active chat."""
+        if not self._active_messages:
+            raise ValueError("No messages in active chat")
+        return self._active_messages[-1].copy()
+
+    def set_active_chat_history(self, messages: List[Dict[str, Any]]):
+        """Sets history of an active chat."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        node_id = self._get_node_id(self.active_path)
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            # Delete existing messages
+            conn.execute("DELETE FROM messages WHERE node_id = ?", (node_id,))
+
+            # Insert new messages
+            for i, msg in enumerate(messages):
+                conn.execute(
+                    """
+                    INSERT INTO messages (node_id, role, content, image_path, position)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (node_id, msg["role"], msg["content"], msg.get("image_path"), i),
+                )
+
+        # Update cache
+        self._active_messages = messages.copy()
+
+    def clear_all_messages(self):
+        """Clear all messages for the active chat."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        node_id = self._get_node_id(self.active_path)
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            conn.execute("DELETE FROM messages WHERE node_id = ?", (node_id,))
+
+        self._active_messages = []
+
+    def clear_last_n_messages(self, n: int):
+        """Clear the last `n` messages for the active chat."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        n = max(0, min(n, len(self._active_messages)))
+        if n == 0:
+            return
+
+        node_id = self._get_node_id(self.active_path)
+        start_position = len(self._active_messages) - n
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            conn.execute(
+                """
+                DELETE FROM messages 
+                WHERE node_id = ? AND position >= ?
+                """,
+                (node_id, start_position),
+            )
+
+        self._active_messages = self._active_messages[:-n]
+
+    # def clear_messages_in_range(self, start: int, end: int):
+    #     """Clear messages in the [start, end] range for the active chat."""
+    #     if not self.active_path:
+    #         raise ValueError("No active chat selected")
+
+    #     total_messages = len(self._active_messages)
+    #     start = max(0, start)
+    #     end = min(total_messages - 1, end)
+
+    #     if start > end:
+    #         return
+
+    #     node_id = self._get_node_id(self.active_path)
+
+    #     with sqlite3.connect(self.db.db_path) as conn:
+    #         # Delete messages in range
+    #         conn.execute(
+    #             """
+    #             DELETE FROM messages
+    #             WHERE node_id = ? AND position BETWEEN ? AND ?
+    #             """,
+    #             (node_id, start, end),
+    #         )
+
+    #         # Update positions for remaining messages
+    #         conn.execute(
+    #             """
+    #             UPDATE messages
+    #             SET position = position - ?
+    #             WHERE node_id = ? AND position > ?
+    #             """,
+    #             (end - start + 1, node_id, end),
+    #         )
+
+    #     # Update cache
+    #     self._active_messages = (
+    #         self._active_messages[:start] + self._active_messages[end + 1 :]
+    #     )
+
+    def clear_messages_by_role(self, role: str):
+        """Clear all messages for a given role in the active chat."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        node_id = self._get_node_id(self.active_path)
+
+        with sqlite3.connect(self.db.db_path) as conn:
+            # Get positions of messages to delete
+            positions = [
+                row[0]
+                for row in conn.execute(
+                    """
+                    SELECT position 
+                    FROM messages 
+                    WHERE node_id = ? AND role = ?
+                    ORDER BY position
+                    """,
+                    (node_id, role),
+                )
+            ]
+
+            if not positions:
+                return
+
+            # Delete messages with specified role
+            conn.execute(
+                """
+                DELETE FROM messages 
+                WHERE node_id = ? AND role = ?
+                """,
+                (node_id, role),
+            )
+
+            # Update positions for remaining messages
+            for i, pos in enumerate(positions):
+                conn.execute(
+                    """
+                    UPDATE messages 
+                    SET position = position - 1
+                    WHERE node_id = ? AND position > ?
+                    """,
+                    (node_id, pos - i),
+                )
+
+        # Update cache
+        self._active_messages = [
+            msg for msg in self._active_messages if msg["role"] != role
+        ]
+
+    def ensure_default_chat(self):
+        """Ensure at least one default chat exists."""
+        with sqlite3.connect(self.db.db_path) as conn:
+            # Check if any chats exist
+            has_chats = conn.execute(
+                "SELECT 1 FROM nodes WHERE type = 'chat' LIMIT 1"
+            ).fetchone()
+
+            if not has_chats:
+                default_chat_path = self.create_chat("💬 Default Chat")
+                self.set_active_chat(default_chat_path)
+
+    def print_node_hierarchy(self):
+        """Debug method to print the entire node hierarchy."""
+        with sqlite3.connect(self.db.db_path) as conn:
+
+            def print_node(node_id, level=0):
+                nodes = conn.execute(
+                    """
+                    SELECT id, name, type, parent_id 
+                    FROM nodes 
+                    WHERE parent_id = ? 
+                    ORDER BY position
+                """,
+                    (node_id,),
+                ).fetchall()
+
+                for node in nodes:
+                    print("  " * level + f"- {node[1]} ({node[2]})")
+                    print_node(node[0], level + 1)
+
+            root_id = conn.execute(
+                "SELECT id FROM nodes WHERE parent_id IS NULL"
+            ).fetchone()[0]
+
+            print("Node Hierarchy:")
+            print_node(root_id)
+
+    # IMPORT/EXPORT from json
+
+    def save_chats(self, filepath: str):
+        """Save chat history from SQLite to a JSON file."""
         from pathlib import Path
 
-        def process_node(node, current_path):
-            """Convert node to saveable format"""
-            result = {}
+        def get_node_path(node_id: int) -> str:
+            """Get full path for a node."""
+            with sqlite3.connect(self.db.db_path) as conn:
+                path_components = []
+                current_id = node_id
 
-            if node["type"] == "chat":
-                # For chat nodes, store messages and group path
-                result[node["name"]] = {
-                    "settings": node["settings"],
-                    "messages": node["messages"],
-                    "group": "/" + "/".join(current_path) if current_path else "/",
-                }
-            else:
-                # For group nodes, process all children
-                for child_name, child_node in node["children"].items():
-                    child_result = process_node(
-                        child_node,
-                        (
-                            current_path + [node["name"]]
-                            if node["name"] != "/"
-                            else current_path
-                        ),
-                    )
-                    result.update(child_result)
+                while True:
+                    result = conn.execute(
+                        "SELECT name, parent_id FROM nodes WHERE id = ?", (current_id,)
+                    ).fetchone()
 
-            return result
+                    if not result:
+                        break
+
+                    name, parent_id = result
+                    if parent_id is None:  # Root node
+                        break
+
+                    path_components.append(name)
+                    current_id = parent_id
+
+                return "/" + "/".join(
+                    reversed(path_components[:-1])
+                )  # Exclude chat name
+
+        def get_chat_data() -> dict:
+            """Get all chats with their data."""
+            with sqlite3.connect(self.db.db_path) as conn:
+                # Get all chat nodes
+                chats = conn.execute(
+                    """
+                    SELECT id, name, settings 
+                    FROM nodes 
+                    WHERE type = 'chat'
+                    ORDER BY id
+                    """
+                ).fetchall()
+
+                result = {}
+                for chat_id, chat_name, settings_json in chats:
+                    # Get messages for this chat
+                    messages = conn.execute(
+                        """
+                        SELECT role, content, image_path 
+                        FROM messages 
+                        WHERE node_id = ? 
+                        ORDER BY position
+                        """,
+                        (chat_id,),
+                    ).fetchall()
+
+                    # Convert messages to dict format
+                    messages_data = []
+                    for role, content, image_path in messages:
+                        msg = {"role": role, "content": content}
+                        if image_path:
+                            msg["image_path"] = image_path
+                        messages_data.append(msg)
+
+                    # Build chat data
+                    chat_data = {
+                        "messages": messages_data,
+                        "group": get_node_path(chat_id),
+                    }
+
+                    # Add settings if present
+                    if settings_json:
+                        chat_data["settings"] = json.loads(settings_json)
+
+                    result[chat_name] = chat_data
+
+                return result
 
         try:
             # Create directory if it doesn't exist
             Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
-            # Convert tree structure to flat format
-            chat_data = process_node(self.root, [])
-
-            # Include active path in saved data
-            save_data = {
-                "chats": chat_data,
-                "active_path": self.active_path,
-            }
+            # Build save data
+            save_data = {"chats": get_chat_data(), "active_path": self.active_path}
 
             # Save to file with pretty printing
             with open(filepath, "w", encoding="utf-8") as f:
@@ -438,54 +842,112 @@ class ChatHistory:
         except IOError as e:
             raise IOError(f"Failed to save chat history: {str(e)}")
 
-    def set_active_chat_history(self, messages):
-        """Sets history of an active chat."""
-        node = self._get_node_by_path(self.active_path)
-        node["messages"] = messages
+    def load_chats(self, file_path: str):
+        """Import chat data from JSON file into SQLite database."""
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
 
-    def clear_all_messages(self):
-        """Clear all messages for the active chat."""
-        node = self._ensure_active_chat_node()
+        chat_data = data.get("chats", {})
+        active_path = data.get("active_path")
 
-        node["messages"] = []
+        with sqlite3.connect(self.db.db_path) as conn:
+            # Start with clean slate - remove all existing nodes except root
+            conn.execute("DELETE FROM messages")
+            conn.execute("DELETE FROM nodes WHERE parent_id IS NOT NULL")
 
-    def clear_last_n_messages(self, n: int):
-        """Clear the last `n` messages for the active chat."""
-        node = self._ensure_active_chat_node()
+            # Get root node id
+            root_id = conn.execute(
+                "SELECT id FROM nodes WHERE parent_id IS NULL"
+            ).fetchone()[0]
 
-        total_messages = len(node["messages"])
+            # Helper function to ensure group exists and get its id
+            def ensure_group_path(path_components):
+                current_id = root_id
+                current_path = []
 
-        # Clamp `n` to a valid range
-        n = max(0, min(n, total_messages))
+                for group_name in path_components:
+                    if not group_name:  # Skip empty components
+                        continue
 
-        if n > 0:
-            node["messages"] = node["messages"][:-n]
+                    current_path.append(group_name)
 
-    def clear_messages_in_range(self, start: int, end: int):
-        """Clear messages in the [start, end] range for the active chat."""
-        node = self._ensure_active_chat_node()
+                    # Check if group exists
+                    result = conn.execute(
+                        """
+                        SELECT id FROM nodes 
+                        WHERE parent_id = ? AND name = ?
+                        """,
+                        (current_id, group_name),
+                    ).fetchone()
 
-        total_messages = len(node["messages"])
+                    if result:
+                        current_id = result[0]
+                    else:
+                        # Create new group
+                        position = conn.execute(
+                            "SELECT COUNT(*) FROM nodes WHERE parent_id = ?",
+                            (current_id,),
+                        ).fetchone()[0]
 
-        # Clamp start and end to valid indices
-        start = max(0, start)
-        end = min(total_messages - 1, end)
+                        cursor = conn.execute(
+                            """
+                            INSERT INTO nodes (name, type, parent_id, position)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                            (group_name, "group", current_id, position),
+                        )
+                        current_id = cursor.lastrowid
 
-        if start <= end:
-            node["messages"] = node["messages"][:start] + node["messages"][end + 1 :]
+                return current_id
 
-    def clear_messages_by_role(self, role: str):
-        """Clear all messages for a given role in the active chat."""
-        node = self._ensure_active_chat_node()
+            # Import chats
+            for chat_name, chat_data in chat_data.items():
+                # Process group path
+                group_path = chat_data.get("group", "/").split("/")
+                group_path = [p for p in group_path if p]  # Remove empty components
+                parent_id = ensure_group_path(group_path)
 
-        node["messages"] = [msg for msg in node["messages"] if msg["role"] != role]
+                # Create chat node
+                position = conn.execute(
+                    "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (parent_id,)
+                ).fetchone()[0]
 
-    def _ensure_active_chat_node(self):
-        if not self.active_path:
-            raise ValueError("No active chat selected.")
+                cursor = conn.execute(
+                    """
+                    INSERT INTO nodes (name, type, parent_id, position, settings)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        chat_name,
+                        "chat",
+                        parent_id,
+                        position,
+                        json.dumps(chat_data.get("settings", {})),
+                    ),
+                )
+                chat_id = cursor.lastrowid
 
-        node = self._get_node_by_path(self.active_path)
-        if node["type"] != "chat":
-            raise ValueError("Active path is not a chat.")
+                # Import messages
+                for i, msg in enumerate(chat_data.get("messages", [])):
+                    conn.execute(
+                        """
+                        INSERT INTO messages (node_id, role, content, image_path, position)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                        (
+                            chat_id,
+                            msg["role"],
+                            msg["content"],
+                            msg.get("image_path"),
+                            i,
+                        ),
+                    )
 
-        return node
+        # Restore active chat if valid
+        if active_path:
+            try:
+                self.set_active_chat(active_path)
+            except ValueError:
+                self.ensure_default_chat()
+        else:
+            self.ensure_default_chat()

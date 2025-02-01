@@ -37,10 +37,10 @@ class AIChatUI:
         self.tts_lock = threading.Lock()
         self.active_tts_threads = 0  # Counter for active TTS chunks
 
-        self.history_path = self.config.get("chat", {}).get("history_path", {})
+        self.db_path = self.config.get("chat", {}).get("db_path", {})
         self.chat_history = ChatHistory(
+            db_path=self.db_path,
             default_prompt=config.get("llm", {}).get("system_prompt", None),
-            history_path=self.history_path,
             history_sort=self.config.get("chat", {}).get("history_sort", False),
         )
 
@@ -88,12 +88,13 @@ class AIChatUI:
         self.root.bind("<Map>", configure_sash)
 
         def save_chat_history(event=None):
-            # silently save to self.config.chat.history_path if defined, otherwise show save dialog
-            if self.history_path:
-                self.chat_history.save_chats(self.history_path)
-                self.update_status_message(message="Chats are saved.")
-            else:
-                self.save_chats_to_file()
+            # # silently save to self.config.chat.history_path if defined, otherwise show save dialog
+            # if self.history_path:
+            #     self.chat_history.save_chats(self.history_path)
+            #     self.update_status_message(message="Chats are saved.")
+            # else:
+            #     self.save_chats_to_file()
+            self.chat_history.print_node_hierarchy()
 
         self.root.bind("<Control-s>", save_chat_history)
 
@@ -116,7 +117,7 @@ class AIChatUI:
                 rag_model=self.rag_model,
                 on_context_set=self.handle_rag_context,
             )
-            self.handle_rag_toggle()
+        self.handle_rag_toggle()
 
         self.chat_menu = ChatMenu(
             self.root,
@@ -500,7 +501,6 @@ class AIChatUI:
         if file_path:
             try:
                 self.chat_history.save_chats(file_path)
-                self.history_path = file_path
                 self.update_status_message(message="Chats saved.")
             except Exception as e:
                 messagebox.showerror("Save Chats", f"Failed to save chats: {e}")
@@ -518,7 +518,6 @@ class AIChatUI:
                 messages = self.chat_history.get_active_chat_messages()
                 self.llm_model.load_history(messages)
 
-                self.history_path = file_path
                 self.update_status_message(message="Chats loaded.")
             except Exception as e:
                 messagebox.showerror("Load Chats", f"Failed to load chats: {e}")
@@ -601,7 +600,8 @@ class AIChatUI:
 
         self.chat_statusbar.update_state_info(
             settings=self.chat_history.get_chat_settings(),
-            is_rag_enabled=self.rag_collection != None,
+            is_rag_enabled=hasattr(self, "rag_collection")
+            and self.rag_collection != None,
         )
 
         self.update_statistics()
@@ -617,7 +617,8 @@ class AIChatUI:
         self.rag_collection = None
         self.rag_filters = None
 
-        self.rag_panel.toggle()
+        if self.rag_model != None:
+            self.rag_panel.toggle()
 
     def apply_theme(self, theme):
         # Configure root and main frames
