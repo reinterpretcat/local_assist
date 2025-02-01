@@ -160,70 +160,6 @@ class ChatHistoryDB:
 
         return current_id
 
-    def _get_node_path(self, node_id: int) -> str:
-        """Get full path for a node."""
-        path_components = []
-        current_id = node_id
-
-        while True:
-            result = self._fetch_one(
-                "SELECT name, parent_id FROM nodes WHERE id = ?", (current_id,)
-            )
-
-            if not result:
-                break
-
-            name, parent_id = result
-            if parent_id is None:  # Root node
-                break
-
-            path_components.append(name)
-            current_id = parent_id
-
-        return "/" + "/".join(reversed(path_components[:-1]))  # Exclude chat name
-
-    def _get_chat_data(self) -> dict:
-        """Get all chats with their data."""
-        chats = self._fetch_all(
-            """
-            SELECT id, name, settings 
-            FROM nodes 
-            WHERE type = 'chat'
-            ORDER BY id
-            """
-        )
-
-        result = {}
-        for chat_id, chat_name, settings_json in chats:
-            messages = self._fetch_all(
-                """
-                SELECT role, content, image_path 
-                FROM messages 
-                WHERE node_id = ? 
-                ORDER BY position
-                """,
-                (chat_id,),
-            )
-
-            messages_data = []
-            for role, content, image_path in messages:
-                msg = {"role": role, "content": content}
-                if image_path:
-                    msg["image_path"] = image_path
-                messages_data.append(msg)
-
-            chat_data = {
-                "messages": messages_data,
-                "group": self._get_node_path(chat_id),
-            }
-
-            if settings_json:
-                chat_data["settings"] = json.loads(settings_json)
-
-            result[chat_name] = chat_data
-
-        return result
-
 
 class ChatHistory:
     """Manages chat history using SQLite storage."""
@@ -798,14 +734,80 @@ class ChatHistory:
         print_node(root_id)
 
     def save_chats(self, filepath: str):
-        """Save chat history from SQLite to a JSON file."""
+        """Export chat history from SQLite to a JSON file."""
         try:
             # Create directory if it doesn't exist
             Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
+            def get_node_path(node_id: int) -> str:
+                """Get full path for a node."""
+                path_components = []
+                current_id = node_id
+
+                while True:
+                    result = self.db._fetch_one(
+                        "SELECT name, parent_id FROM nodes WHERE id = ?", (current_id,)
+                    )
+
+                    if not result:
+                        break
+
+                    name, parent_id = result
+                    if parent_id is None:  # Root node
+                        break
+
+                    path_components.append(name)
+                    current_id = parent_id
+
+                return "/" + "/".join(
+                    reversed(path_components[:-1])
+                )  # Exclude chat name
+
+            def get_chat_data() -> dict:
+                """Get all chats with their data."""
+                chats = self.db._fetch_all(
+                    """
+                    SELECT id, name, settings 
+                    FROM nodes 
+                    WHERE type = 'chat'
+                    ORDER BY id
+                    """
+                )
+
+                result = {}
+                for chat_id, chat_name, settings_json in chats:
+                    messages = self.db._fetch_all(
+                        """
+                        SELECT role, content, image_path 
+                        FROM messages 
+                        WHERE node_id = ? 
+                        ORDER BY position
+                        """,
+                        (chat_id,),
+                    )
+
+                    messages_data = []
+                    for role, content, image_path in messages:
+                        msg = {"role": role, "content": content}
+                        if image_path:
+                            msg["image_path"] = image_path
+                        messages_data.append(msg)
+
+                    chat_data = {
+                        "messages": messages_data,
+                        "group": get_node_path(chat_id),
+                    }
+
+                    if settings_json:
+                        chat_data["settings"] = json.loads(settings_json)
+
+                    result[chat_name] = chat_data
+
+                return result
+
             # Build save data
             save_data = {
-                "chats": self.db._get_chat_data(),
+                "chats": get_chat_data(),
                 "active_path": self.active_path,
             }
 
