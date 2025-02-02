@@ -837,99 +837,69 @@ class ChatHistory:
         with open(file_path, "r", encoding="utf-8") as file:
             data = json.load(file)
 
-        chat_data = data.get("chats", {})
-        active_path = data.get("active_path")
-
-        # Start with clean slate - remove all existing nodes except root
+        # Reset database except root
         self.db._execute_query("DELETE FROM messages")
         self.db._execute_query("DELETE FROM nodes WHERE parent_id IS NOT NULL")
 
-        # Get root node id
-        root_id = self.db._fetch_one("SELECT id FROM nodes WHERE parent_id IS NULL")[0]
-
-        # Helper function to ensure group exists and get its id
-        def ensure_group_path(path_components):
-            current_id = root_id
+        def create_path(path_components: List[str], is_chat=False, chat_data=None):
+            """Recursively create path and return final node id."""
             current_path = []
+            for component in path_components:
+                current_path.append(component)
 
-            for group_name in path_components:
-                if not group_name:  # Skip empty components
-                    continue
+                try:
+                    # Try to get existing node id
+                    self.db._get_node_id(current_path)
+                except:
+                    # Create new node if doesn't exist
+                    if component == path_components[-1] and is_chat:
+                        new_path = self.create_chat(component, current_path[:-1])
+                        node_id = self.db._get_node_id(new_path)
 
-                current_path.append(group_name)
+                        # Update settings and messages
+                        if chat_data:
+                            self.set_chat_settings(
+                                ChatSettings.from_dict(chat_data.get("settings", {})),
+                                new_path,
+                            )
 
-                # Check if group exists
-                result = self.db._fetch_one(
-                    """
-                    SELECT id FROM nodes 
-                    WHERE parent_id = ? AND name = ?
-                    """,
-                    (current_id, group_name),
-                )
+                            # Clear default welcome message
+                            self.db._execute_query(
+                                "DELETE FROM messages WHERE node_id = ?", (node_id,)
+                            )
 
-                if result:
-                    current_id = result[0]
-                else:
-                    # Create new group
-                    position = self.db._fetch_one(
-                        "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (current_id,)
-                    )[0]
+                            # Import messages
+                            for i, msg in enumerate(chat_data.get("messages", [])):
+                                self.db._execute_query(
+                                    """
+                                    INSERT INTO messages 
+                                    (node_id, role, content, image_path, position)
+                                    VALUES (?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        node_id,
+                                        msg["role"],
+                                        msg["content"],
+                                        msg.get("image_path"),
+                                        i,
+                                    ),
+                                )
+                    else:
+                        self.create_group(component, current_path[:-1])
 
-                    cursor = self.db._execute_query(
-                        """
-                        INSERT INTO nodes (name, type, parent_id, position)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                        (group_name, "group", current_id, position),
-                    )
-                    current_id = cursor.lastrowid
-
-            return current_id
+            return current_path
 
         # Import chats
-        for chat_name, chat_data in chat_data.items():
-            # Process group path
-            group_path = chat_data.get("group", "/").split("/")
-            group_path = [p for p in group_path if p]  # Remove empty components
-            parent_id = ensure_group_path(group_path)
+        for chat_name, chat_data in data.get("chats", {}).items():
+            group_path = chat_data.get("group", "/").strip("/").split("/")
+            if group_path == [""]:
+                group_path = []
 
-            # Create chat node
-            position = self.db._fetch_one(
-                "SELECT COUNT(*) FROM nodes WHERE parent_id = ?", (parent_id,)
-            )[0]
+            full_path = group_path + [chat_name]
+            create_path(full_path, is_chat=True, chat_data=chat_data)
 
-            cursor = self.db._execute_query(
-                """
-                INSERT INTO nodes (name, type, parent_id, position, settings)
-                VALUES (?, ?, ?, ?, ?)
-                """,
-                (
-                    chat_name,
-                    "chat",
-                    parent_id,
-                    position,
-                    json.dumps(chat_data.get("settings", {})),
-                ),
-            )
-            chat_id = cursor.lastrowid
-
-            # Import messages
-            for i, msg in enumerate(chat_data.get("messages", [])):
-                self.db._execute_query(
-                    """
-                    INSERT INTO messages (node_id, role, content, image_path, position)
-                    VALUES (?, ?, ?, ?, ?)
-                    """,
-                    (
-                        chat_id,
-                        msg["role"],
-                        msg["content"],
-                        msg.get("image_path"),
-                        i,
-                    ),
-                )
-
-        # Restore active chat if valid
+        # Set active chat
+        active_path = data.get("active_path")
         if active_path:
             try:
                 self.set_active_chat(active_path)
