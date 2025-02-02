@@ -24,6 +24,7 @@ dark_theme = {
     "list_hover_bg": "#3b4048",
     "chat_bg": "#2f343f",
     "chat_fg": "#d3dae3",
+    "chat_select_bg": "#3a3f4a",
     "chat_border": "#3b4048",
     "scrollbar_bg": "#4c566a",
     "scrollbar_fg": "#3b4048",

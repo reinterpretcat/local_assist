@@ -20,6 +20,7 @@
     "list_hover_bg": "#3c3f41",
     "chat_bg": "#313335",
     "chat_fg": "#dcdcdc",
+    "chat_select_bg": "#3c3d40",
     "chat_border": "#3c3f41",
     "scrollbar_bg": "#313335",
     "scrollbar_fg": "#4d4d4d",
