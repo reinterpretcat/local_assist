@@ -4,7 +4,6 @@ from typing import Callable, Dict
 from PIL import Image, ImageTk
 from ..models import RoleNames, RoleTags
 from ..tools import *
-from .code_editor import CodeEditorWindow
 
 
 class ChatDisplay:
