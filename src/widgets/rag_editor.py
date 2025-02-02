@@ -1,5 +1,6 @@
 import tkinter as tk
 import os
+import threading
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 from typing import Callable, Optional, Set
@@ -219,8 +220,18 @@ class RAGManagementUI:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to create collection: {e}")
 
+    def _handle_upload(self, upload_fn, path, progress_message):
+        def upload_task():
+            try:
+                upload_fn(path, collection_name=self.current_collection)
+                self.frame.after(0, self._on_upload_complete)
+            except Exception as e:
+                self.frame.after(0, lambda: self._on_upload_error(str(e)))
+
+        self.show_progress(progress_message)
+        threading.Thread(target=upload_task, daemon=True).start()
+
     def upload_file(self):
-        """Handle file uploads."""
         if not self.current_collection:
             messagebox.showwarning("Warning", "Please select a collection first.")
             return
@@ -235,21 +246,12 @@ class RAGManagementUI:
                 ("EPUB ebook format", "*.epub"),
             ]
         )
-        if not file_path:
-            return
-
-        try:
-            self.show_progress(f"Adding {os.path.basename(file_path)}...")
-            # Add document to the current collection
-            self.rag_model.add_document(
-                file_path=file_path, collection_name=self.current_collection
+        if file_path:
+            self._handle_upload(
+                self.rag_model.add_document,
+                file_path,
+                f"Adding {os.path.basename(file_path)}...",
             )
-            self._select_current_collection()
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to upload file: {e}")
-        finally:
-            self.hide_progress()
 
     def upload_folder_file(self):
         if not self.current_collection:
@@ -257,21 +259,20 @@ class RAGManagementUI:
             return
 
         dir_path = filedialog.askdirectory()
-        if not dir_path:
-            return
-
-        try:
-            self.show_progress(f"Adding files from {os.path.basename(dir_path)}...")
-            # Add all supported files from the folder to the current collection
-            self.rag_model.add_documents(
-                path=dir_path, collection_name=self.current_collection
+        if dir_path:
+            self._handle_upload(
+                self.rag_model.add_documents,
+                dir_path,
+                f"Adding files from {os.path.basename(dir_path)}...",
             )
-            self._select_current_collection()
 
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to upload file: {e}")
-        finally:
-            self.hide_progress()
+    def _on_upload_complete(self):
+        self._select_current_collection()
+        self.hide_progress()
+
+    def _on_upload_error(self, error_msg):
+        self.hide_progress()
+        messagebox.showerror("Error", f"Failed to upload file: {error_msg}")
 
     def _select_current_collection(self):
         # Refresh the tree view
