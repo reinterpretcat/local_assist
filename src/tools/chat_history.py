@@ -797,82 +797,35 @@ class ChatHistory:
     def save_chats(self, filepath: str):
         """Export chat history from SQLite to a JSON file."""
         try:
-            # Create directory if it doesn't exist
             Path(filepath).parent.mkdir(parents=True, exist_ok=True)
 
-            def get_node_path(node_id: int) -> str:
-                """Get full path for a node."""
-                path_components = []
-                current_id = node_id
-
-                while True:
-                    result = self.db._fetch_one(
-                        "SELECT name, parent_id FROM nodes WHERE id = ?", (current_id,)
-                    )
-
-                    if not result:
-                        break
-
-                    name, parent_id = result
-                    if parent_id is None:  # Root node
-                        break
-
-                    path_components.append(name)
-                    current_id = parent_id
-
-                return "/" + "/".join(
-                    reversed(path_components[:-1])
-                )  # Exclude chat name
-
-            def get_chat_data() -> dict:
-                """Get all chats with their data."""
-                chats = self.db._fetch_all(
-                    """
-                    SELECT id, name, settings 
-                    FROM nodes 
-                    WHERE type = 'chat'
-                    ORDER BY id
-                    """
-                )
-
+            def get_node_data(path: List[str] = None) -> dict:
+                """Recursively get all chats and groups data."""
                 result = {}
-                for chat_id, chat_name, settings_json in chats:
-                    messages = self.db._fetch_all(
-                        """
-                        SELECT role, content, image_path 
-                        FROM messages 
-                        WHERE node_id = ? 
-                        ORDER BY position
-                        """,
-                        (chat_id,),
-                    )
+                nodes = self.get_nodes(path)
 
-                    messages_data = []
-                    for role, content, image_path in messages:
-                        msg = {"role": role, "content": content}
-                        if image_path:
-                            msg["image_path"] = image_path
-                        messages_data.append(msg)
+                for node in nodes:
+                    current_path = (path or []) + [node["name"]]
 
-                    chat_data = {
-                        "messages": messages_data,
-                        "group": get_node_path(chat_id),
-                    }
+                    if node["type"] == "chat":
+                        messages = self.get_chat_messages(current_path)
+                        settings = self.get_chat_settings(current_path)
 
-                    if settings_json:
-                        chat_data["settings"] = json.loads(settings_json)
+                        # Get full group path excluding chat name
+                        group_path = "/" + "/".join(path) if path else "/"
 
-                    result[chat_name] = chat_data
+                        result[node["name"]] = {
+                            "messages": messages,
+                            "settings": settings.to_dict(),
+                            "group": group_path,
+                        }
+                    elif node["type"] == "group":
+                        result.update(get_node_data(current_path))
 
                 return result
 
-            # Build save data
-            save_data = {
-                "chats": get_chat_data(),
-                "active_path": self.active_path,
-            }
+            save_data = {"chats": get_node_data(), "active_path": self.active_path}
 
-            # Save to file with pretty printing
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(save_data, f, indent=2, ensure_ascii=False)
 
