@@ -41,7 +41,11 @@ class EditMessage(tk.Toplevel):
 
         self.transient(parent)
         self.grab_set()
-        self.mainloop()
+        self.bind("<FocusOut>", lambda e: self.focus_force())
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() - self.winfo_width()) // 2
+        y = (self.winfo_screenheight() - self.winfo_height()) // 2
+        self.geometry(f"+{x}+{y}")
 
 
 class ChatDisplay:
@@ -245,6 +249,7 @@ class ChatDisplay:
                 "Edit and Run Code", state=tk.NORMAL if has_code else tk.DISABLED
             )
             self.message_menu.post(event.x_root, event.y_root)
+            return "break"
 
     def handle_code_run(self):
         if self.selected_message:
@@ -254,6 +259,7 @@ class ChatDisplay:
                 self.on_code_editor(None, "\n\n\n\n".join(code_blocks).strip())
 
     def handle_click(self, event):
+        self.message_menu.unpost()
         index = self.display.index(f"@{event.x},{event.y}")
         self.select_message_at_index(index)
 
