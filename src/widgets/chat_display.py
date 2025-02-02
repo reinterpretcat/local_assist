@@ -75,7 +75,6 @@ class ChatDisplay:
             self.display.insert(tk.END, "\n")
 
         # Store starting position for message
-        # start_index = self.display.index(tk.END)
         start_index = self.display.index("insert linestart")
 
         # Insert role prefix
@@ -255,23 +254,21 @@ class ChatDisplay:
 
             def save():
                 new_content = text.get("1.0", tk.END).strip()
-                self.update_message(self.selected_message, new_content)
+                position = self.message_boundaries.index(self.selected_message)
+                self.chat_history.update_message(position, new_content)
+                self.selected_message["content"] = new_content
+                self.update_display()
                 dialog.destroy()
 
             tk.Button(dialog, text="Save", command=save).pack(pady=5)
 
     def delete_message(self):
         if self.selected_message:
-            # self.chat_history.delete_message(self.selected_message)
-
+            position = self.message_boundaries.index(self.selected_message)
+            self.chat_history.delete_message(position)
             self.message_boundaries.remove(self.selected_message)
+            self.selected_message = None
             self.update_display()
-
-    def update_message(self, message, new_content):
-        # self.chat_history.update_message(message, new_content)
-
-        message["content"] = new_content
-        self.update_display()
 
     def update_display(self):
         messages = [

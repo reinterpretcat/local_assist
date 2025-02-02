@@ -161,6 +161,29 @@ class ChatHistoryDB:
 
         return current_id
 
+    def _update_message(self, node_id: int, position: int, content: str):
+        """Update message content at given position."""
+        self._execute_query(
+            "UPDATE messages SET content = ? WHERE node_id = ? AND position = ?",
+            (content, node_id, position),
+        )
+
+    def _delete_message(self, node_id: int, position: int):
+        """Delete message and reorder remaining messages."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                "DELETE FROM messages WHERE node_id = ? AND position = ?",
+                (node_id, position),
+            )
+            conn.execute(
+                """
+                UPDATE messages 
+                SET position = position - 1 
+                WHERE node_id = ? AND position > ?
+            """,
+                (node_id, position),
+            )
+
 
 class ChatHistory:
     """Manages chat history using SQLite storage."""
@@ -608,6 +631,24 @@ class ChatHistory:
 
         if path == self.active_path:
             self._active_settings = settings
+
+    def update_message(self, position: int, content: str):
+        """Update message at given position."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        node_id = self.db._get_node_id(self.active_path)
+        self.db._update_message(node_id, position, content)
+        self._active_messages[position]["content"] = content
+
+    def delete_message(self, position: int):
+        """Delete message at given position."""
+        if not self.active_path:
+            raise ValueError("No active chat selected")
+
+        node_id = self.db._get_node_id(self.active_path)
+        self.db._delete_message(node_id, position)
+        del self._active_messages[position]
 
     def get_last_message(self) -> Dict[str, Any]:
         """Returns last message in the active chat."""
