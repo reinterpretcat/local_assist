@@ -1,9 +1,47 @@
 import tkinter as tk
 from tkinter.scrolledtext import ScrolledText
+from tkinter import messagebox
 from typing import Callable, Dict
 from PIL import Image, ImageTk
 from ..models import RoleNames, RoleTags
 from ..tools import *
+
+
+class EditMessage(tk.Toplevel):
+    def __init__(self, parent, content: str, theme: Dict, on_save: Callable):
+        super().__init__(parent)
+        self.title("📝 Message Editor")
+
+        # Make the window resizable and bind close event to Esc key
+        self.resizable(True, True)
+        # self.protocol("WM_DELETE_WINDOW", self.destroy)
+        self.bind("<Escape>", lambda event: self.destroy())
+
+        self.configure(bg=theme["bg"])
+
+        # Text field
+        self.text = ScrolledText(self, wrap=tk.WORD, font=("Arial", 12))
+        configure_scrolled_text(self.text, theme)
+        self.text.insert("1.0", content)
+        self.text.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+
+        # Save button
+        def handle_save():
+            new_content = self.text.get("1.0", tk.END).strip()
+            on_save(new_content)
+            self.destroy()
+
+        self.button = tk.Button(self, text="Save", command=handle_save)
+        self.button.grid(row=1, column=0, pady=5)
+        self.button.configure(**get_button_config(theme))
+
+        # Configure resizing
+        self.columnconfigure(0, weight=1)
+        self.rowconfigure(0, weight=1)
+
+        self.transient(parent)
+        self.grab_set()
+        self.mainloop()
 
 
 class ChatDisplay:
@@ -211,9 +249,7 @@ class ChatDisplay:
     def handle_code_run(self):
         if self.selected_message:
             content = self.selected_message["content"]
-            code_blocks = self.extract_code_blocks(
-                content
-            )  # You'll need to implement this
+            code_blocks = self.extract_code_blocks(content)
             if code_blocks:
                 self.on_code_editor(None, "\n\n\n\n".join(code_blocks).strip())
 
@@ -243,26 +279,27 @@ class ChatDisplay:
         self.display.config(state=tk.DISABLED)
 
     def edit_message(self):
+        def on_save(new_content):
+            position = self.message_boundaries.index(self.selected_message)
+            self.chat_history.update_message(position, new_content)
+            self.selected_message["content"] = new_content
+            self.update_display()
+
         if self.selected_message:
-            # Create edit dialog
-            dialog = tk.Toplevel(self.parent)
-            dialog.title("Edit Message")
-
-            text = tk.Text(dialog, wrap=tk.WORD, height=10, width=50)
-            text.insert("1.0", self.selected_message["content"])
-            text.pack(padx=10, pady=10)
-
-            def save():
-                new_content = text.get("1.0", tk.END).strip()
-                position = self.message_boundaries.index(self.selected_message)
-                self.chat_history.update_message(position, new_content)
-                self.selected_message["content"] = new_content
-                self.update_display()
-                dialog.destroy()
-
-            tk.Button(dialog, text="Save", command=save).pack(pady=5)
+            EditMessage(
+                parent=self.parent,
+                content=self.selected_message["content"],
+                theme=self.theme,
+                on_save=on_save,
+            )
 
     def delete_message(self):
+        if not messagebox.askyesno(
+            "Confirm Deletion",
+            f"Are you sure you want to delete message?",
+        ):
+            return
+
         if self.selected_message:
             position = self.message_boundaries.index(self.selected_message)
             self.chat_history.delete_message(position)
