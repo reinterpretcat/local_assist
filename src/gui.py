@@ -71,22 +71,6 @@ class AIChatUI:
         )
         self.main_paned_window.pack(fill=tk.BOTH, expand=True)
 
-        left_panel_width = int(window_width * 0.25)  # 25% of window width
-        min_left_panel_width = int(window_width * 0.15)  # 15% minimum
-
-        # Set initial sash position
-        def configure_sash(event=None):
-            self.root.update_idletasks()
-            self.main_paned_window.sash_place(0, left_panel_width, 0)
-            # Set minimum size for the paned window sections
-            self.main_paned_window.paneconfigure(
-                self.left_panel,
-                minsize=min_left_panel_width,
-            )
-
-        # Bind the configuration to when the window is fully loaded
-        self.root.bind("<Map>", configure_sash)
-
         # Left panel for chat list and RAG
         self.left_panel = tk.Frame(self.main_paned_window)
         self.left_panel.pack_propagate(False)
@@ -169,6 +153,14 @@ class AIChatUI:
             self.root.bind("<F9>", self.handle_rag_toggle)
 
         self.apply_theme(self.theme)
+
+        # place sash adn calculate limits
+        self.root.update_idletasks()
+        self.main_paned_window.sash_place(0, int(window_width * 0.2), 0)
+        self.main_paned_window.paneconfigure(
+            self.left_panel,
+            minsize=int(window_width * 0.15),
+        )
 
     def load_theme(self):
         """Load a custom theme from a JSON file."""

@@ -61,9 +61,9 @@ class ChatInput:
 
         self.image_button = tk.Button(
             self.input_frame,
-            text="📷",
+            text="🖼️",
             command=self.handle_image_selection,
-            font=("Arial", 10),
+            font=("Arial", 16),
             width=2,
             height=1,
         )
@@ -71,20 +71,20 @@ class ChatInput:
 
         self.record_button = tk.Button(
             self.input_frame,
-            text="🎙️ Rec",
+            text="🎙️ ",
             command=lambda: (
                 self.handle_record_voice() if self.is_record_enabled else None
             ),
-            font=("Arial", 12),
+            font=("Arial", 16),
         )
         self.record_button.pack(side=tk.RIGHT, padx=(5, 5), pady=5)
         self.record_button.config(state=tk.NORMAL if on_record_voice else tk.DISABLED)
 
         self.send_button = tk.Button(
             self.input_frame,
-            text="Send",
+            text="➤",
             command=lambda: self._consume_input(),
-            font=("Arial", 12),
+            font=("Arial", 16),
         )
         self.send_button.pack(side=tk.RIGHT, padx=(5, 10), pady=5)
 
