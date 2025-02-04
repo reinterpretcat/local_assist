@@ -153,7 +153,7 @@ class ChatInput:
         else:
             self.user_input.insert(tk.END, new_text)
 
-        self.send_button.config(text="Edit")
+        self.send_button.config(text="📝")
 
     def handle_return_key(self, event):
         """Handle Return key press - submit if alone, newline if with Shift."""
@@ -233,7 +233,7 @@ class ChatInput:
         self.user_input.config(state=tk.DISABLED)
         self.record_button.config(state=tk.DISABLED)
         self.send_button.config(
-            text="Cancel", command=lambda: self.on_cancel_response(), state=tk.NORMAL
+            text="■", command=lambda: self.on_cancel_response(), state=tk.NORMAL
         )
 
     def enable(self):
@@ -242,7 +242,7 @@ class ChatInput:
         self.record_button.config(
             state=tk.NORMAL if self.is_record_enabled else tk.DISABLED
         )
-        self.send_button.config(text="Send", command=lambda: self._consume_input())
+        self.send_button.config(text="➤", command=lambda: self._consume_input())
 
     def clear_input(self):
         """Clears input field."""
