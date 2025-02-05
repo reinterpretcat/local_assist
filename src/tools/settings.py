@@ -71,8 +71,7 @@ default_config = {
         "chunk_size": 512,
         "chunk_overlap": 64,
         "similarity_top_k": 2,
-        # Check https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
-        "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt"],
+        "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt", ".json"],
         # Prompt for answering question
         "prompt_template": """Context: {context}
 

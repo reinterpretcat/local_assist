@@ -244,6 +244,7 @@ class RAGManagementUI:
                 ("Comma-Separated Values", "*.csv"),
                 ("Microsoft Word", "*.docx"),
                 ("EPUB ebook format", "*.epub"),
+                ("JSON data", ".json"),
             ]
         )
         if file_path:

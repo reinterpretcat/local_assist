@@ -12,6 +12,7 @@ from llama_index.llms.ollama import Ollama
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.vector_stores import MetadataFilters
+from llama_index.readers.json import JSONReader
 from llama_index.core import Settings
 
 from .common import BaseModel
@@ -55,6 +56,9 @@ class RAG(BaseModel):
         self.similarity_top_k = kwargs["similarity_top_k"]
         self.supported_extensions = kwargs["supported_extensions"]
         self.prompt_template = kwargs["prompt_template"]
+
+        # extra file extractors beyound https://docs.llamaindex.ai/en/stable/module_guides/loading/simpledirectoryreader/
+        self.file_extractor = {".json": JSONReader()}
 
         self.embed_model = HuggingFaceEmbedding(
             model_name=self.embed_model_name, cache_folder=kwargs["embed_cache"]
@@ -126,12 +130,16 @@ class RAG(BaseModel):
         """
         path = Path(path)
         if path.is_file() and path.suffix in self.supported_extensions:
-            reader = SimpleDirectoryReader(input_files=[str(path)])
+            reader = SimpleDirectoryReader(
+                input_files=[str(path)], file_extractor=self.file_extractor
+            )
         else:
             reader = SimpleDirectoryReader(
                 input_dir=str(path),
                 required_exts=self.supported_extensions,
                 input_files=file_filter,
+                file_extractor=self.file_extractor,
+                recursive=True,
             )
 
         documents = reader.load_data()
