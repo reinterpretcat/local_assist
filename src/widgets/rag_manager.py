@@ -18,7 +18,7 @@ from ..tools import (
 from ..models import RAG
 
 
-class DocumentManagerGUI(tk.Toplevel):
+class RAGManagerUI(tk.Toplevel):
     def __init__(self, root, rag: RAG, theme: Dict):
         super().__init__(root)
         self.rag = rag

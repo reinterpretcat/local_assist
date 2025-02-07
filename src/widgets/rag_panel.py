@@ -14,7 +14,7 @@ from ..tools import get_button_config, get_list_style
 from .toolbar import create_tooltip
 
 
-class RAGManagementUI:
+class RAGPanelUI:
     """Provides the way to use RAG on documents."""
 
     def __init__(

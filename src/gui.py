@@ -85,7 +85,7 @@ class AIChatUI:
 
         # RAG UI
         if self.rag_model:
-            self.rag_panel = RAGManagementUI(
+            self.rag_panel = RAGPanelUI(
                 parent=self.left_panel,
                 rag_model=self.rag_model,
                 on_context_set=self.handle_rag_context,
@@ -603,9 +603,7 @@ class AIChatUI:
             self.rag_panel.toggle()
 
     def handle_show_rag_manager(self):
-        manager = DocumentManagerGUI(
-            root=self.root, rag=self.rag_model, theme=self.theme
-        )
+        manager = RAGManagerUI(root=self.root, rag=self.rag_model, theme=self.theme)
         manager.transient(self.root)
         manager.grab_set()
         manager.mainloop()
