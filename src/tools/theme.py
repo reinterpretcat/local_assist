@@ -53,6 +53,24 @@ def get_button_config(theme: Dict) -> Dict:
         "borderwidth": 1,
     }
 
+def get_combobox_style(theme: Dict):
+    style = ttk.Style()
+    style.map(
+        "TCombobox",
+        fieldbackground=[("readonly", theme["input_bg"])],
+        selectbackground=[("readonly", theme["input_bg"])],
+        selectforeground=[("readonly", theme["input_fg"])],
+    )
+    style.configure(
+        "TCombobox",
+        background=theme["input_bg"],
+        foreground=theme["input_fg"],
+        arrowcolor=theme["input_fg"],
+        selectbackground=theme["input_bg"],
+        selectforeground=theme["input_fg"],
+        fieldbackground=theme["input_bg"],
+    )
+    return style
 
 def get_list_style(theme: Dict) -> ttk.Style:
     style = ttk.Style()

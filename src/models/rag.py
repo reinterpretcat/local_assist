@@ -108,10 +108,12 @@ class RAG(BaseModel):
             metadatas = metadata_result.get("metadatas", [])
 
             unique_sources = {meta.get("source") for meta in metadatas if meta}
+            unique_files = {meta.get("file_path") for meta in metadatas if meta}
             return {
                 "name": collection_name,
                 "document_count": collection.count(),
                 "unique_sources": list(unique_sources),
+                "unique_files": list(unique_files),
             }
         except Exception as e:
             print(f"Error fetching collection '{collection_name}': {e}")
@@ -149,12 +151,19 @@ class RAG(BaseModel):
         # Generate unique IDs for each chunk based on source and chunk index
         metadata = []
         for i, node in enumerate(nodes):
+            # Get actual source file path from node metadata
+            file_path = node.metadata.get("file_path", str(path))
+
             unique_id = (
-                f"{path.stem}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_{i}"
+                f"{path.stem}_"
+                f"{Path(file_path).stem}_"
+                f"{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}_"
+                f"{i}"
             )
             meta = {
                 "id": unique_id,
                 "source": str(path),
+                "file_path": file_path,
                 "chunk_size": self.chunk_size,
                 "created_at": datetime.datetime.now().isoformat(),
                 "chunk_index": i,

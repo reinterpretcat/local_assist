@@ -5,6 +5,7 @@ from .chat_tree import ChatTree
 from .code_editor import CodeEditorWindow
 from .llm_settings import open_llm_settings_dialog
 from .rag_editor import RAGManagementUI
+from .rag_manager import DocumentManagerGUI
 from .rag_settings import RAGSettingsWindow
 from .statusbar import ChatStatusBar
 from .toolbar import ChatToolBar

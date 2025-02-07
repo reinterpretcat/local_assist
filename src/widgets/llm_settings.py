@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk
 from typing import Callable, Dict, List
 from ..models import LLM, ModelInfo
-from ..tools import LLMSettings, get_button_config
+from ..tools import LLMSettings, get_button_config, get_combobox_style
 
 
 def create_model_info_frame(parent, theme: Dict, model_info: ModelInfo):
@@ -79,22 +79,7 @@ def open_llm_settings_dialog(
 
     # Model dropdown
     model_var = tk.StringVar(value=current_model_id)
-    style = ttk.Style()
-    style.map(
-        "TCombobox",
-        fieldbackground=[("readonly", theme["input_bg"])],
-        selectbackground=[("readonly", theme["input_bg"])],
-        selectforeground=[("readonly", theme["input_fg"])],
-    )
-    style.configure(
-        "TCombobox",
-        background=theme["input_bg"],
-        foreground=theme["input_fg"],
-        arrowcolor=theme["input_fg"],
-        selectbackground=theme["input_bg"],
-        selectforeground=theme["input_fg"],
-        fieldbackground=theme["input_bg"],
-    )
+    style = get_combobox_style(theme=theme)
 
     # Configure combobox list popup colors
     settings_window.option_add("*TCombobox*Listbox.background", theme["input_bg"])

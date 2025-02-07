@@ -17,17 +17,13 @@ from .toolbar import create_tooltip
 class RAGManagementUI:
     """Provides the way to use RAG on documents."""
 
-    def __init__(self, parent, rag_model: RAG, on_context_set: Callable):
-        """Initialize the RAG Management UI.
-
-        Args:
-            parent: The parent tkinter widget
-            rag_model: Instance of RAG class
-            on_context_set: Callback function to set RAG context
-        """
+    def __init__(
+        self, parent, rag_model: RAG, on_context_set: Callable, on_doc_manager: Callable
+    ):
         self.parent = parent
         self.rag_model = rag_model
         self.on_context_set = on_context_set
+        self.on_doc_manager = on_doc_manager
 
         self.rag_visible = True
         self.current_collection: Optional[str] = None
@@ -78,6 +74,15 @@ class RAGManagementUI:
         )
         self.upload_folder_button.pack(side=tk.LEFT, padx=5, pady=5)
         create_tooltip(self.upload_folder_button, "Upload New Folder")
+
+        self.collection_info_button = tk.Button(
+            self.collection_frame,
+            text="🛈",
+            command=self.on_doc_manager,
+            **button_style,
+        )
+        self.collection_info_button.pack(side=tk.LEFT, padx=5, pady=5)
+        create_tooltip(self.collection_info_button, "Show Collection Info")
 
         self.delete_button = tk.Button(
             self.collection_frame,
@@ -531,6 +536,7 @@ class RAGManagementUI:
             self.rename_collection_button,
             self.upload_file_button,
             self.upload_folder_button,
+            self.collection_info_button,
             self.delete_button,
         ]:
             button.configure(**button_config)

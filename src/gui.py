@@ -89,6 +89,7 @@ class AIChatUI:
                 parent=self.left_panel,
                 rag_model=self.rag_model,
                 on_context_set=self.handle_rag_context,
+                on_doc_manager=self.handle_show_rag_manager,
             )
         self.handle_rag_toggle()
 
@@ -600,6 +601,14 @@ class AIChatUI:
 
         if self.rag_model != None:
             self.rag_panel.toggle()
+
+    def handle_show_rag_manager(self):
+        manager = DocumentManagerGUI(
+            root=self.root, rag=self.rag_model, theme=self.theme
+        )
+        manager.transient(self.root)
+        manager.grab_set()
+        manager.mainloop()
 
     def apply_theme(self, theme):
         # Configure root and main frames

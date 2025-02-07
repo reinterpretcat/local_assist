@@ -10,4 +10,5 @@ from .theme import (
     get_list_style,
     get_scrollbar_style,
     configure_scrolled_text,
+    get_combobox_style,
 )
