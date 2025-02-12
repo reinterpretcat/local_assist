@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from .widgets import *
+from .styles import ThemeManager
 
 
 class EditorApp:
@@ -12,6 +13,8 @@ class EditorApp:
         self.main_container.pack(fill=tk.BOTH, expand=True)
 
         self.set_geometry()
+
+        self.theme_manager = ThemeManager()
 
         # Main container using PanedWindow
         self.main_paned = MainPanedWindow(
@@ -25,6 +28,7 @@ class EditorApp:
         self.setup_status_panel()
 
         self.side_panel.show_panel("file_tree")
+        self.theme_manager.apply_theme("dark")
 
     def set_geometry(self):
         """Sets geometry and other properties."""
@@ -119,6 +123,20 @@ class EditorApp:
         text_widget.pack(fill=tk.BOTH, expand=True)
 
         return tab_frame
+
+    def toggle_theme(self):
+        """Toggle between light and dark themes"""
+        current_theme = self.theme_manager.get_current_theme()
+        if current_theme == "light":
+            self.theme_manager.apply_theme("dark")
+        elif current_theme == "dark":
+            self.theme_manager.apply_theme("light")
+        else:
+            self.theme_manager.apply_theme("light")
+
+    def set_theme(self, theme_name: str):
+        """Set a specific theme"""
+        self.theme_manager.apply_theme(theme_name)
 
     def run(self):
         """Start the application"""
