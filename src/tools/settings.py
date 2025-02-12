@@ -63,14 +63,14 @@ default_config = {
     # retrieval augument generation config
     "rag": {
         # NOTE: actually ignored, but required by BaseModel, so keep it for compatibility
-        "model": "llama3:latest",
+        "model": "qwen2.5-coder:7b",
         # chroma path
         "persist_dir": ".chromadb",
         "embed_cache": ".cache",
         "embed_model_name": "all-MiniLM-L6-v2",
-        "chunk_size": 512,
-        "chunk_overlap": 64,
-        "similarity_top_k": 2,
+        "chunk_size": 2048,
+        "chunk_overlap": 128,
+        "similarity_top_k": 4,
         "supported_extensions": [".csv", ".docx", ".epub", ".md", ".pdf", ".txt", ".json"],
         # Prompt for answering question
         "prompt_template": """Context: {context}
