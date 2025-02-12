@@ -113,6 +113,8 @@ class ThemeManager:
 
         theme = self._themes[theme_name]
 
+        self._style.configure("TPanedwindow", background=theme.background)
+
         # Configure ttk styles
         self._style.configure("TFrame", background=theme.panel_background)
         self._style.configure(
@@ -186,8 +188,7 @@ class ThemeManager:
                 "selectforeground": theme.status_foreground,
                 "borderwidth": 1,
                 "relief": "solid",
-            },
-            tk.PanedWindow: {"background": theme.border, "sashwidth": 2},
+            }
         }
 
         def configure_widget(widget):

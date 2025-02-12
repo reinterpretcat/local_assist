@@ -18,7 +18,8 @@ class EditorApp:
 
         # Main container using PanedWindow
         self.main_paned = MainPanedWindow(
-            self.main_container, orient=tk.HORIZONTAL, sashrelief=tk.FLAT, sashwidth=2
+            self.main_container,
+            orient=tk.HORIZONTAL,
         )
         self.main_paned.pack(fill=tk.BOTH, expand=True)
 
@@ -61,8 +62,8 @@ class EditorApp:
         )
         self.main_paned.add(
             self.side_panel.icon_container,
+            min_width=side_panel_width,
             max_width=side_panel_width,
-            minsize=side_panel_width,
         )
         self.main_paned.add(self.side_panel.content_container)
 
@@ -79,14 +80,12 @@ class EditorApp:
     def setup_middle_panel(self):
         """Setup the middle panel with editor and bottom chat/console"""
         # Middle container for editor and bottom panel
-        self.middle_paned = tk.PanedWindow(
-            self.main_paned, orient=tk.VERTICAL, sashrelief=tk.RAISED, sashwidth=5
-        )
+        self.middle_paned = ttk.PanedWindow(self.main_paned, orient=tk.VERTICAL)
         self.main_paned.add(self.middle_paned)
 
         # Setup editor
         self.editor_notebook = CustomNotebook(self.middle_paned)
-        self.middle_paned.add(self.editor_notebook, stretch="always")
+        self.middle_paned.add(self.editor_notebook, weight=1)
 
         # Add sample tabs
         self.add_tab("Tab 1")
@@ -94,7 +93,7 @@ class EditorApp:
 
         # Setup bottom panel with chat/console
         self.bottom_panel = ttk.Frame(self.middle_paned, height=100)
-        self.middle_paned.add(self.bottom_panel)
+        self.middle_paned.add(self.bottom_panel, weight=0)
 
         # Chat/console input area
         self.chat_input_frame = ttk.Frame(self.bottom_panel)

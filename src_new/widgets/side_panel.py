@@ -5,7 +5,7 @@ from .collapsible_panel import CollapsiblePanelManager
 
 
 class SidePanel(ttk.Frame):
-    def __init__(self, main_paned: tk.PanedWindow, icon_panel_width: int):
+    def __init__(self, main_paned: ttk.PanedWindow, icon_panel_width: int):
         super().__init__(main_paned, width=icon_panel_width)
 
         self.main_paned = main_paned
@@ -52,7 +52,7 @@ class SidePanel(ttk.Frame):
             panel.on_shown()
 
         if self.current_position:
-            self.main_paned.sash_place(1, self.current_position, 0)
+            self.main_paned.sashpos(1, self.current_position)
 
     def hide_current_panel(self):
         """Hide current panel by collapsing container width."""
@@ -61,8 +61,8 @@ class SidePanel(ttk.Frame):
             self.content_container.configure(width=0)
             self.current_panel = None
 
-            self.current_position = self.main_paned.sash_coord(1)[0]
-            self.main_paned.sash_place(1, self.icon_panel_width, 0)
+            self.current_position = self.main_paned.sashpos(1)
+            self.main_paned.sashpos(1, self.icon_panel_width)
 
     def add_top_icon(self, text, name):
         self._create_icon(self.top_group, text, name)

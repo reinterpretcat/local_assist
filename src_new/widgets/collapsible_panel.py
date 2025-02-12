@@ -74,7 +74,7 @@ class CollapsiblePanel(ttk.Frame):
 
 
 class CollapsiblePanelManager:
-    def __init__(self, container: ttk.Frame, panel: tk.PanedWindow):
+    def __init__(self, container: ttk.Frame, panel: ttk.PanedWindow):
         self.container = container
         self.panel = panel
         self.panels = []
