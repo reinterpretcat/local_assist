@@ -175,6 +175,7 @@ class ThemeManager:
 
         # Configure non-ttk widgets (minimize usage)
         self._configure_tk_widgets(theme)
+        self._configure_notebook(theme)
 
     def _configure_tk_widgets(self, theme: ThemeColors):
         """Configure tk widgets that couldn't be replaced with ttk"""
@@ -204,6 +205,40 @@ class ThemeManager:
         # Get all root windows
         for window in tk._default_root.winfo_children():
             configure_widget(window)
+
+    def _configure_notebook(self, theme: ThemeColors):
+        self._style.configure(
+            "CustomNotebook",
+            background=theme.background,  # VS Code dark theme background
+            borderwidth=0,
+            padding=0,
+        )
+
+        # Tab styling with increased size and padding
+        self._style.configure(
+            "CustomNotebook.Tab",
+            padding=[15, 15],  # Increased horizontal and vertical padding
+            background=theme.background,
+            foreground=theme.foreground,
+            borderwidth=0,
+        )
+
+        # Active tab styling
+        self._style.map(
+            "CustomNotebook.Tab",
+            background=[("selected", theme.panel_background)],
+            foreground=[("selected", theme.selection)],
+            padding=[("selected", [15, 15])],  # Match the regular tab padding
+        )
+
+        # Configure the close button with more spacing
+        self._style.configure(
+            "CustomNotebook.close",
+            background=theme.panel_background,
+            relief="flat",
+            borderwidth=0,
+            padding=[5, 0],  # Add padding around close button
+        )
 
     def get_current_theme(self) -> str:
         """Get the name of the current theme"""

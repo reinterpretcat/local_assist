@@ -16,6 +16,7 @@ class CustomNotebook(ttk.Notebook):
         self._active = None
         self.bind("<ButtonPress-1>", self.on_close_press, True)
         self.bind("<ButtonRelease-1>", self.on_close_release)
+        self.bind("<B1-Motion>", self.reorder)
 
     def on_close_press(self, event):
         element = self.identify(event.x, event.y)
@@ -37,6 +38,14 @@ class CustomNotebook(ttk.Notebook):
             self.event_generate("<<NotebookTabClosed>>")
         self.state(["!pressed"])
         self._active = None
+
+    def reorder(self, event):
+        try:
+            index = self.index(f"@{event.x},{event.y}")
+            self.insert(index, child=self.select())
+
+        except tk.TclError:
+            pass
 
     def __initialize_custom_style(self):
         style = ttk.Style()

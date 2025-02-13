@@ -25,6 +25,7 @@ class CollapsiblePanel(ttk.Frame):
         self.header = ttk.Frame(self)
         self.header.grid(row=0, column=0, sticky="ew")
         self.header.columnconfigure(1, weight=1)
+        self.header.bind("<Button-1>", self.toggle)
 
         # Toggle button
         self.toggle_btn = ttk.Label(self.header, text="▶")
